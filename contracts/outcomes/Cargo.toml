@@ -1,0 +1,19 @@
+[package]
+name = "tredio-outcomes"
+description = "Up/Down outcome series: every UP and DOWN token in one NEP-245 contract, complete sets for 1 USDC."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true }
+near-contract-standards = { workspace = true }
+tredio-common = { workspace = true }
+defuse-nep245 = { git = "https://github.com/near/intents", rev = "32cd1f9788a347908164fbcc56525dc6542f158f", features = ["near-contract"] }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }

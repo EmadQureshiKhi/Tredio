@@ -1,0 +1,14 @@
+[package]
+name = "tredio-common"
+description = "Shared units, fixed-point math, identifiers and types for the Tredio contracts."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+near-sdk = { workspace = true }
+near-contract-standards = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }

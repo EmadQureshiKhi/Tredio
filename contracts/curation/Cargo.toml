@@ -1,0 +1,18 @@
+[package]
+name = "tredio-curation"
+description = "Curation rewards: the share of perp and curve fees owed to the account that first surfaced each trend."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true }
+near-contract-standards = { workspace = true }
+tredio-common = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }

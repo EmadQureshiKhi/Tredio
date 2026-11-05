@@ -1,0 +1,22 @@
+[package]
+name = "tredio-sandbox-tests"
+description = "Sandbox tests of every Tredio contract and cross-contract flow on a local NEAR node (near-workspaces)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+
+[dev-dependencies]
+near-workspaces = { version = "0.24", default-features = false, features = ["install"] }
+near-sdk = { workspace = true, features = ["unit-testing", "global-contracts"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+anyhow = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+ed25519-dalek = "2"
+bs58 = "0.5"
+base64 = "0.22"
+hex = { workspace = true }
+p256 = { version = "0.13", features = ["ecdsa"] }
+sha2 = "0.10"

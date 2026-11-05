@@ -1,0 +1,17 @@
+[package]
+name = "tredio-coin"
+description = "A trend coin: an 18-decimal NEP-141 minted and burned only by its bonding curve. Published once as a global contract."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true }
+near-contract-standards = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }

@@ -1,0 +1,18 @@
+[package]
+name = "tredio-accounts"
+description = "Creates Tredio user accounts as NEP-655 universal accounts running the account contract as a global contract."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true, features = ["global-contracts", "universal-accounts"] }
+tredio-common = { workspace = true }
+borsh = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing", "global-contracts", "universal-accounts"] }

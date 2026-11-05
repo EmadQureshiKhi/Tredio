@@ -1,0 +1,18 @@
+[package]
+name = "tredio-perps"
+description = "Attention perps: isolated-margin long and short exposure to a trend's attention index, up to 3x."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true }
+near-contract-standards = { workspace = true }
+tredio-common = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }

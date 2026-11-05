@@ -1,0 +1,7 @@
+packages:
+  - packages/*
+  - apps/*
+  - backend
+  - frontend
+  - admin
+  - landing-page

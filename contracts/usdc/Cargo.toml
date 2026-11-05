@@ -1,0 +1,18 @@
+[package]
+name = "tredio-usdc"
+description = "Testnet USDC: a 6-decimal NEP-141 with a rate-limited faucet. Never deployed to mainnet."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true }
+near-contract-standards = { workspace = true }
+tredio-common = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }

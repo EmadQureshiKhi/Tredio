@@ -1,0 +1,20 @@
+[package]
+name = "tredio-registry"
+description = "Trends, the attention index and settlement values, written only by the attested oracle."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true }
+tredio-common = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing"] }
+ed25519-dalek = "2"
+bs58 = "0.5"

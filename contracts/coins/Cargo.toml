@@ -1,0 +1,18 @@
+[package]
+name = "tredio-coins"
+description = "Trend coins: one NEP-141 per trend on a bonding curve whose floor ratchets with peak attention, graduating into a Rhea pool."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true, features = ["global-contracts"] }
+near-contract-standards = { workspace = true }
+tredio-common = { workspace = true }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing", "global-contracts"] }

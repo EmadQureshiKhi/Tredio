@@ -1,0 +1,21 @@
+[package]
+name = "tredio-account"
+description = "A Tredio user account: passkey owner, guarded gas-key sessions, and Hyperliquid orders signed through Chain Signatures behind an on-chain guard."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { workspace = true, features = ["global-contracts"] }
+tredio-common = { workspace = true }
+hex = { workspace = true }
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+near-sdk = { workspace = true, features = ["unit-testing", "global-contracts"] }
+p256 = { version = "0.13", features = ["ecdsa"] }
+sha2 = "0.10"

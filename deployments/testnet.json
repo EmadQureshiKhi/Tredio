@@ -1,0 +1,39 @@
+{
+  "network": "testnet",
+  "rpc": "https://test.rpc.fastnear.com",
+  "deployedAt": "2026-11-05T18:14:25Z",
+  "root": "tredio.testnet",
+  "treasury": "tredio-treasury.testnet",
+  "contracts": {
+    "usdc": "usdc.tredio.testnet",
+    "registry": "registry.tredio.testnet",
+    "outcomes": "outcomes.tredio.testnet",
+    "book": "book.tredio.testnet",
+    "perps": "perps.tredio.testnet",
+    "curation": "curation.tredio.testnet",
+    "coins": "coins.tredio.testnet",
+    "accounts": "accounts.tredio.testnet"
+  },
+  "external": {
+    "exchange": "ref-finance-101.testnet",
+    "chainSignatures": "v1.signer-prod.testnet"
+  },
+  "globalCode": {
+    "coin": "DsgtQXqNL8Jat89BX27i8S34fGu7L2MHxcLTL7BcYV8s",
+    "account": "J1GvtY5xj7QuNwmdDFM56EYxmTvwp1wHqkPZjY7CNK9x"
+  },
+  "oracle": {
+    "mode": "tee_signer",
+    "publicKey": "ed25519:3vtthHwFoJBJQ48zkXxCU2Te4hHcDnVhg2zgVuEwebsr"
+  },
+  "params": {
+    "usdcDecimals": 6,
+    "indexDecimals": 6,
+    "coinDecimals": 18,
+    "outcomeTestWindow": 900,
+    "bookTakerFeeBps": 20,
+    "maxOpenInterestPerSide": "250000000000",
+    "curveBaseVirtualQuote": "2000000000",
+    "curveGraduationReserve": "2000000000"
+  }
+}
