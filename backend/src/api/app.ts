@@ -111,6 +111,10 @@ function trendJson(t: ChainTrend, meta: TrendMeta | undefined, latest: Partial<R
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
     surfacer: t.surfacer,
+    /** SHA-256 of the NEAR AI Cloud review evidence (GET /v1/reviews/<hash>), when a verifiable model reviewed it. */
+    reviewHash: t.reviewHash,
+    /** The Hyperliquid perp of the trend's asset, if any. */
+    asset: t.asset,
     keywords: meta?.keywords ?? [],
     article: meta?.article ?? null,
     ticker: meta?.ticker ?? null,
