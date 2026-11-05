@@ -110,7 +110,6 @@ export interface IndexerProgress {
   /** The processed block's time (ms). */
   progressBlockAt: number | null;
   eventsProcessed: number;
-  startBlock: number | null;
 }
 
 export interface IndexedOracle {
@@ -170,9 +169,8 @@ export class IndexerReader {
   async progress(network: string): Promise<IndexerProgress | null> {
     const [row] = await this.sql<{ height: string; block_time: Date | null }[]>`SELECT height, block_time FROM ${this.t("cursor")} WHERE id = ${network}`;
     if (!row) return null;
-    const [est] = await this.sql<{ n: string }[]>`SELECT reltuples::bigint AS n FROM pg_class WHERE oid = ${`${this.schema}.events`}::regclass`;
-    const [first] = await this.sql<{ h: string | null }[]>`SELECT min(block_height) AS h FROM ${this.t("events")}`;
-    return { progressBlock: Number(row.height), progressBlockAt: row.block_time ? row.block_time.getTime() : null, eventsProcessed: Math.max(0, num(est?.n)), startBlock: first?.h ? Number(first.h) : null };
+    const [n] = await this.sql<{ n: string }[]>`SELECT count(*) AS n FROM ${this.t("events")}`;
+    return { progressBlock: Number(row.height), progressBlockAt: row.block_time ? row.block_time.getTime() : null, eventsProcessed: num(n?.n) };
   }
 
   async oracle(nowSec = Math.floor(Date.now() / 1000)): Promise<IndexedOracle> {
@@ -392,8 +390,6 @@ export class IndexerReader {
     const [r] = await this.sql<{
       book: string | null;
       book24: string | null;
-      swaps: string | null;
-      swaps24: string | null;
       coin: string | null;
       coin24: string | null;
       perp: string | null;
@@ -410,14 +406,12 @@ export class IndexerReader {
       SELECT
         (SELECT sum(usdc) FROM ${this.t("book_trades")} WHERE series IN (SELECT id FROM s)) AS book,
         (SELECT sum(usdc) FROM ${this.t("book_trades")} WHERE series IN (SELECT id FROM s) AND at > to_timestamp(${since})) AS book24,
-        (SELECT sum(CASE WHEN dir = 'buy' THEN amount_in ELSE amount_out END) FROM ${this.t("book_swaps")} WHERE series IN (SELECT id FROM s)) AS swaps,
-        (SELECT sum(CASE WHEN dir = 'buy' THEN amount_in ELSE amount_out END) FROM ${this.t("book_swaps")} WHERE series IN (SELECT id FROM s) AND at > to_timestamp(${since})) AS swaps24,
         (SELECT sum(usdc) FROM ${this.t("coin_trades")} WHERE trend = ${identifier}) AS coin,
         (SELECT sum(usdc) FROM ${this.t("coin_trades")} WHERE trend = ${identifier} AND at > to_timestamp(${since})) AS coin24,
         (SELECT sum(margin) FROM ${this.t("perp_positions")} WHERE trend = ${identifier}) AS perp,
         (SELECT sum(margin) FROM ${this.t("perp_positions")} WHERE trend = ${identifier} AND opened_at > to_timestamp(${since})) AS perp24,
+        -- book_trades holds every fill, the ones swaps took included, so swaps are not added again.
         ((SELECT count(*) FROM ${this.t("book_trades")} WHERE series IN (SELECT id FROM s)) +
-         (SELECT count(*) FROM ${this.t("book_swaps")} WHERE series IN (SELECT id FROM s)) +
          (SELECT count(*) FROM ${this.t("coin_trades")} WHERE trend = ${identifier}) +
          (SELECT count(*) FROM ${this.t("perp_positions")} WHERE trend = ${identifier}))::int AS n,
         (SELECT count(DISTINCT a)::int FROM (
@@ -434,8 +428,8 @@ export class IndexerReader {
     const [curve] = await this.sql<{ stage: string; spot: string; reserve: string; graduated_at: Date | null }[]>`
       SELECT stage, spot, reserve, graduated_at FROM ${this.t("curves")} WHERE trend = ${identifier}`;
     return {
-      volumeUsdc: usdc(r.book) + usdc(r.swaps) + usdc(r.coin) + usdc(r.perp),
-      volume24hUsdc: usdc(r.book24) + usdc(r.swaps24) + usdc(r.coin24) + usdc(r.perp24),
+      volumeUsdc: usdc(r.book) + usdc(r.coin) + usdc(r.perp),
+      volume24hUsdc: usdc(r.book24) + usdc(r.coin24) + usdc(r.perp24),
       tradeCount: r.n,
       traderCount: r.traders,
       holderCount: r.holders,

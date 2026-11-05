@@ -1,0 +1,23 @@
+{
+  "name": "@tredio/indexer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tredio indexer: reads the NEP-297 events of the Tredio contracts from the neardata block stream into Postgres tables the backend and app read.",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "resync": "bun src/resync.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "4.12.18",
+    "postgres": "3.4.9",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.1",
+    "typescript": "5.9.3"
+  }
+}
