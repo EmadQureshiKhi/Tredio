@@ -1,0 +1,18 @@
+# Keeps local installs, secrets, build output and logs out of every image's build context.
+.git
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+**/.next
+**/.next-*
+**/dist
+**/build
+**/out
+**/coverage
+**/target
+**/*.tsbuildinfo
+**/*.log
+**/.DS_Store
+**/Thumbs.db

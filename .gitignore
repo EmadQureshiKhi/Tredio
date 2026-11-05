@@ -1,0 +1,57 @@
+# Private notes, plans and scratch
+/internal/
+CLAUDE.local.md
+scratch/
+*.scratch.*
+
+# Local agent settings
+.claude/
+.agents/
+skills-lock.json
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+.next*/
+out/
+dist/
+build/
+coverage/
+target/
+*.tsbuildinfo
+next-env.d.ts
+.vercel/
+.turbo/
+
+# Test output and logs
+test-results/
+playwright-report/
+blob-report/
+e2e-results/
+*.log
+*.pid
+
+# Env files hold secrets; examples are committed
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Keys and local service state
+*.json.bak
+*-keypair.json
+.near-credentials/
+**/.state/
+**/.*-state*.json
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Deploy script markers
+deployments/.*

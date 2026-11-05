@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Light is the default; dark follows the system setting. Components use the
+ * semantic names below (bg-surface, text-muted, border-line, ...) and never raw colors, so both
+ * themes stay in step.
+ */
+:root {
+  color-scheme: light dark;
+
+  --canvas: #f6f6f8;
+  --surface: #ffffff;
+  --raised: #f1f1f4;
+  --line: #e4e4e9;
+  --line-strong: #d0d0d8;
+  --fg: #0b0b0f;
+  --muted: #52525b;
+  --subtle: #6b6b75;
+  --accent: #5b50c8;
+  --accent-hover: #4b41b0;
+  --accent-fg: #ffffff;
+  --accent-soft: rgb(91 80 200 / 0.1);
+  --ok: #15803d;
+  --ok-soft: rgb(21 128 61 / 0.1);
+  --bad: #b91c1c;
+  --bad-soft: rgb(185 28 28 / 0.08);
+  --warn: #a35a00;
+  --warn-soft: rgb(217 119 6 / 0.12);
+  --ring: rgb(91 80 200 / 0.45);
+  --shadow: 0 1px 2px rgb(16 16 24 / 0.04), 0 1px 1px rgb(16 16 24 / 0.03);
+  --overlay: rgb(9 9 11 / 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #09090b;
+    --surface: #111114;
+    --raised: #19191e;
+    --line: #24242b;
+    --line-strong: #33333c;
+    --fg: #fafafa;
+    --muted: #a1a1aa;
+    --subtle: #8b8b96;
+    --accent: #9c93e8;
+    --accent-hover: #b3abf0;
+    --accent-fg: #0b0a1a;
+    --accent-soft: rgb(156 147 232 / 0.14);
+    --ok: #4ade80;
+    --ok-soft: rgb(74 222 128 / 0.12);
+    --bad: #f87171;
+    --bad-soft: rgb(248 113 113 / 0.12);
+    --warn: #fbbf24;
+    --warn-soft: rgb(251 191 36 / 0.12);
+    --ring: rgb(156 147 232 / 0.5);
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+    --overlay: rgb(0 0 0 / 0.6);
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-ring: var(--ring);
+  --color-overlay: var(--overlay);
+  --shadow-card: var(--shadow);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html {
+  /* Keeps the layout still when a dialog locks scrolling or a list grows past the fold. */
+  scrollbar-gutter: stable;
+  background: var(--canvas);
+  -webkit-text-size-adjust: 100%;
+}
+
+html:has(dialog[open]) {
+  overflow: hidden;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  /* In the base layer so a utility (outline-none on text fields, which draw a ring) can opt out. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

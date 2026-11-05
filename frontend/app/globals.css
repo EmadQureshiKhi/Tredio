@@ -1,0 +1,560 @@
+@import "tailwindcss";
+
+/*
+ * Tredio design tokens. Dark is the default; light follows the system unless the user picks a
+ * theme (html[data-theme]). Colors are tokens only: components never hard-code a color. The light
+ * set appears twice (chosen, and from the system) because CSS has no way to share it.
+ */
+:root {
+  --bg: #09090b;
+  --surface: #111113;
+  --surface-2: #18181b;
+  --surface-3: #222226;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --text: #fafafa;
+  --text-2: rgba(250, 250, 250, 0.62);
+  --text-3: rgba(250, 250, 250, 0.4);
+  --primary: #a49bf0;
+  --primary-strong: #c0b9f6;
+  --primary-soft: rgba(164, 155, 240, 0.14);
+  --on-primary: #0b0a14;
+  --accent: #e0ff98;
+  --accent-soft: rgba(224, 255, 152, 0.12);
+  --on-accent: #0f1404;
+  --up: #34d399;
+  --up-soft: rgba(52, 211, 153, 0.13);
+  --down: #f87171;
+  --down-soft: rgba(248, 113, 113, 0.13);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.13);
+  --focus: rgba(164, 155, 240, 0.55);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px -18px rgba(0, 0, 0, 0.8);
+  --pop: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 18px 40px -14px rgba(0, 0, 0, 0.85);
+  --overlay: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-2: #f1f1ef;
+  --surface-3: #e7e7e4;
+  --line: rgba(9, 9, 11, 0.08);
+  --line-strong: rgba(9, 9, 11, 0.16);
+  --text: #0b0b0d;
+  --text-2: rgba(11, 11, 13, 0.64);
+  --text-3: rgba(11, 11, 13, 0.44);
+  --primary: #5b4fd6;
+  --primary-strong: #483cc4;
+  --primary-soft: rgba(91, 79, 214, 0.1);
+  --on-primary: #ffffff;
+  --accent: #b6e34a;
+  --accent-soft: rgba(182, 227, 74, 0.2);
+  --on-accent: #10160a;
+  --up: #0f9f6e;
+  --up-soft: rgba(15, 159, 110, 0.1);
+  --down: #dc3b3b;
+  --down-soft: rgba(220, 59, 59, 0.09);
+  --warn: #b7791f;
+  --warn-soft: rgba(183, 121, 31, 0.12);
+  --focus: rgba(91, 79, 214, 0.45);
+  --shadow: 0 1px 2px rgba(9, 9, 11, 0.04), 0 12px 32px -20px rgba(9, 9, 11, 0.25);
+  --pop: 0 2px 6px rgba(9, 9, 11, 0.05), 0 16px 36px -14px rgba(9, 9, 11, 0.28);
+  --overlay: rgba(9, 9, 11, 0.35);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --surface-2: #f1f1ef;
+    --surface-3: #e7e7e4;
+    --line: rgba(9, 9, 11, 0.08);
+    --line-strong: rgba(9, 9, 11, 0.16);
+    --text: #0b0b0d;
+    --text-2: rgba(11, 11, 13, 0.64);
+    --text-3: rgba(11, 11, 13, 0.44);
+    --primary: #5b4fd6;
+    --primary-strong: #483cc4;
+    --primary-soft: rgba(91, 79, 214, 0.1);
+    --on-primary: #ffffff;
+    --accent: #b6e34a;
+    --accent-soft: rgba(182, 227, 74, 0.2);
+    --on-accent: #10160a;
+    --up: #0f9f6e;
+    --up-soft: rgba(15, 159, 110, 0.1);
+    --down: #dc3b3b;
+    --down-soft: rgba(220, 59, 59, 0.09);
+    --warn: #b7791f;
+    --warn-soft: rgba(183, 121, 31, 0.12);
+    --focus: rgba(91, 79, 214, 0.45);
+    --shadow: 0 1px 2px rgba(9, 9, 11, 0.04), 0 12px 32px -20px rgba(9, 9, 11, 0.25);
+    --pop: 0 2px 6px rgba(9, 9, 11, 0.05), 0 16px 36px -14px rgba(9, 9, 11, 0.28);
+    --overlay: rgba(9, 9, 11, 0.35);
+    color-scheme: light;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-soft: var(--primary-soft);
+  --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-up: var(--up);
+  --color-up-soft: var(--up-soft);
+  --color-down: var(--down);
+  --color-down-soft: var(--down-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-overlay: var(--overlay);
+
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-strong: var(--font-strong), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), ui-serif, Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --shadow-card: var(--shadow);
+  --shadow-pop: var(--pop);
+  --radius-card: 18px;
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-weight: 300;
+  line-height: 1.5;
+}
+
+/* Large display numbers: proportional figures, so separators sit tight against the digits. */
+.num-display {
+  font-variant-numeric: lining-nums proportional-nums;
+  font-feature-settings: "lnum" 1, "pnum" 1;
+}
+
+/* Numbers line up in columns and never jitter as they change. */
+.num {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Text fields show focus with their own border (focus-within on the field), never a second ring. */
+input:not([type="checkbox"], [type="radio"]):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
+::selection {
+  background: var(--primary-soft);
+}
+
+/* Thin scrollbars that match the surface. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* The rule above never reaches view transitions' pseudo elements: pages and reveals swap at once. */
+  ::view-transition-group(*),
+  ::view-transition-image-pair(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
+/*
+ * Page motion (React <ViewTransition>, see components/shell/PageTransition.tsx). Leaving is quick
+ * so it never competes with what arrives; arriving eases out. Under 400ms throughout.
+ */
+:root {
+  --vt-exit: 140ms;
+  --vt-enter: 220ms;
+  --vt-move: 340ms;
+  --vt-ease: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Clicks reach the live page while a transition plays. */
+::view-transition {
+  pointer-events: none;
+}
+
+/* The header, sidebar and bottom nav anchor the screen: pages change beneath them, they never move. */
+::view-transition-group(site-header),
+::view-transition-group(site-sidebar),
+::view-transition-group(site-nav) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header),
+::view-transition-old(site-sidebar),
+::view-transition-old(site-nav) {
+  display: none;
+}
+::view-transition-new(site-header),
+::view-transition-new(site-sidebar),
+::view-transition-new(site-nav) {
+  animation: none;
+}
+
+/* Any navigation without a direction: a crossfade with a hint of rise. */
+::view-transition-old(.page-fade) {
+  animation: var(--vt-exit) ease-in both vt-fade reverse;
+}
+::view-transition-new(.page-fade) {
+  animation:
+    var(--vt-enter) ease-out 60ms both vt-fade,
+    var(--vt-move) var(--vt-ease) both vt-rise;
+}
+
+/* Into a trend or a rule: the page arrives from the right. Back: from the left. */
+::view-transition-old(.nav-forward) {
+  --vt-offset: -32px;
+  animation:
+    var(--vt-exit) ease-in both vt-fade reverse,
+    var(--vt-move) var(--vt-ease) both vt-slide reverse;
+}
+::view-transition-new(.nav-forward) {
+  --vt-offset: 32px;
+  animation:
+    var(--vt-enter) ease-out 60ms both vt-fade,
+    var(--vt-move) var(--vt-ease) both vt-slide;
+}
+::view-transition-old(.nav-back) {
+  --vt-offset: 32px;
+  animation:
+    var(--vt-exit) ease-in both vt-fade reverse,
+    var(--vt-move) var(--vt-ease) both vt-slide reverse;
+}
+::view-transition-new(.nav-back) {
+  --vt-offset: -32px;
+  animation:
+    var(--vt-enter) ease-out 60ms both vt-fade,
+    var(--vt-move) var(--vt-ease) both vt-slide;
+}
+
+/* A trend card's name, index and sparkline become the trend page's. The blur hides the scaling. */
+::view-transition-group(.morph) {
+  animation-duration: 380ms;
+  animation-timing-function: var(--vt-ease);
+  /* Above the arriving page, whose opaque cards would otherwise cover the moving parts. */
+  z-index: 50;
+}
+/* Only the name: duration and fill come from the group, so the images hold their end state. */
+::view-transition-image-pair(.morph) {
+  animation-name: vt-blur;
+}
+
+/* A skeleton hands over to what it stood for: it leaves fast, the content settles in. */
+::view-transition-old(.reveal-out) {
+  animation: var(--vt-exit) ease-in both vt-fade reverse;
+}
+::view-transition-new(.reveal-in) {
+  animation:
+    var(--vt-enter) ease-out 80ms both vt-fade,
+    var(--vt-move) var(--vt-ease) both vt-rise;
+}
+
+@keyframes vt-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes vt-rise {
+  from {
+    translate: 0 8px;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+@keyframes vt-slide {
+  from {
+    translate: var(--vt-offset) 0;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+@keyframes vt-blur {
+  40% {
+    filter: blur(2px);
+  }
+}
+
+/* A value that just changed: one soft pulse of the card that holds it. */
+@keyframes settle-pulse {
+  from {
+    box-shadow: 0 0 0 0 var(--primary-soft);
+  }
+  40% {
+    box-shadow: 0 0 0 4px var(--primary-soft);
+  }
+  to {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* Check marks that draw themselves (pathLength="1" on the path). */
+@keyframes draw-stroke {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.draw-in {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: draw-stroke 320ms var(--ease-out-quart) both;
+}
+
+/* A chart that draws itself in from the left on first show. */
+@keyframes wipe-in {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.wipe-in {
+  animation: wipe-in 700ms var(--ease-out-quart) both;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: 10px;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.live-dot {
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+/*
+ * While the session restores, the shell shows one of two placeholders: signed in when this browser
+ * holds an account (html[data-account], set before first paint), signed out otherwise.
+ */
+html:not([data-account]) .when-account,
+html[data-account] .when-no-account {
+  display: none;
+}
+
+/*
+ * Until the waitlist store is read, every state of its sidebar card and the Home row render; the
+ * pre-paint hint (html[data-waitlist]: "joined", "row-dismissed", "card-collapsed") shows the ones
+ * this browser left off with. A join wins over a collapsed card.
+ */
+html[data-waitlist~="joined"] .when-waitlist-open,
+html[data-waitlist~="card-collapsed"] .when-waitlist-open,
+html:not([data-waitlist~="card-collapsed"]) .when-waitlist-collapsed,
+html[data-waitlist~="joined"] .when-waitlist-collapsed,
+html:not([data-waitlist~="joined"]) .when-waitlist-joined,
+html[data-waitlist~="joined"] .when-waitlist-row,
+html[data-waitlist~="row-dismissed"] .when-waitlist-row {
+  display: none;
+}
+
+/* A toast's timer: a glowing bar along its foot fills from edge to edge over the toast's life (the
+   duration comes inline from src/lib/toast.tsx) and pauses, like the timer, while the stack is
+   hovered; a pending transaction's bar sweeps instead. */
+[data-toast-bar] {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  box-shadow: 0 0 10px var(--primary), 0 0 3px var(--accent);
+  pointer-events: none;
+}
+[data-toast-bar="timed"] {
+  right: 0;
+  transform-origin: left;
+  animation-name: toast-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+[data-toast-bar="wait"] {
+  width: 36%;
+  animation: toast-wait 1.6s ease-in-out infinite;
+}
+[data-sonner-toaster]:hover [data-toast-bar] {
+  animation-play-state: paused;
+}
+@keyframes toast-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes toast-wait {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(280%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-toast-bar="wait"] {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
+/* Desktop: toasts sit beside an open side sheet (420px wide, 12px from the edge), never over its actions. */
+@media (min-width: 1024px) {
+  body:has([data-vaul-drawer-direction="right"][data-state="open"]) [data-sonner-toaster][data-x-position="right"] {
+    right: 456px !important;
+  }
+}
+
+/* Sideways rows (chips, carousels) scroll by touch without a visible bar. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Safe areas for the installed app on phones. */
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 0px);
+}
+.pt-safe {
+  padding-top: max(env(safe-area-inset-top), 0px);
+}
+
+/* Phones and tablets: on a trend page, toasts rise above its trade bar as well as the bottom nav. */
+@media (max-width: 1023px) {
+  body:has([data-trade-bar="shown"]) [data-sonner-toaster] {
+    --mobile-offset-bottom: calc(env(safe-area-inset-bottom) + 138px) !important;
+    --offset-bottom: calc(env(safe-area-inset-bottom) + 138px) !important;
+  }
+}
+
+/*
+ * A sideways scroller whose cut-off cards fade out at the edge instead of slicing through a word
+ * (useEdgeFade sets which ends hide more). The fade widths animate as an end is reached.
+ */
+@property --fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+.edge-fade {
+  mask-image: linear-gradient(to right, transparent, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent);
+  transition:
+    --fade-start 200ms ease-out,
+    --fade-end 200ms ease-out;
+}
+.edge-fade[data-fade-start] {
+  --fade-start: 40px;
+}
+.edge-fade[data-fade-end] {
+  --fade-end: 56px;
+}
+
+/* Sparklines draw in from the left on first show, then ease between readings. */
+.spark-line {
+  stroke-dasharray: 1;
+  animation: draw-stroke 700ms var(--ease-out-quart) both;
+  transition: d 400ms var(--ease-out-quart);
+}
+.spark-fill {
+  animation: vt-fade 500ms ease-out 250ms both;
+  transition: d 400ms var(--ease-out-quart);
+}
+
+/*
+ * Desktop trend pages: toasts sit left of the sticky trade panel (380px, in the main column's
+ * right gutter), so a trade's toast never covers the position it just changed.
+ */
+@media (min-width: 1024px) {
+  body:has([data-testid="trade-panel"]) [data-sonner-toaster][data-x-position="right"] {
+    right: calc(max(32px, (100vw - 1476px) / 2 + 32px) + 396px) !important;
+  }
+}
