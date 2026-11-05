@@ -1,0 +1,27 @@
+{
+  "name": "@tredio/market-maker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Quotes Up/Down markets on the Tredio book from the first block: two-sided ladders around the registry's fair value, inventory from complete sets, skew against inventory, re-quotes in one batch, complete-set arbitrage and a kill switch.",
+  "author": "Emad Qureshi",
+  "license": "MIT",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noble/curves": "2.2.0",
+    "@noble/hashes": "2.0.1",
+    "@tredio/chain": "workspace:*",
+    "@tredio/contracts": "workspace:*",
+    "hono": "4.12.18",
+    "near-kit": "0.20.2",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.1",
+    "typescript": "5.9.3"
+  }
+}
