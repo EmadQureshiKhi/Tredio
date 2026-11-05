@@ -1,0 +1,27 @@
+{
+  "name": "@tredio/topup",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Keeps every Tredio service account, gas key and contract funded from one treasury, mints testnet USDC for the market maker, and reports the treasury's burn and runway.",
+  "author": "Emad Qureshi",
+  "license": "MIT",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noble/curves": "2.2.0",
+    "@noble/hashes": "2.0.1",
+    "@tredio/chain": "workspace:*",
+    "@tredio/contracts": "workspace:*",
+    "hono": "4.12.18",
+    "near-kit": "0.20.2",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.1",
+    "typescript": "5.9.3"
+  }
+}
