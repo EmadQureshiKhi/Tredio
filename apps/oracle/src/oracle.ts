@@ -3,6 +3,7 @@ import { calls, type Deployment, type Report, type Trend } from "@tredio/contrac
 import type { HyperliquidInfo } from "@tredio/hyperliquid";
 import { type Method, measure, type Readings } from "./method";
 import { allocate, assetClassOf, baseOf, type Candidate, decide, freeListing, type LiveTrend } from "./plan";
+import type { OutLayerRunner } from "./outlayer";
 import type { ReportSigner } from "./signer";
 
 export interface OracleOptions {
@@ -43,7 +44,8 @@ export class Oracle {
   constructor(
     private readonly viewer: Viewer,
     private readonly sender: Sender,
-    private readonly signer: ReportSigner,
+    /** Local mode: this process signs; null when the enclave computes and signs (outlayer mode). */
+    private readonly signer: ReportSigner | null,
     private readonly hyperliquid: HyperliquidInfo,
     private readonly d: Deployment,
     private readonly o: OracleOptions,
@@ -66,7 +68,27 @@ export class Oracle {
     }
   }
 
+  /** Outlayer mode: the enclave computes and signs; this submits what it signed. */
+  async runEnclave(enclave: OutLayerRunner): Promise<RunResult> {
+    const { output, tx: enclaveTx } = await enclave.run();
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (output.error) throw new Error(`enclave: ${output.error}`);
+    for (const w of output.warnings ?? []) this.log({ warning: w, enclaveTx }, "enclave warning");
+    if (!output.report_json || !output.signature) {
+      this.lastRun = { runId: 0, sampled: 0, created: [], updated: 0, marks: 0, tx: null, skipped: "nothing to report", at: nowSec };
+      return this.lastRun;
+    }
+    const report = JSON.parse(output.report_json) as Report;
+    const sent = await this.sender.send(calls(this.d).registry.submitReport(output.report_json, output.signature));
+    const result: RunResult = { runId: report.run_id, sampled: report.updates.length + report.new_trends.length, created: report.new_trends.map((n) => n.identifier), updated: report.updates.length, marks: report.marks.length, tx: sent.hash };
+    this.lastRun = { ...result, at: nowSec };
+    this.lastError = null;
+    this.log({ runId: report.run_id, created: result.created, updated: result.updated, marks: result.marks, enclaveTx, tx: sent.hash }, "enclave report submitted");
+    return result;
+  }
+
   async run(nowSec = Math.floor(Date.now() / 1000)): Promise<RunResult> {
+    if (!this.signer) throw new Error("no local signer: run the enclave instead");
     const observedAt = nowSec;
     const [all, queue, lastRunId, hlMarkets] = await Promise.all([
       this.trends(),

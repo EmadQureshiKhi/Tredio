@@ -4,15 +4,26 @@ import { Hono } from "hono";
 import { loadConfig } from "./config";
 import { METHOD } from "./method";
 import { Oracle } from "./oracle";
+import { OutLayerRunner } from "./outlayer";
 import { KeySigner } from "./signer";
 
 const cfg = loadConfig(process.env);
 const log = (fields: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ service: "oracle", msg, ...fields }));
 const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpcUrls);
 const sender = new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.ORACLE_ACCOUNT_ID, privateKey: cfg.ORACLE_PRIVATE_KEY, rpcUrls: cfg.rpcUrls });
-const signer = new KeySigner(cfg.REPORT_SIGNING_KEY);
+const signer = cfg.ORACLE_MODE === "local" ? new KeySigner(cfg.REPORT_SIGNING_KEY!) : null;
+const enclave =
+  cfg.ORACLE_MODE === "outlayer"
+    ? new OutLayerRunner(sender, viewer, {
+        contract: cfg.OUTLAYER_CONTRACT,
+        wasmUrl: cfg.OUTLAYER_WASM_URL!,
+        wasmHash: cfg.OUTLAYER_WASM_HASH!,
+        maxSeconds: cfg.OUTLAYER_MAX_SECONDS,
+        secrets: cfg.OUTLAYER_SECRETS_PROFILE && cfg.OUTLAYER_SECRETS_ACCOUNT ? { profile: cfg.OUTLAYER_SECRETS_PROFILE, account_id: cfg.OUTLAYER_SECRETS_ACCOUNT } : null,
+      })
+    : null;
 const trusted = await viewer.view<{ tee_signer?: { public_key: string } }>(cfg.deployment.contracts.registry, "get_oracle").catch(() => null);
-if (trusted?.tee_signer?.public_key && trusted.tee_signer.public_key !== signer.publicKey) {
+if (signer && trusted?.tee_signer?.public_key && trusted.tee_signer.public_key !== signer.publicKey) {
   log({ trusted: trusted.tee_signer.public_key, ours: signer.publicKey }, "the registry trusts another report key; reports will be refused");
 }
 const oracle = new Oracle(
@@ -42,7 +53,7 @@ void (async () => {
   while (!stopped) {
     const started = Date.now();
     try {
-      await oracle.run();
+      await (enclave ? oracle.runEnclave(enclave) : oracle.run());
     } catch (e) {
       oracle.lastError = e instanceof Error ? e.message.slice(0, 300) : String(e);
       log({ err: oracle.lastError }, "run failed");
@@ -66,7 +77,7 @@ app.get("/health", async (c) => {
       ok,
       service: "oracle",
       network: cfg.NEAR_NETWORK,
-      signer: { kind: signer.kind, publicKey: signer.publicKey },
+      signer: signer ? { kind: signer.kind, publicKey: signer.publicKey } : { kind: "outlayer-tee", wasmHash: cfg.OUTLAYER_WASM_HASH, trustedKey: trusted?.tee_signer?.public_key ?? null },
       wallets: [wallet],
       alerts: funded ? {} : { balance: `below ${cfg.MIN_BALANCE_NEAR} NEAR` },
       lastError: oracle.lastError,
@@ -74,7 +85,7 @@ app.get("/health", async (c) => {
       lastRun: r,
       facts: [
         ...(r ? [{ label: "Last run", at: r.at }, { label: "Last report", value: r.tx ? `run ${r.runId}: ${r.updated} updates, ${r.created.length} new, ${r.marks} marks` : (r.skipped ?? "none") }] : []),
-        { label: "Report key", value: signer.kind === "local-key" ? "local key (bootstrap)" : "OutLayer enclave", tone: signer.kind === "local-key" ? "warn" : "ok" },
+        { label: "Report key", value: signer ? "local key (bootstrap)" : `OutLayer enclave, build ${cfg.OUTLAYER_WASM_HASH!.slice(0, 12)}`, tone: signer ? "warn" : "ok" },
       ],
       flags: [],
     },
@@ -82,7 +93,7 @@ app.get("/health", async (c) => {
   );
 });
 const server = Bun.serve({ port: cfg.PORT, fetch: app.fetch });
-log({ port: server.port, network: cfg.NEAR_NETWORK, account: sender.accountId, reportKey: signer.publicKey, signer: signer.kind }, "oracle listening");
+log({ port: server.port, network: cfg.NEAR_NETWORK, account: sender.accountId, mode: cfg.ORACLE_MODE, reportKey: signer?.publicKey ?? null, wasmHash: cfg.OUTLAYER_WASM_HASH ?? null }, "oracle listening");
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {

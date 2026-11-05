@@ -1,0 +1,1 @@
+{"signing_keys": [{"path": "report", "type": "ed25519", "caller": "none", "bind": "wasm"}]}

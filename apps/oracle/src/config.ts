@@ -13,8 +13,21 @@ const schema = z.object({
   /** The account that submits reports (it pays gas; the signature is what the registry trusts). */
   ORACLE_ACCOUNT_ID: z.string().min(2),
   ORACLE_PRIVATE_KEY: z.string().regex(/^ed25519:/),
-  /** The report signing key the registry trusts (`set_oracle`), held by this process in local-key mode. */
-  REPORT_SIGNING_KEY: z.string().regex(/^ed25519:/),
+  /**
+   * local: this process computes and signs reports with REPORT_SIGNING_KEY (bootstrap).
+   * outlayer: the OutLayer enclave build (apps/oracle/tee) computes and signs them; this process
+   * only requests the run and submits the signed report.
+   */
+  ORACLE_MODE: z.enum(["local", "outlayer"]).default("local"),
+  /** The report signing key the registry trusts in local mode. */
+  REPORT_SIGNING_KEY: optional(z.string().regex(/^ed25519:/)),
+  OUTLAYER_CONTRACT: z.string().default("outlayer.testnet"),
+  OUTLAYER_WASM_URL: optional(z.string().url()),
+  OUTLAYER_WASM_HASH: optional(z.string().regex(/^[0-9a-f]{64}$/)),
+  OUTLAYER_MAX_SECONDS: z.coerce.number().int().min(10).max(180).default(60),
+  /** OutLayer secrets holding the enclave's API token: profile and owner account. */
+  OUTLAYER_SECRETS_PROFILE: optional(z.string()),
+  OUTLAYER_SECRETS_ACCOUNT: optional(z.string()),
   BACKEND_URL: z.string().url().default("http://localhost:4000"),
   /** The backend's ORACLE_TOKEN. */
   BACKEND_TOKEN: z.string().min(16),
@@ -37,5 +50,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
   const c = schema.parse(env);
   const deployment = c.DEPLOYMENT_JSON ? (JSON.parse(c.DEPLOYMENT_JSON) as Deployment) : deploymentOf(c.NEAR_NETWORK);
   const rpcUrls = list(c.NEAR_RPC_URLS).length > 0 ? list(c.NEAR_RPC_URLS) : DEFAULT_RPCS[c.NEAR_NETWORK];
+  if (c.ORACLE_MODE === "local" && !c.REPORT_SIGNING_KEY) throw new Error("local mode needs REPORT_SIGNING_KEY");
+  if (c.ORACLE_MODE === "outlayer" && !(c.OUTLAYER_WASM_URL && c.OUTLAYER_WASM_HASH)) throw new Error("outlayer mode needs OUTLAYER_WASM_URL and OUTLAYER_WASM_HASH");
   return { ...c, deployment, rpcUrls };
 }
