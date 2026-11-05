@@ -460,10 +460,13 @@ export function createApp(d: AppDeps): Hono {
     return c.json({
       // `pinned`: kept by an admin; the workflow tries it first and lists crypto without smart-money inflow.
       // `pick`: a community pick; the workflow tries it right after kept topics, with every listing check.
+      // `reviewHash`: the NEAR AI Cloud review the registry stores with the listing (GET /v1/reviews/<hash>).
       candidates: ranked.map((a) => ({
         identifier: a.identifier,
         keywords: a.keywords.slice(0, 5),
         surfacer: a.surfacer,
+        ticker: a.ticker,
+        reviewHash: a.reviewHash,
         ...(pins.has(a.identifier) ? { pinned: true } : picks.has(a.identifier) ? { pick: true } : {}),
       })),
       // The workflow stops updating these (see rotation.ts) and counts their slots as free.
