@@ -1,0 +1,22 @@
+{
+  "name": "@tredio/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Typed shapes, call descriptors, events and deployments for the Tredio NEAR contracts.",
+  "author": "Emad Qureshi",
+  "license": "MIT",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.1",
+    "typescript": "5.9.3"
+  }
+}
