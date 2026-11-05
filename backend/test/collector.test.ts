@@ -37,6 +37,8 @@ const trend = (identifier: string, over: Partial<ChainTrend> = {}): ChainTrend =
   index: 40,
   peakIndex: 40,
   surfacer: "radar",
+  reviewHash: null,
+  asset: null,
   ...over,
 });
 const STALE_RETIRE_SEC = 7200;

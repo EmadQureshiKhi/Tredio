@@ -1,11 +1,13 @@
 import { scrub } from "../errors";
 import { REJECTED_KEY_MS } from "../budget";
 import { BudgetError, type Fetch, fetchJson, HttpError } from "../sources/http";
+import type { ReviewEvidence } from "./nearai";
 
 /**
  * Language-model providers behind one call that returns JSON matching a schema. Providers are
  * tried in order and the first that answers wins, so an exhausted or failing model falls back to
- * the next one (Gemini Flash, Gemini Flash Lite, then OpenAI or Kimi when funded).
+ * the next one. Tredio's cascade is NEAR AI Cloud's verifiable models (see nearai.ts), each answer
+ * carrying the evidence that it came from an attested enclave.
  */
 
 /** The JSON Schema subset every provider accepts: objects, arrays, strings, numbers, booleans, enums. */
@@ -16,124 +18,15 @@ export type Schema =
 
 export interface Provider {
   readonly name: string;
-  generate(system: string, user: string, schema: Schema, schemaName: string): Promise<unknown>;
-}
-
-/** Gemini's response schema: uppercase types and `nullable` instead of type unions. */
-function toGemini(s: Schema): Record<string, unknown> {
-  switch (s.type) {
-    case "object":
-      return {
-        type: "OBJECT",
-        properties: Object.fromEntries(Object.entries(s.properties).map(([k, v]) => [k, toGemini(v)])),
-        required: s.required,
-        propertyOrdering: Object.keys(s.properties),
-      };
-    case "array":
-      return { type: "ARRAY", items: toGemini(s.items), ...(s.minItems === undefined ? {} : { minItems: s.minItems }), ...(s.maxItems === undefined ? {} : { maxItems: s.maxItems }) };
-    default:
-      return {
-        type: s.type.toUpperCase(),
-        ...(s.enum ? { enum: s.enum, format: "enum" } : {}),
-        ...(s.nullable ? { nullable: true } : {}),
-        ...(s.description ? { description: s.description } : {}),
-      };
-  }
+  generate(system: string, user: string, schema: Schema, schemaName: string): Promise<{ value: unknown; evidence?: ReviewEvidence }>;
 }
 
 /** Strict JSON Schema for OpenAI structured outputs: nullable becomes a type union. */
-function toOpenAi(s: Schema): Record<string, unknown> {
-  switch (s.type) {
-    case "object":
-      return {
-        type: "object",
-        properties: Object.fromEntries(Object.entries(s.properties).map(([k, v]) => [k, toOpenAi(v)])),
-        required: Object.keys(s.properties),
-        additionalProperties: false,
-      };
-    case "array":
-      return { type: "array", items: toOpenAi(s.items) };
-    default:
-      return {
-        type: s.nullable ? [s.type, "null"] : s.type,
-        ...(s.enum ? { enum: s.nullable ? [...s.enum, null] : s.enum } : {}),
-        ...(s.description ? { description: s.description } : {}),
-      };
-  }
-}
-
-function parseJsonText(provider: string, text: unknown): unknown {
-  if (typeof text !== "string" || text.length === 0) throw new Error(`${provider}: empty response`);
-  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/, "");
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    throw new Error(`${provider}: response is not JSON`);
-  }
-}
-
-export function gemini(apiKey: string, model: string, fetchImpl: Fetch = fetch): Provider {
-  const name = `gemini:${model}`;
-  return {
-    name,
-    async generate(system, user, schema) {
-      const json = await fetchJson<{ candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }> }>(
-        fetchImpl,
-        name,
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-        {
-          method: "POST",
-          headers: { "x-goog-api-key": apiKey, "content-type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: system }] },
-            contents: [{ role: "user", parts: [{ text: user }] }],
-            generationConfig: { responseMimeType: "application/json", responseSchema: toGemini(schema), temperature: 0.2 },
-          }),
-        },
-        60_000,
-      );
-      const c = json.candidates?.[0];
-      return parseJsonText(name, c?.content?.parts?.map((p) => p.text ?? "").join(""));
-    },
-  };
-}
-
-/** OpenAI, or any service with OpenAI's chat completions API (Kimi). */
-export function openAiCompatible(label: string, baseUrl: string, apiKey: string, model: string, opts: { strictSchema: boolean }, fetchImpl: Fetch = fetch): Provider {
-  const name = `${label}:${model}`;
-  return {
-    name,
-    async generate(system, user, schema, schemaName) {
-      const responseFormat = opts.strictSchema
-        ? { type: "json_schema", json_schema: { name: schemaName, strict: true, schema: toOpenAi(schema) } }
-        : { type: "json_object" };
-      const prompt = opts.strictSchema ? user : `${user}\n\nAnswer with JSON matching this schema:\n${JSON.stringify(toOpenAi(schema))}`;
-      const json = await fetchJson<{ choices?: Array<{ message?: { content?: string } }> }>(
-        fetchImpl,
-        name,
-        `${baseUrl.replace(/\/$/, "")}/chat/completions`,
-        {
-          method: "POST",
-          headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: prompt },
-            ],
-            response_format: responseFormat,
-          }),
-        },
-        60_000,
-      );
-      return parseJsonText(name, json.choices?.[0]?.message?.content);
-    },
-  };
-}
-
 export interface AiResult<T> {
   value: T;
   provider: string;
+  /** Verification evidence when the provider supplies it (NEAR AI Cloud). */
+  evidence?: ReviewEvidence;
 }
 
 /** A daily allowance of provider requests (a KeyRing): `take` reserves one, or returns null when spent. */
@@ -214,11 +107,11 @@ export class Ai {
       const stats = this.statsOf(p.name);
       stats.requests++;
       try {
-        const raw = await p.generate(system, user, schema, schemaName);
-        const value = parse(raw);
+        const out = await p.generate(system, user, schema, schemaName);
+        const value = parse(out.value);
         stats.ok++;
         stats.lastOkAt = this.now();
-        return { value, provider: p.name };
+        return { value, provider: p.name, evidence: out.evidence };
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         stats.failures++;

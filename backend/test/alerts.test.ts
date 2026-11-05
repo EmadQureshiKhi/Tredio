@@ -58,6 +58,8 @@ describe("Alerts job", () => {
     index: 50,
     peakIndex: 50,
     surfacer: "radar",
+  reviewHash: null,
+  asset: null,
     ...over,
   });
   beforeAll(async () => {

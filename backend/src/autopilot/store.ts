@@ -160,12 +160,12 @@ export class AutopilotStore {
   async requestGrant(owner: string, sessionKey: string, sealedKey: string, nowSec: number): Promise<{ replaces: string | null } | null> {
     return this.sql.begin(async (tx) => {
       const known = await tx<{ owner: string }[]>`
-        INSERT INTO autopilot_grant_keys (session_key, owner) VALUES (${sessionKey.toLowerCase()}, ${owner.toLowerCase()})
+        INSERT INTO autopilot_grant_keys (session_key, owner) VALUES (${sessionKey}, ${owner.toLowerCase()})
         ON CONFLICT (session_key) DO UPDATE SET owner = autopilot_grant_keys.owner
         RETURNING owner`;
       if (known[0]?.owner !== owner.toLowerCase()) return null;
       const rows = await tx<{ status: Grant["status"]; session_key: string }[]>`
-        INSERT INTO autopilot_grants AS g (owner, session_key, sealed_key, status) VALUES (${owner.toLowerCase()}, ${sessionKey.toLowerCase()}, ${sealedKey}, 'pending')
+        INSERT INTO autopilot_grants AS g (owner, session_key, sealed_key, status) VALUES (${owner.toLowerCase()}, ${sessionKey}, ${sealedKey}, 'pending')
         ON CONFLICT (owner) DO UPDATE SET
           session_key = CASE WHEN g.status = 'active' AND g.valid_until > ${nowSec} THEN g.session_key ELSE EXCLUDED.session_key END,
           sealed_key = CASE WHEN g.status = 'active' AND g.valid_until > ${nowSec} THEN g.sealed_key ELSE EXCLUDED.sealed_key END,
@@ -188,8 +188,8 @@ export class AutopilotStore {
    */
   async isGrantKey(account: string, key: string): Promise<boolean> {
     const rows = await this.sql`
-      SELECT 1 FROM autopilot_grant_keys WHERE session_key = ${key.toLowerCase()} AND owner = ${account.toLowerCase()}
-      UNION ALL SELECT 1 FROM autopilot_grants WHERE owner = ${account.toLowerCase()} AND (session_key = ${key.toLowerCase()} OR next_session_key = ${key.toLowerCase()}) LIMIT 1`;
+      SELECT 1 FROM autopilot_grant_keys WHERE session_key = ${key} AND owner = ${account.toLowerCase()}
+      UNION ALL SELECT 1 FROM autopilot_grants WHERE owner = ${account.toLowerCase()} AND (session_key = ${key} OR next_session_key = ${key}) LIMIT 1`;
     return rows.length > 0;
   }
 
@@ -199,7 +199,7 @@ export class AutopilotStore {
    * on to another key since it was read.
    */
   async activateGrant(owner: string, sessionKey: string, validUntil: number, dailyLimit: bigint): Promise<boolean> {
-    const key = sessionKey.toLowerCase();
+    const key = sessionKey;
     const rows = await this.sql`
       UPDATE autopilot_grants SET
         sealed_key = CASE WHEN next_session_key = ${key} THEN next_sealed_key ELSE sealed_key END,

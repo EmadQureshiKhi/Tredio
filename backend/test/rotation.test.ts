@@ -18,6 +18,8 @@ const trend = (identifier: string, index: number, peakIndex: number, ageHours: n
   index,
   peakIndex,
   surfacer: "radar",
+  reviewHash: null,
+  asset: null,
 });
 
 const candidate = (identifier: string): Candidate => ({
@@ -36,6 +38,7 @@ const candidate = (identifier: string): Candidate => ({
   confidence: 0.9,
   ai: {},
   decidedBy: "radar",
+  reviewHash: null,
   createdAt: new Date(0),
   updatedAt: new Date(0),
 });

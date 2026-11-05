@@ -246,6 +246,7 @@ export class Radar {
   private async assessBatch(batch: Keyed[], report: RadarReport): Promise<boolean> {
     const existing = await this.store.knownIdentifiers();
     let results: Array<Assessment | null>;
+    let reviewHash: string | null = null;
     try {
       const out = await assess(
         this.ai,
@@ -254,6 +255,7 @@ export class Radar {
       );
       results = out.results;
       report.provider = out.provider;
+      if (out.evidence) reviewHash = await this.store.saveReview(out.evidence);
     } catch (e) {
       report.skipped.push(`ai: ${message(e)}`);
       return false;
@@ -262,7 +264,7 @@ export class Radar {
       const a = results[i];
       if (!a) continue;
       report.assessed++;
-      const stored = await this.propose(a, b.source, { signal: b.signal }, RADAR_SURFACER);
+      const stored = await this.propose(a, b.source, { signal: b.signal }, RADAR_SURFACER, reviewHash);
       // A topic already listed counts as approved; one that faded stays out, as rejected.
       report[stored.status === "live" ? "approved" : stored.status === "retired" ? "rejected" : stored.status]++;
       await this.store.recordSignal(b.key, b.signal.kind, a.identifier);
@@ -276,6 +278,7 @@ export class Radar {
     source: CandidateSource,
     sourceRef: Record<string, unknown>,
     surfacer: string,
+    reviewHash: string | null = null,
   ): Promise<{ id: number; identifier: string; status: CandidateStatus; reason: string; created: boolean }> {
     let v = verdict(a, this.cfg.autoApproveConfidence);
     if (v.status === "approved" && REVIEWED_SOURCES.has(source)) v = { status: "pending", reason: `review: ${source} proposals are always reviewed (confidence ${a.confidence.toFixed(2)})` };
@@ -298,6 +301,7 @@ export class Radar {
       confidence: a.confidence,
       ai: { reason: v.reason, policyFlags: a.policyFlags, trendWorthy: a.trendWorthy, duplicateOf: a.duplicateOf },
       decidedBy: v.status === "pending" ? null : "radar",
+      reviewHash,
     });
     if (created) this.log.info({ identifier: candidate.identifier, status: candidate.status, reason: v.reason }, "radar proposal");
     return { id: candidate.id, identifier: candidate.identifier, status: candidate.status, reason: created ? v.reason : "already proposed", created };

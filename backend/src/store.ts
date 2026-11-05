@@ -1,3 +1,4 @@
+import { reviewHash, type ReviewEvidence } from "./ai/nearai";
 import type { Sql } from "./db";
 import { assetClassOf } from "./identifiers";
 
@@ -37,6 +38,8 @@ export interface Candidate {
   confidence: number;
   ai: Record<string, unknown>;
   decidedBy: string | null;
+  /** SHA-256 of the AI review evidence (ai_reviews), when a verifiable model reviewed it. */
+  reviewHash: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,6 +59,8 @@ export interface NewCandidate {
   confidence: number;
   ai: Record<string, unknown>;
   decidedBy: string | null;
+  /** SHA-256 of the verified NEAR AI Cloud review that assessed it (ai_reviews). */
+  reviewHash?: string | null;
 }
 
 export interface TrendMeta {
@@ -92,6 +97,7 @@ interface CandidateRow {
   decided_by: string | null;
   created_at: Date;
   updated_at: Date;
+  review_hash: string | null;
 }
 
 const toCandidate = (r: CandidateRow): Candidate => ({
@@ -110,6 +116,7 @@ const toCandidate = (r: CandidateRow): Candidate => ({
   confidence: r.confidence,
   ai: r.ai,
   decidedBy: r.decided_by,
+  reviewHash: r.review_hash ?? null,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -157,15 +164,31 @@ export class Store {
   async insertCandidate(c: NewCandidate): Promise<{ candidate: Candidate; created: boolean }> {
     const sql = this.sql;
     const inserted = await sql<CandidateRow[]>`
-      INSERT INTO candidates (identifier, display_name, asset_class, keywords, article, ticker, summary, source, source_ref, surfacer, status, confidence, ai, decided_by)
+      INSERT INTO candidates (identifier, display_name, asset_class, keywords, article, ticker, summary, source, source_ref, surfacer, status, confidence, ai, decided_by, review_hash)
       VALUES (${c.identifier}, ${c.displayName}, ${c.assetClass}, ${sql.array(c.keywords)}, ${c.article}, ${c.ticker}, ${c.summary},
-              ${c.source}, ${sql.json(c.sourceRef as never)}, ${c.surfacer.toLowerCase()}, ${c.status}, ${c.confidence}, ${sql.json(c.ai as never)}, ${c.decidedBy})
+              ${c.source}, ${sql.json(c.sourceRef as never)}, ${c.surfacer.toLowerCase()}, ${c.status}, ${c.confidence}, ${sql.json(c.ai as never)}, ${c.decidedBy}, ${c.reviewHash ?? null})
       ON CONFLICT (identifier) DO NOTHING
       RETURNING *`;
     if (inserted[0]) return { candidate: toCandidate(inserted[0]), created: true };
     const existing = await this.candidateByIdentifier(c.identifier);
     if (!existing) throw new Error(`candidate ${c.identifier} vanished`);
     return { candidate: existing, created: false };
+  }
+
+  /** Stores a verified review's evidence under its hash (idempotent) and returns the hash. */
+  async saveReview(evidence: ReviewEvidence): Promise<string> {
+    const hash = reviewHash(evidence);
+    await this.sql`
+      INSERT INTO ai_reviews (review_hash, model, completion_id, evidence)
+      VALUES (${hash}, ${evidence.model}, ${evidence.completionId}, ${this.sql.json(evidence as never)})
+      ON CONFLICT (review_hash) DO NOTHING`;
+    return hash;
+  }
+
+  async review(hash: string): Promise<{ hash: string; evidence: ReviewEvidence; createdAt: Date } | null> {
+    const rows = await this.sql<{ review_hash: string; evidence: ReviewEvidence; created_at: Date }[]>`
+      SELECT review_hash, evidence, created_at FROM ai_reviews WHERE review_hash = ${hash}`;
+    return rows[0] ? { hash: rows[0].review_hash, evidence: rows[0].evidence, createdAt: rows[0].created_at } : null;
   }
 
   async candidateByIdentifier(identifier: string): Promise<Candidate | null> {

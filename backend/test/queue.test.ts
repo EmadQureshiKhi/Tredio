@@ -19,6 +19,7 @@ const candidate = (identifier: string, assetClass = 6, ticker: string | null = n
   confidence: 0.9,
   ai: {},
   decidedBy: "radar",
+  reviewHash: null,
   createdAt: new Date(0),
   updatedAt: new Date(0),
 });

@@ -16,7 +16,7 @@ describe("parseLink", () => {
     ["https://127.0.0.1/", "public website"],
     ["https://[::1]/", "public website"],
     ["https://localhost/", "public website"],
-    ["https://backend.internal.example/", "public website"],
+    ["https://api.svc.internal/", "public website"],
     ["https://printer.local/", "public website"],
     ["javascript:alert(1)", "only https"],
     ["not a url", "valid URL"],

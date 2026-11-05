@@ -53,7 +53,7 @@ export class Viewer {
   /** The network's final block height and time. */
   async head(): Promise<{ height: number; time: number }> {
     const r = await this.rpc<{ sync_info: { latest_block_height: number; latest_block_time: string } }>("status", []);
-    return { height: r.sync_info.latest_block_height, time: Date.parse(r.sync_info.latest_block_time) };
+    return { height: r.sync_info.latest_block_height, time: Math.floor(Date.parse(r.sync_info.latest_block_time) / 1000) };
   }
 
   async balance(accountId: string): Promise<bigint> {
@@ -119,7 +119,7 @@ export function failureOf(o: FinalExecutionOutcome): string | null {
   };
   return (
     read(o.status) ??
-    o.receipts_outcome.map((r) => read(r.outcome.status)).find((x): x is string => x !== null) ??
+    (o.receipts_outcome ?? []).map((r) => read(r.outcome.status)).find((x): x is string => x !== null) ??
     null
   );
 }
@@ -210,7 +210,7 @@ export class Sender {
 
   async send<T = unknown>(call: Call): Promise<{ hash: string; value: T | undefined }> {
     const o = await this.sendOutcome(call);
-    return { hash: o.transaction.hash, value: returnValue<T>(o) };
+    return { hash: o.transaction?.hash ?? o.transaction_outcome?.id ?? "", value: returnValue<T>(o) };
   }
 
   /** The underlying near-kit client, for actions call descriptors do not cover. */

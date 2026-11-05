@@ -9,7 +9,7 @@ import { testDb } from "./helpers";
  */
 
 const SECRET = "s".repeat(64);
-const ACCOUNT = "Account-AB";
+const ACCOUNT = "Trader-00AB.testnet";
 
 let sql: Sql;
 let now = Date.parse("2026-10-12T12:00:00Z");
