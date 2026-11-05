@@ -10,7 +10,12 @@
  */
 import type { Call } from "@tredio/contracts";
 import { Near } from "near-kit";
-import type { FinalExecutionOutcome, PrivateKey } from "near-kit";
+import type { FinalExecutionOutcome, PrivateKey, TransactionBuilder } from "near-kit";
+
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { base58Decode, base58Encode } from "./proofs";
+
+export * from "./proofs";
 
 export const DEFAULT_RPCS: Record<"testnet" | "mainnet", string[]> = {
   testnet: ["https://test.rpc.fastnear.com", "https://rpc.testnet.near.org"],
@@ -54,6 +59,20 @@ export class Viewer {
   async head(): Promise<{ height: number; time: number }> {
     const r = await this.rpc<{ sync_info: { latest_block_height: number; latest_block_time: string } }>("status", []);
     return { height: r.sync_info.latest_block_height, time: Math.floor(Date.parse(r.sync_info.latest_block_time) / 1000) };
+  }
+
+  /** A gas key's prepaid balance (yoctoNEAR) and nonce lanes, or null when the key is missing or not a gas key. */
+  async gasKey(accountId: string, publicKey: string): Promise<{ balance: bigint; nonces: number } | null> {
+    let r: { permission: unknown };
+    try {
+      r = await this.rpc<{ permission: unknown }>("query", { request_type: "view_access_key", finality: "final", account_id: accountId, public_key: publicKey });
+    } catch (e) {
+      if (/UNKNOWN_ACCESS_KEY|UNKNOWN_ACCOUNT|does not exist/i.test(String((e as Error).message))) return null;
+      throw e;
+    }
+    const p = r.permission as Record<string, { balance?: string; num_nonces?: number }> | string;
+    const g = typeof p === "object" ? (p.GasKeyFunctionCall ?? p.GasKeyFullAccess) : undefined;
+    return g?.balance === undefined ? null : { balance: BigInt(g.balance), nonces: g.num_nonces ?? 1 };
   }
 
   async balance(accountId: string): Promise<bigint> {
@@ -136,8 +155,17 @@ export function returnValue<T>(o: FinalExecutionOutcome): T | undefined {
   }
 }
 
+/** The public key (`ed25519:<base58>`) of an `ed25519:<base58>` secret key (64-byte secret or 32-byte seed). */
+export function publicKeyOf(secret: string): string {
+  const raw = base58Decode(secret.replace(/^ed25519:/, ""));
+  if (raw.length !== 64 && raw.length !== 32) throw new Error("an ed25519 secret key is 32 or 64 bytes");
+  return `ed25519:${base58Encode(ed25519.getPublicKey(raw.slice(0, 32)))}`;
+}
+
 export class Sender {
   readonly accountId: string;
+  /** The key this sender signs with. */
+  readonly publicKey: string;
   readonly network: Network;
   private readonly near: Near;
   private readonly lanes: number;
@@ -147,6 +175,7 @@ export class Sender {
 
   constructor(o: SenderOptions) {
     this.accountId = o.accountId;
+    this.publicKey = publicKeyOf(o.privateKey);
     this.network = o.network;
     const rpcUrl = (o.rpcUrls ?? DEFAULT_RPCS[o.network])[0]!;
     this.near = new Near({
@@ -174,14 +203,24 @@ export class Sender {
   }
 
   /** Sends `call` and returns the outcome, throwing a TxError on any failure. */
-  async sendOutcome(call: Call, waitUntil: "EXECUTED_OPTIMISTIC" | "FINAL" = "EXECUTED_OPTIMISTIC"): Promise<FinalExecutionOutcome> {
-    const run = async (lane: number | null) => {
-      let tx = this.near
-        .transaction(this.accountId)
-        .functionCall(call.receiverId, call.methodName, call.args, {
+  sendOutcome(call: Call, waitUntil: "EXECUTED_OPTIMISTIC" | "FINAL" = "EXECUTED_OPTIMISTIC"): Promise<FinalExecutionOutcome> {
+    return this.sendTx(
+      (tx) =>
+        tx.functionCall(call.receiverId, call.methodName, call.args, {
           gas: `${BigInt(call.gas) / 10n ** 12n} Tgas` as never,
           attachedDeposit: `${call.deposit} yocto` as never,
-        });
+        }),
+      waitUntil,
+    );
+  }
+
+  /**
+   * Sends a transaction `build` fills in (any actions: transfers, gas-key funding, relayed
+   * delegate actions), on a free gas-key lane or after the previous transaction of a regular key.
+   */
+  async sendTx(build: (tx: TransactionBuilder) => TransactionBuilder, waitUntil: "EXECUTED_OPTIMISTIC" | "FINAL" = "EXECUTED_OPTIMISTIC"): Promise<FinalExecutionOutcome> {
+    const run = async (lane: number | null) => {
+      let tx = build(this.near.transaction(this.accountId));
       if (lane !== null) tx = tx.useGasKey(lane);
       let o: FinalExecutionOutcome;
       try {
@@ -208,6 +247,18 @@ export class Sender {
     return p;
   }
 
+  /**
+   * Moves `yocto` from this account into a gas key of `account` (any account's: the protocol
+   * lets anyone fund a gas key, as with a transfer).
+   */
+  fundGasKey(account: string, publicKey: string, yocto: bigint): Promise<FinalExecutionOutcome> {
+    return this.sendTx((tx) => {
+      // near-kit points TransferToGasKey at the signer unless a receiver is already set.
+      (tx as unknown as { receiverId?: string }).receiverId = account;
+      return tx.transferToGasKey(publicKey, `${yocto} yocto` as never);
+    });
+  }
+
   async send<T = unknown>(call: Call): Promise<{ hash: string; value: T | undefined }> {
     const o = await this.sendOutcome(call);
     return { hash: o.transaction?.hash ?? o.transaction_outcome?.id ?? "", value: returnValue<T>(o) };
@@ -232,4 +283,37 @@ export async function retry<T>(fn: () => Promise<T>, attempts = 4, baseMs = 500)
     }
   }
   throw last;
+}
+
+/** yoctoNEAR as a decimal NEAR string, without float rounding (up to six decimals). */
+export function toNear(yocto: bigint): string {
+  const neg = yocto < 0n;
+  const v = neg ? -yocto : yocto;
+  const whole = v / 10n ** 24n;
+  const frac = ((v % 10n ** 24n) / 10n ** 18n).toString().padStart(6, "0").replace(/0+$/, "");
+  return `${neg ? "-" : ""}${whole}${frac ? `.${frac}` : ""}`;
+}
+
+/** One account a service sends from, as every Tredio service reports it on /health. */
+export interface WalletHealth {
+  label: string;
+  account: string;
+  balance: string | null;
+  min: string | null;
+  gasKeys: Array<{ publicKey: string; balance: string; nonces: number }>;
+}
+
+/** Reads an account's NEAR and its gas keys for a health report; never throws. */
+export async function walletHealth(viewer: Viewer, label: string, account: string, opts: { min?: bigint; gasKeys?: readonly string[] } = {}): Promise<WalletHealth> {
+  const [balance, keys] = await Promise.all([
+    viewer.balance(account).catch(() => null),
+    Promise.all((opts.gasKeys ?? []).map(async (pk) => ({ pk, key: await viewer.gasKey(account, pk).catch(() => null) }))),
+  ]);
+  return {
+    label,
+    account,
+    balance: balance === null ? null : toNear(balance),
+    min: opts.min === undefined ? null : toNear(opts.min),
+    gasKeys: keys.flatMap(({ pk, key }) => (key ? [{ publicKey: pk, balance: toNear(key.balance), nonces: key.nonces }] : [])),
+  };
 }

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "NEAR access for Tredio services: near-kit clients with RPC failover, gas-key nonce lanes, retries and call helpers.",
+  "description": "NEAR access for Tredio services: near-kit clients with RPC failover, gas-key nonce lanes, retries, call helpers, and the passkey and NEP-413 proofs services check.",
   "author": "Emad Qureshi",
   "license": "MIT",
   "main": "src/index.ts",
@@ -16,6 +16,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@noble/curves": "2.2.0",
+    "@noble/hashes": "2.0.1",
     "@tredio/contracts": "workspace:*",
     "near-kit": "0.20.2"
   },
