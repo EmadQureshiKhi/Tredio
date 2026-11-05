@@ -32,7 +32,7 @@ const sections = [
         </li>
         <li>Your account is a passkey on your device. The passkey never reaches us.</li>
         <li>
-          We identify you by your account address, which is public, like every transaction your account makes.
+          We identify you by your NEAR account ID, which is public, like every transaction your account makes.
         </li>
         <li>Notes and strategies in your vault are encrypted on your device. We only store ciphertext.</li>
         <li>
@@ -65,7 +65,7 @@ const sections = [
           head={["Data", "Why", "Kept"]}
           rows={[
             [
-              <><strong>Account addresses</strong>: your account address and the keys it has authorised (trading session keys, Autopilot grant keys).</>,
+              <><strong>Account IDs</strong>: your NEAR account ID and the keys and grants it has authorised (trading sessions, Autopilot grants).</>,
               "To sign you in, attach your rules, follows and posts to your account, and check its permissions.",
               "While your account uses Tredio.",
             ],
@@ -96,7 +96,7 @@ const sections = [
             ],
             [
               <><strong>Links you submit</strong> for the radar to consider.</>,
-              "To review them as possible trends.",
+              "To review them as possible trends, with a model on NEAR AI Cloud.",
               "As long as the radar needs them.",
             ],
             [
@@ -119,13 +119,13 @@ const sections = [
     body: (
       <>
         <p>
-          Tredio runs on Testnet today. If you join the waitlist on this website or in the app, the Tredio
+          Tredio runs on NEAR testnet today. If you join the waitlist on this website or in the app, the Tredio
           backend stores:
         </p>
         <ul>
           <li>your email address;</li>
           <li>
-            the Tredio account address you chose to link, if you joined in the app while signed in and left
+            the Tredio account you chose to link, if you joined in the app while signed in and left
             &ldquo;Link my Tredio account&rdquo; on;
           </li>
           <li>when you joined (and when you last joined again), and whether you joined on the website or in the app;</li>
@@ -188,7 +188,7 @@ const sections = [
     title: "Public transaction data",
     body: (
       <p>
-        Your trades, balances and account settings are recorded on a public ledger and are permanent. Anyone can read
+        Your trades, balances and account settings are recorded on NEAR&apos;s public ledger and are permanent. Anyone can read
         them, and Tredio indexes them to build portfolios, track records, volumes and leaderboards. We cannot change
         or delete data on that ledger.
       </p>
@@ -202,12 +202,16 @@ const sections = [
         <p>We do not sell personal data. Data reaches these services only as needed to run Tredio:</p>
         <ul>
           <li>
-            <strong>The network</strong> Tredio runs on and its infrastructure providers receive the transactions your
-            account sends.
+            <strong>NEAR</strong> and its RPC providers receive the transactions your account sends. Chain Signatures
+            signs the Hyperliquid orders your account asks for.
           </li>
           <li>
-            <strong>The provider of asset perps</strong> receives your account address and orders when you trade asset
-            perps.
+            <strong>Hyperliquid</strong> (its testnet while Tredio runs on NEAR testnet) receives the address derived
+            from your account and your orders when you trade Hyperliquid perps.
+          </li>
+          <li>
+            <strong>NEAR Intents</strong> will receive deposit and withdrawal requests when you move funds from or to
+            another chain on mainnet. On testnet the app asks it for quotes only.
           </li>
           <li>
             <strong>Push services</strong> run by your browser&apos;s maker deliver notifications you turned on.
@@ -218,16 +222,16 @@ const sections = [
           </li>
           <li>
             An <strong>email delivery service</strong> receives the waitlist&apos;s email addresses only when we send
-            the Mainnet launch email.
+            the mainnet launch email.
           </li>
         </ul>
         <p>
           <strong>Elfa</strong>, <strong>Bluesky</strong>, <strong>Wikimedia</strong> (Wikipedia pageviews),{" "}
           <strong>GDELT</strong>, <strong>Hacker News</strong> (through Algolia), <strong>CoinGecko</strong>,{" "}
-          <strong>GeckoTerminal</strong> and <strong>Nansen</strong> supply public attention data, and the oracle
-          records the index made from it. The <strong>AI providers</strong>{" "}
-          (OpenAI and Google Gemini) review proposed trends and links submitted to the radar. None of them receive
-          your account data from us. <strong>The order book</strong> and <strong>the indexer</strong>{" "}
+          <strong>GeckoTerminal</strong> and <strong>Nansen</strong> supply public attention data.{" "}
+          <strong>NEAR AI Cloud</strong> reviews proposed trends and links submitted to the radar, and the oracle that
+          turns the data into the index runs in an <strong>OutLayer</strong> trusted execution environment. None of
+          them receive your account data from us. <strong>The order book</strong> and <strong>the indexer</strong>{" "}
           work with public transaction data only.
         </p>
       </>
@@ -284,7 +288,7 @@ const sections = [
     title: "Changes",
     body: (
       <p>
-        We will update this policy when Tredio changes what it stores, for example before a Mainnet launch. The date
+        We will update this policy when Tredio changes what it stores, for example before a mainnet launch. The date
         at the top shows the latest version.
       </p>
     ),

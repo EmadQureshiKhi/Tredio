@@ -1,25 +1,23 @@
 import "./globals.css";
-import localFont from "next/font/local";
+import { Hanken_Grotesk, Newsreader } from "next/font/google";
 import LenisSmoothScroll from "@/components/Lenis/LenisScroll";
 import PageTransition from "@/components/page-transition/PageTransition";
 import { WaitlistProvider } from "@/components/waitlist/Waitlist";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/config/links";
 
-const Font1 = localFont({
-  src: [{ path: "./fonts/font1.woff2", weight: "300", style: "normal" }],
+// Open fonts (SIL OFL 1.1): Hanken Grotesk for text and UI (variable, light to bold) and Newsreader
+// for display lines (variable, with its optical sizes). "Third" is Hanken Grotesk at medium weight,
+// set in globals.css.
+const sans = Hanken_Grotesk({
+  subsets: ["latin", "latin-ext"],
   variable: "--font-body",
   display: "swap",
 });
 
-const Font2 = localFont({
-  src: [{ path: "./fonts/font2.woff2", weight: "400", style: "normal" }],
+const serif = Newsreader({
+  subsets: ["latin", "latin-ext"],
+  axes: ["opsz"],
   variable: "--font-display",
-  display: "swap",
-});
-
-const Font3 = localFont({
-  src: [{ path: "./fonts/font3.woff2", weight: "400", style: "normal" }],
-  variable: "--font-third",
   display: "swap",
 });
 
@@ -45,9 +43,6 @@ export const metadata = {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
   },
-  icons: {
-    icon: "/assets/icons/tredio-favicon.svg",
-  },
 };
 
 export const viewport = {
@@ -57,8 +52,8 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body className={`${Font1.variable} ${Font2.variable} ${Font3.variable} antialiased`}>
+    <html lang="en" className={`${sans.variable} ${serif.variable}`}>
+      <body className="antialiased">
         <LenisSmoothScroll />
         <WaitlistProvider>
           <PageTransition>{children}</PageTransition>

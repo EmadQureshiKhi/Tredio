@@ -1,272 +1,65 @@
-'use client'
-import React, { useState, useRef, useEffect } from 'react';
-import { gsap } from 'gsap';
-import Btn from '../button/Btn';
+import Link from "next/link";
+import Navbar from "@/components/header/Navbar";
+import Footer from "@/components/footer/Footer";
+import MobileFooter from "@/components/footer/MobileFooter";
+import { APP_URL, CONTACT_EMAIL } from "@/config/links";
 
-const Contact = () => {
-  const [activeForm, setActiveForm] = useState('quote');
-  const overlayRef = useRef(null);
+const TOPICS = [
+  { title: "Help with the app", body: "Something not working on NEAR testnet, a trade you want explained, or an idea for a market." },
+  { title: "Partners and press", body: "Data sources, integrations, agents that want the index, and interviews." },
+  { title: "Security", body: "Found a bug in a contract or a service? Write before you share it anywhere else." },
+  { title: "Your data", body: "Access, correction or deletion requests, or leaving the Mainnet waitlist." },
+];
 
-  // Animate form open/close
-  useEffect(() => {
-    if (overlayRef.current) {
-      if (activeForm === 'contact') {
-        gsap.to(overlayRef.current, {
-          clipPath: 'polygon(7.75% 0%, 100% 0%, 100% 100%, 11.25% 100%)',
-          duration: 1.2,
-          ease: 'power3.inOut',
-        });
-      } else {
-        gsap.to(overlayRef.current, {
-          clipPath: 'polygon(92.5% 0%, 100% 0%, 100% 100%, 88.5% 100%)',
-          duration: 1.2,
-          ease: 'power3.inOut',
-        });
-      }
-    }
-  }, [activeForm]);
-
-  // --- Hover animations ---
-  const handleHover = (side) => {
-    if (!overlayRef.current) return;
-
-    if (side === 'contact' && activeForm === 'quote') {
-      gsap.to(overlayRef.current, {
-        clipPath: 'polygon(90% 0%, 100% 0%, 100% 100%, 86% 100%)',
-        duration: 0.6,
-        ease: 'power2.out',
-      });
-    }
-
-    if (side === 'quote' && activeForm === 'contact') {
-      gsap.to(overlayRef.current, {
-        clipPath: 'polygon(10.5% 0%, 100% 0%, 100% 100%, 14% 100%)',
-        duration: 0.6,
-        ease: 'power2.out',
-      });
-    }
-  };
-
-  const handleHoverOut = () => {
-    if (!overlayRef.current) return;
-
-    if (activeForm === 'contact') {
-      gsap.to(overlayRef.current, {
-        clipPath: 'polygon(7.75% 0%, 100% 0%, 100% 100%, 11.25% 100%)',
-        duration: 0.6,
-        ease: 'power2.inOut',
-      });
-    } else {
-      gsap.to(overlayRef.current, {
-        clipPath: 'polygon(92.5% 0%, 100% 0%, 100% 100%, 88.5% 100%)',
-        duration: 0.6,
-        ease: 'power2.inOut',
-      });
-    }
-  };
-
-  // --- Floating label animation ---
-  useEffect(() => {
-    const inputs = document.querySelectorAll('.float-input');
-    inputs.forEach((input) => {
-      const label = input.previousElementSibling;
-
-      const animateUp = () => {
-        gsap.to(label, {
-          y: '-2vw',
-          scale: 0.75,
-          color: '#1f2937',
-          duration: 0.3,
-          ease: 'power2.out',
-        });
-      };
-
-      const animateDown = () => {
-        gsap.to(label, {
-          y: '0vw',
-          scale: 1,
-          color: '#6b7280',
-          duration: 0.3,
-          ease: 'power2.out',
-        });
-      };
-
-      const checkState = () => {
-        if (input.value.trim() !== '') animateUp();
-        else animateDown();
-      };
-
-      input.addEventListener('focus', animateUp);
-      input.addEventListener('blur', checkState);
-
-      // Initialize state
-      checkState();
-    });
-  }, []);
-
+// One address for everything, and what to write about.
+export default function Contact() {
   return (
-    <div className="relative w-full h-screen px-[10vw] bg-[#9C93E8] overflow-hidden">
-      {/* Base Form - Get a quote */}
-      <div className="flex h-full items-center">
-        {/* Left Content */}
-        <div className="w-[40%] flex items-start justify-start p-[6vw]">
-          <div className="max-w-[45vw] space-y-[3vw]">
-            <h2 className="text-[2.5vw] font-display leading-[1.2]">Have a project in mind?</h2>
-            <p className="text-[1.1vw] leading-relaxed text-gray-700">
-              Your vision deserves a partner who listens, challenges and elevates. Share your project with us and let's design an experience that goes beyond expectations. Bold ideas, flawless execution, unforgettable impact.
-            </p>
-          </div>
-        </div>
-
-        {/* Right Form */}
-        <div className="w-[60%] flex items-center justify-center p-[5vw]">
-          <div className="w-full pt-[5vw] space-y-[2vw]">
-            {/* Floating Inputs */}
-            {[
-              { label: 'Full name*', type: 'text' },
-              { label: 'Email address*', type: 'email' },
-              { label: 'Phone number', type: 'tel' },
-              { label: 'Company name*', type: 'text' },
-            ].map((field, i) => (
-              <div key={i} className="relative">
-                <label className="absolute left-0 top-[40%] text-gray-500 text-[1vw] pointer-events-none origin-left">
-                  {field.label}
-                </label>
-                <input
-                  type={field.type}
-                  className="float-input w-full bg-transparent border-b border-gray-400 pb-[0.5vw] pt-[1.2vw] text-gray-700 placeholder-transparent focus:outline-none focus:border-gray-700 transition-colors"
-                />
-              </div>
-            ))}
-
-            <div className="space-y-[1vw]">
-              <label className="text-[0.7vw] uppercase tracking-wider text-gray-600">PROJECT TYPE</label>
-              <div className="relative">
-                <select className="w-full bg-transparent border-b border-gray-400 pb-[0.5vw] text-gray-700 appearance-none focus:outline-none focus:border-gray-700 transition-colors cursor-pointer">
-                  <option>Corporate Event</option>
-                  <option>Wedding</option>
-                  <option>Conference</option>
-                  <option>Product Launch</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="relative">
-              <label className="absolute left-0 top-0 text-gray-500 text-[1vw] pointer-events-none origin-left">
-                Tell us more about your project's vision, location, size, timing, and audience.
-              </label>
-              <textarea
-                rows="3"
-                className="float-input w-full bg-transparent border-b border-gray-400 pb-[0.5vw] pt-[1.2vw] text-gray-700 placeholder-transparent focus:outline-none focus:border-gray-700 transition-colors resize-none"
-              />
-            </div>
-
-            <Btn text='Next' bgColor='bg-[#9C93E8] px-[2vw] py-[0.8vw]' />
-          </div>
-        </div>
-
-        {/* Vertical Text on Right Edge */}
-        <div
-          className="absolute right-[-7%] top-1/2 -translate-y-1/2 cursor-pointer z-50"
-          onMouseEnter={() => handleHover('contact')}
-          onMouseLeave={() => handleHoverOut('contact')}
-          onClick={() => setActiveForm('contact')}
-        >
-          <div className="text-[7vw] font-bold leading-none tracking-tight origin-center rotate-90 whitespace-nowrap">
+    <>
+      <Navbar />
+      <main className="min-h-screen bg-[#09090B] text-white pt-[clamp(112px,10vw,168px)] pb-24 max-sm:pb-16">
+        <div className="mx-auto w-full max-w-[1180px] px-5 sm:px-8">
+          <span className="inline-flex items-center gap-2 rounded-full border border-[#9C93E8]/30 bg-[#9C93E8]/10 px-3 py-1 font-body text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C9C3F5]">
             Contact
-          </div>
+          </span>
+          <h1 className="mt-5 max-w-[860px] text-balance font-third text-[clamp(40px,5.5vw,84px)] leading-[1.04] tracking-[-0.02em]">
+            Write to us. A person reads every email.
+          </h1>
+          <a
+            href={`mailto:${CONTACT_EMAIL}`}
+            className="mt-8 inline-flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-5 font-body text-[clamp(20px,2vw,30px)] text-white transition-colors hover:border-[#9C93E8]/50 hover:bg-white/[0.06] max-sm:w-full max-sm:px-5 max-sm:py-4 [overflow-wrap:anywhere]"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="size-[0.9em] shrink-0 text-[#9C93E8]" fill="none" stroke="currentColor" strokeWidth={1.8}>
+              <rect x="3" y="5" width="18" height="14" rx="2.5" />
+              <path d="m4 7 8 6 8-6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {CONTACT_EMAIL}
+          </a>
+
+          <ul className="mt-16 grid gap-4 sm:grid-cols-2">
+            {TOPICS.map((t) => (
+              <li key={t.title} className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-6">
+                <h2 className="font-display text-[22px] leading-tight">{t.title}</h2>
+                <p className="mt-2 font-body text-[16px] leading-[1.6] text-white/70">{t.body}</p>
+              </li>
+            ))}
+          </ul>
+
+          <p className="mt-12 max-w-[760px] font-body text-[16px] leading-[1.7] text-white/65">
+            For how we handle what you send, see the <Link href="/privacy" className="text-white underline decoration-white/30 underline-offset-4 hover:decoration-white">privacy policy</Link>.
+            To try Tredio, open the{" "}
+            <a href={APP_URL} target="_blank" rel="noopener noreferrer" className="text-white underline decoration-white/30 underline-offset-4 hover:decoration-white">
+              app on NEAR testnet
+            </a>
+            .
+          </p>
         </div>
+      </main>
+      <div className="max-[768px]:hidden">
+        <Footer />
       </div>
-
-      {/* Overlay Form - General Contact */}
-      <div
-        ref={overlayRef}
-        className="absolute inset-0 bg-[#9C93E8] pointer-events-auto px-[10vw]"
-        style={{
-          clipPath: 'polygon(92.5% 0%, 100% 0%, 100% 100%, 88.5% 100%)',
-        }}
-      >
-        <div className="flex h-screen relative">
-          {/* Left Content */}
-          <div className="w-[40%] flex items-center justify-center pl-[6vw]">
-            <div>
-              <h2 className="text-[2.5vw] font-display mb-[3vw] leading-[1.2]">We're looking forward to hear from you</h2>
-              <p className="text-[1.1vw] leading-relaxed text-gray-700">
-                Every great collaboration starts with a conversation. Whether you're exploring a partnership, joining our team, or simply reaching out, we're here, ready to listen and respond with purpose. Let's connect.
-              </p>
-            </div>
-          </div>
-
-          {/* Right Form */}
-          <div className="flex-1 flex items-center justify-center p-[6vw]">
-            <div className="w-full max-w-[30vw] space-y-[2.5vw]">
-              {[
-                { label: 'Full name*', type: 'text' },
-                { label: 'Email address*', type: 'email' },
-                { label: 'Phone number', type: 'tel' },
-              ].map((field, i) => (
-                <div key={i} className="relative">
-                  <label className="absolute left-0 top-[40%] text-gray-500 text-[1vw] pointer-events-none origin-left">
-                    {field.label}
-                  </label>
-                  <input
-                    type={field.type}
-                    className="float-input w-full bg-transparent border-b border-gray-400 pb-[0.5vw] pt-[1.2vw] text-gray-700 placeholder-transparent focus:outline-none focus:border-gray-700 transition-colors"
-                  />
-                </div>
-              ))}
-
-              <div className="space-y-[1vw]">
-                <label className="text-[0.7vw] uppercase tracking-wider text-gray-600">REASON FOR CONTACT</label>
-                <div className="relative">
-                  <select className="w-full bg-transparent border-b border-gray-400 pb-[0.5vw] text-gray-700 appearance-none focus:outline-none focus:border-gray-700 transition-colors cursor-pointer">
-                    <option>General Inquiry</option>
-                    <option>Partnership</option>
-                    <option>Career</option>
-                    <option>Support</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-[1vw]">
-                <label className="text-[0.7vw] uppercase tracking-wider text-gray-600">SUPPORTING DOCUMENT</label>
-                <button className="flex cursor-pointer items-center gap-[1vw] border border-gray-400 px-[1vw] py-[0.5vw] rounded-[0.6vw] hover:border-gray-700 transition-colors">
-                  <span>Upload file</span>
-                  <svg width="1.2vw" height="1.2vw" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M8 12V4M8 4L5 7M8 4L11 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-              </div>
-
-              <div className="relative">
-                <label className="absolute left-0 top-0 text-gray-500 text-[1vw] pointer-events-none origin-left">
-                  Message
-                </label>
-                <textarea
-                  rows="2"
-                  className="float-input w-full bg-transparent border-b border-gray-400 pb-[0.5vw] pt-[1.2vw] text-gray-700 placeholder-transparent focus:outline-none focus:border-gray-700 transition-colors resize-none"
-                />
-              </div>
-
-              <Btn text='send' bgColor='bg-[#9C93E8] px-[2vw] py-[0.8vw]' />
-            </div>
-          </div>
-        </div>
+      <div className="min-[769px]:hidden">
+        <MobileFooter />
       </div>
-
-      {/* Left Edge Label */}
-      <div
-        className="absolute left-[-12%] top-1/2 -translate-y-1/2 cursor-pointer z-50"
-        onMouseEnter={() => handleHover('quote')}
-        onMouseLeave={() => handleHoverOut('quote')}
-        onClick={() => setActiveForm('quote')}
-      >
-        <div className="text-[7vw] font-bold leading-none tracking-tight origin-center -rotate-90 whitespace-nowrap">
-          Get a quote
-        </div>
-      </div>
-    </div>
+    </>
   );
-};
-
-export default Contact;
+}

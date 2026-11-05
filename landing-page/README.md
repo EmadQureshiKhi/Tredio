@@ -2,8 +2,11 @@
 
 Marketing site for Tredio, built with Next.js, GSAP, Framer Motion and Lenis.
 Its "Launch App" buttons open the trading app, and its Mainnet waitlist form (hero modal and the section before the footer) posts to the backend.
-The site is served at tredio.bid, with legal pages at `/terms`, `/privacy` and `/cookies`; the operator details they show live in `src/config/legal.js`.
-Third-party images and partner logos, with their sources and licences, are listed in `ASSETS.md`.
+The site is served at tredio.bid, with legal pages at `/terms`, `/privacy` and `/cookies` and a contact page at `/contact`; the operator details they show live in `src/config/legal.js`.
+Home page copy lives in `src/config/content.js` (shared by the desktop and phone layouts), the "Built with" logos in `src/config/partners.js`, and `public/llms.txt` describes Tredio for AI agents.
+Fonts (Hanken Grotesk and Newsreader, SIL OFL) load through `next/font/google`, so a build needs network access to Google Fonts.
+Third-party images, logos and fonts, with their sources and licences, are listed in `ASSETS.md`; the logo, icons, link cards and rendered pictures come from `assets/brand/` (`assets/brand/export.sh`).
+The hero film goes in `public/assets/video/hero-vid.mp4`; until it exists the hero shows `hero-poster.webp` without playback controls.
 
 ## Setup
 

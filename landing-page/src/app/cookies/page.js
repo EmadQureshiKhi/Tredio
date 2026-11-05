@@ -39,13 +39,13 @@ const sections = [
         <Table
           head={["Name", "Where", "What it is for", "How long"]}
           rows={[
-            [<code key="a">tredio-account</code>, "IndexedDB", "Your trading session key, encrypted under a key the browser cannot export, so you trade without a passkey prompt each time.", "Until it expires or you clear site data"],
-            [<code key="b">tredio-private</code>, "IndexedDB", "The keys that open your vault and sign your posts, encrypted the same way.", "Until you clear site data"],
-            [<code key="c">tredio.backend-token</code>, "Session storage", "Your sign-in token for the Tredio backend.", "Until you close the tab"],
-            [<code key="d">tredio.pending-activation</code>, "Local storage", "A new account's public key while its setup finishes.", "Until setup completes"],
+            ["Session key store", "IndexedDB", "Your trading session key, encrypted under a key the browser cannot export, so you trade on NEAR testnet without a passkey prompt each time.", "Until the session expires or you clear site data"],
+            ["Private key store", "IndexedDB", "The keys that open your vault and sign your posts, encrypted the same way.", "Until you clear site data"],
+            ["Sign-in token", "Session storage", "Your sign-in token for the Tredio backend.", "Until you close the tab"],
             [<code key="e">tredio.theme</code>, "Local storage", "Light or dark theme, if you picked one.", "Until you change it or clear site data"],
             [<code key="f">tredio.push.topics</code>, "Local storage", "Which notification topics you turned on.", "Until you change them or clear site data"],
-            [<code key="g">tredio.portfolio.series:&lt;account&gt;</code>, "Local storage", "A short list of outcome series you traded, so your portfolio finds them quickly.", "Until you clear site data"],
+            [<code key="g">tredio.push.added</code>, "Local storage", "Notification topics added after you chose your list, so each is added once.", "Until you clear site data"],
+            [<code key="i">tredio.faucet-claims</code>, "Local storage", "When each account last claimed test USDC from the faucet, so the button shows when the next claim opens.", "Until you clear site data"],
             [<code key="h">tredio.waitlist</code>, "Local storage", "The email you joined the Mainnet waitlist with, and whether you closed its banner, so the app shows that you joined.", "Until you clear site data"],
           ]}
         />
@@ -62,7 +62,7 @@ const sections = [
     body: (
       <p>
         You can clear all of it at any time in your browser&apos;s settings (site data for app.tredio.bid). You will
-        then need your passkey to sign in again, and nothing else is lost: your account and assets do not live in your browser,
+        then need your passkey to sign in again, and nothing else is lost: your account and assets live on NEAR, not in your browser,
         and your vault is stored encrypted by the backend. More about what we store is in the{" "}
         <Link href="/privacy">privacy policy</Link>.
       </p>

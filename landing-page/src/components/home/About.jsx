@@ -4,10 +4,11 @@ import gsap from "gsap";
 import ScrollTrigger from "gsap/dist/ScrollTrigger";
 import SplitText from "gsap/dist/SplitText";
 import Image from "next/image";
+import { HOW_IT_WORKS } from "@/config/content";
 
 gsap.registerPlugin(ScrollTrigger, SplitText);
 
-export default function ClippedTextSection() {
+export default function About() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -21,44 +22,8 @@ export default function ClippedTextSection() {
   const maskRef = useRef(null);
   const cursorRef = useRef(null);
 
-  //  Each slide has its own background + text
-  const slides = [
-    {
-      image: "/assets/img/topics-islands.jpg",
-      heading: "A topic starts trending on X. The radar picks it up and proposes a market.",
-      category: "Topics",
-      country: "Radar",
-      description: "Elfa, Bluesky, CoinGecko, Wikipedia, Nansen and an AI review find what's rising.",
-    },
-    {
-      image: "/assets/img/crypto-chart.jpg",
-      heading: "Bitcoin gets loud. Its attention index moves with it, point by point.",
-      category: "Crypto",
-      country: "Index",
-      description: "The Tredio oracle records every score from 0 to 100.",
-    },
-    {
-      image: "/assets/img/saylor-bitcoin-strategy.avif",
-      heading: "A CEO posts and the timeline lights up. Trade the noise, or the stock behind it.",
-      category: "Equities",
-      country: "Perps",
-      description: "Attention perps on the index, asset perps on the asset.",
-    },
-    {
-      image: "/assets/img/coinbase-logo.jpg",
-      heading: "Regulation hits the feed. Will the attention be higher tomorrow? Take a side.",
-      category: "Outcomes",
-      country: "Up / Down",
-      description: "Outcome series on an order book, settled in USDC.",
-    },
-    {
-      image: "/assets/img/crypto-act-narrative.jpg",
-      heading: "A bill is debated all week. A narrative that big can have a coin of its own.",
-      category: "Narratives",
-      country: "Coins",
-      description: "Trend coins launch on bonding curves.",
-    },
-  ];
+  // Each slide has its own background and text.
+  const slides = HOW_IT_WORKS;
 
   // GSAP ScrollTrigger for mask animation
   useEffect(() => {
@@ -272,14 +237,6 @@ export default function ClippedTextSection() {
 
       {/* Sticky container - everything is contained within this */}
       <div className="sticky top-0 h-screen w-full overflow-hidden">
-        {/* Background Image - positioned relative to sticky container */}
-        {/* <div
-          className="absolute top-0 left-0 h-full w-full bg-cover bg-center transition-opacity duration-700"
-          style={{
-            backgroundImage: `url('${slides[currentSlide].image}')`,
-          }}
-        /> */}
-
         {/* Clip Path Diagonal V-Shape Transition Overlay */}
         {isTransitioning && (
           <div
@@ -309,7 +266,7 @@ export default function ClippedTextSection() {
         <div ref={maskRef} className="absolute inset-0 moving-about z-5">
           <svg
             role="img"
-            aria-label="Trade what the internet watches. Scored 0 to 100. Recorded live. Traded in USDC."
+            aria-label="Trade what the internet watches. Scored 0 to 100. Verified on NEAR. Settled in USDC."
             viewBox="0 0 1512 823"
             xmlns="http://www.w3.org/2000/svg"
             className="w-full h-full"
@@ -320,10 +277,9 @@ export default function ClippedTextSection() {
                 <rect width="100%" height="100%" fill="white" />
                 <text
                   fontSize="113"
-                  fontWeight="bold"
                   fill="black"
                   textAnchor="middle"
-                  fontFamily="system-ui, -apple-system, sans-serif"
+                  style={{ fontFamily: "var(--font-body), system-ui, sans-serif", fontWeight: 700, letterSpacing: "-0.01em" }}
                 >
                   <tspan x="50%" y="184.7">
                     Trade what the{" "}
@@ -335,10 +291,10 @@ export default function ClippedTextSection() {
                     Scored 0 to 100.{" "}
                   </tspan>
                   <tspan x="50%" y="524.9">
-                    Recorded live.{" "}
+                    Verified on NEAR.{" "}
                   </tspan>
                   <tspan x="50%" y="638.3">
-                    Traded in USDC.
+                    Settled in USDC.
                   </tspan>
                 </text>
               </mask>
@@ -389,7 +345,7 @@ export default function ClippedTextSection() {
           >
             {/* Main Heading */}
             <div className="slide-line">
-              <h2 className="text-[3.5vw] font-bold w-[90%] leading-[1.1] about-slider-text max-sm:text-[6.5vw] max-sm:w-full">
+              <h2 className="text-[3.5vw] font-semibold w-[90%] leading-[1.1] about-slider-text max-sm:text-[6.5vw] max-sm:w-full">
                 {slides[currentSlide].heading}
               </h2>
             </div>
@@ -399,10 +355,10 @@ export default function ClippedTextSection() {
                 longest category plus a gap, and the description keeps to one line at the right. */}
             <div className="grid grid-cols-[11.5vw_auto_1fr] items-baseline max-sm:flex max-sm:flex-col max-sm:items-start max-sm:gap-[1.5vw]">
               <p className="text-[2vw] font-display about-slider-text max-sm:text-[4.5vw]">
-                {slides[currentSlide].category}
+                {slides[currentSlide].label}
               </p>
               <p className="text-[2vw] font-display about-slider-text max-sm:text-[4.5vw]">
-                {slides[currentSlide].country}
+                {slides[currentSlide].detail}
               </p>
               <p className="justify-self-end whitespace-nowrap text-[1.2vw] text-gray-200 about-slider-text max-sm:justify-self-auto max-sm:whitespace-normal max-sm:text-[3.5vw] max-sm:leading-[1.3]">
                 {slides[currentSlide].description}
@@ -415,69 +371,6 @@ export default function ClippedTextSection() {
           <div className="absolute w-full h-px bg-white opacity-40 top-[50%]" />
         )}
 
-        {/* Navigation */}
-        {/* {isSliderActive && (
-          <div className="absolute inset-0 flex items-center justify-between px-8 pointer-events-none">
-            <button
-              onClick={prevSlide}
-              className="pointer-events-auto bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white p-4 rounded-full transition-all duration-300"
-              aria-label="Previous slide"
-            >
-              <svg
-                width="48"
-                height="48"
-                viewBox="0 0 48 48"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M30 36L18 24L30 12"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            <button
-              onClick={nextSlide}
-              className="pointer-events-auto bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white p-4 rounded-full transition-all duration-300"
-              aria-label="Next slide"
-            >
-              <svg
-                width="48"
-                height="48"
-                viewBox="0 0 48 48"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M18 36L30 24L18 12"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          </div>
-        )} */}
-
-        {/* Indicators */}
-        {/* {isSliderActive && (
-          <div className="absolute bottom-8 left-0 right-0 flex justify-center gap-2">
-            {slides.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => changeSlide(index)}
-                className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                  currentSlide === index ? "bg-white w-8" : "bg-white/50"
-                }`}
-                disabled={isTransitioning}
-              />
-            ))}
-          </div>
-        )} */}
       </div>
     </section>
   );

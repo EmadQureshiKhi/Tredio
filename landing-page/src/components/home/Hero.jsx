@@ -37,11 +37,26 @@ const Hero = () => {
   // Phones and tablets toggle sound by tapping the video. Set after mount so the server render and
   // the first client render agree.
   const [tapTogglesSound, setTapTogglesSound] = useState(false);
-  useEffect(() => setTapTogglesSound(window.innerWidth <= 1024), []);
-  const isMobile = globalThis.innerWidth <= 1024;
+  useEffect(() => setTapTogglesSound(window.innerWidth < 1024), []);
+  // False once the film fails to load (or is not there yet): the poster stays and the playback
+  // controls hide.
+  const [hasVideo, setHasVideo] = useState(true);
+  // Matches Tailwind's lg breakpoint, where the layout switches to the phone and tablet hero.
+  const isMobile = globalThis.innerWidth < 1024;
 
   const isFullyScaled = scrollProgress >= 0.85;
   const controlsOpacity = Math.min(1, Math.max(0, (scrollProgress - 0.65) / 0.2));
+
+  // A missing or unplayable film: keep the poster, drop the controls. The error can fire before
+  // hydration, so the element's state is read once on mount too.
+  useEffect(() => {
+    const video = videoElRef.current;
+    if (!video) return;
+    const fail = () => setHasVideo(false);
+    if (video.error || video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) fail();
+    video.addEventListener("error", fail);
+    return () => video.removeEventListener("error", fail);
+  }, []);
 
   // Track video playback progress
   useEffect(() => {
@@ -142,7 +157,7 @@ const Hero = () => {
         mask: "lines",
       });
 
-      gsap.set(".ivention-overlay", {
+      gsap.set(".hero-veil", {
         delay: 0.2,
         opacity: 0,
       });
@@ -310,15 +325,16 @@ const Hero = () => {
       onMouseLeave={handleMouseLeave}
       className="w-screen h-[200vh] max-lg:h-screen bg-black relative"
     >
-      <div className="fixed inset-0 bg-[#9C93E8] pointer-events-none h-full w-full ivention-overlay z-[99999]"></div>
+      {/* A lavender veil over the first paint, lifted once the page has loaded. */}
+      <div className="fixed inset-0 bg-[#9C93E8] pointer-events-none h-full w-full hero-veil z-[99999]"></div>
 
       <div className="h-screen w-full max-lg:w-screen sticky top-0 max-lg:left-0 overflow-hidden flex justify-center items-center">
         <div
           ref={videoRef}
           className="h-[60vw] w-[102vw] max-lg:h-[25vh] max-lg:mx-auto max-lg:w-[90vw] opacity-0 hero-video relative z-40 rounded-[4.5vw] overflow-hidden shadow-2xl origin-center max-lg:rounded-[3.5vw]"
           style={{ transformStyle: "preserve-3d", willChange: "transform" }}
-          onClick={tapTogglesSound ? toggleMute : undefined}
-          data-video-sound={tapTogglesSound ? "" : undefined}
+          onClick={tapTogglesSound && hasVideo ? toggleMute : undefined}
+          data-video-sound={tapTogglesSound && hasVideo ? "" : undefined}
         >
           {/* Started from script, with sound when the browser allows it (see the effects above). */}
           <video
@@ -332,7 +348,7 @@ const Hero = () => {
             className="w-full h-full object-cover"
           />
           {/* Mobile mute indicator */}
-          <div className="absolute inset-0 hidden max-lg:flex items-end justify-end p-3 pointer-events-none">
+          <div className={`absolute inset-0 hidden ${hasVideo ? "max-lg:flex" : ""} items-end justify-end p-3 pointer-events-none`}>
             <div className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
               {isMuted ? (
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
@@ -350,9 +366,16 @@ const Hero = () => {
         <ClipPath clipRef={clipRef} />
 
         {/* TEXT LAYER */}
-        <div className="absolute inset-0 h-screen w-full flex items-center max-lg:flex-col max-lg:items-start max-lg:justify-between max-lg:pt-[22vw] max-lg:pb-[10vw] text-[#101417] justify-between z-20 px-[3vw] max-lg:px-[5vw]">
+        <div className="absolute inset-0 h-screen w-full flex items-center max-lg:flex-col max-lg:items-start max-lg:justify-between max-lg:pt-[clamp(84px,18vw,120px)] max-lg:pb-[10vw] text-[#101417] justify-between z-20 px-[3vw] max-lg:px-[5vw]">
           <div>
-            <h1 className="text-[2.5vw] max-lg:text-[10vw] max-lg:text-white max-lg:[text-shadow:0_1px_14px_rgba(0,0,0,0.5)] font-third leading-[1.1] hero-text max-lg:text-left">
+            <p className="hero-cta mb-[1.1vw] inline-flex items-center gap-[0.5vw] rounded-full border border-[#101417]/25 bg-[#101417]/[0.06] px-[clamp(10px,0.75vw,14px)] py-[clamp(4px,0.3vw,6px)] font-body text-[clamp(10px,0.7vw,13px)] font-semibold uppercase tracking-[0.16em] max-lg:mb-4 max-lg:gap-2 max-lg:border-white/30 max-lg:bg-black/40 max-lg:text-white max-lg:backdrop-blur-sm">
+              <span aria-hidden="true" className="relative flex size-[clamp(6px,0.45vw,8px)]">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#16A34A] opacity-60 motion-reduce:animate-none max-lg:bg-[#4ADE80]" />
+                <span className="relative inline-flex size-full rounded-full bg-[#16A34A] max-lg:bg-[#4ADE80]" />
+              </span>
+              Live on NEAR testnet
+            </p>
+            <h1 className="text-[2.5vw] max-lg:text-[clamp(36px,10vw,64px)] max-lg:text-white max-lg:[text-shadow:0_1px_14px_rgba(0,0,0,0.5)] font-third leading-[1.1] hero-text max-lg:text-left">
               Trade the World&apos;s <br /> Attention
             </h1>
             <div className="hero-cta mt-[1.7vw] flex flex-wrap items-center gap-[0.6vw] max-lg:mt-5 max-lg:gap-2.5">
@@ -374,8 +397,8 @@ const Hero = () => {
               </button>
             </div>
           </div>
-          <p className="w-[23%] max-lg:w-full max-lg:text-[4vw] max-lg:leading-[1.5] max-lg:text-left max-lg:mb-12 max-lg:bg-black/65 max-lg:backdrop-blur-sm max-lg:rounded-2xl max-lg:px-4 max-lg:py-3 text-[1.3vw] leading-5.5 hero-text text-white">
-            When something starts trending, Tredio opens a market on it. Trade where the attention goes next.
+          <p className="w-[23%] max-lg:w-full max-lg:text-[clamp(15px,4vw,20px)] max-lg:leading-[1.5] max-lg:text-left max-lg:mb-12 max-lg:bg-black/65 max-lg:backdrop-blur-sm max-lg:rounded-2xl max-lg:px-4 max-lg:py-3 text-[1.3vw] leading-[1.35] hero-text text-white">
+            When something starts trending, Tredio opens a market on it. Trade where the attention goes next, with one passkey and no gas.
           </p>
         </div>
 
@@ -383,10 +406,10 @@ const Hero = () => {
         <div
           className="absolute inset-0 z-50 max-lg:hidden"
           style={{
-            cursor: isFullyScaled ? "none" : "default",
-            pointerEvents: isFullyScaled ? "auto" : "none",
+            cursor: isFullyScaled && hasVideo ? "none" : "default",
+            pointerEvents: isFullyScaled && hasVideo ? "auto" : "none",
           }}
-          onClick={isFullyScaled ? togglePlayPause : undefined}
+          onClick={isFullyScaled && hasVideo ? togglePlayPause : undefined}
           data-video-sound=""
           onMouseMove={isFullyScaled ? handleCursorMove : undefined}
           onMouseEnter={() => isFullyScaled && setIsCursorVisible(true)}
@@ -400,7 +423,7 @@ const Hero = () => {
             left: 0,
             top: 0,
             transform: "translate(-50%, -50%)",
-            opacity: isCursorVisible && isFullyScaled ? 1 : 0,
+            opacity: isCursorVisible && isFullyScaled && hasVideo ? 1 : 0,
             transition: "opacity 0.2s ease",
           }}
         >
@@ -421,47 +444,49 @@ const Hero = () => {
         </div>
 
         {/* BOTTOM CONTROLS BAR: progress + mute side by side */}
-        <div
-          className="absolute bottom-0 left-0 right-0 z-50 px-8 pb-8 flex flex-row items-center gap-4 max-lg:hidden pointer-events-none"
-          style={{ opacity: controlsOpacity }}
-        >
-          {/* Progress bar */}
+        {hasVideo && (
           <div
-            className="flex-1 h-[3px] bg-white/20 rounded-full cursor-pointer group"
-            onClick={handleProgressClick}
-            style={{ pointerEvents: controlsOpacity > 0.1 ? "auto" : "none" }}
+            className="absolute bottom-0 left-0 right-0 z-50 px-8 pb-8 flex flex-row items-center gap-4 max-lg:hidden pointer-events-none"
+            style={{ opacity: controlsOpacity }}
           >
+            {/* Progress bar */}
             <div
-              className="h-full bg-white rounded-full relative"
-              style={{ width: `${videoProgress}%` }}
+              className="flex-1 h-[3px] bg-white/20 rounded-full cursor-pointer group"
+              onClick={handleProgressClick}
+              style={{ pointerEvents: controlsOpacity > 0.1 ? "auto" : "none" }}
             >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div
+                className="h-full bg-white rounded-full relative"
+                style={{ width: `${videoProgress}%` }}
+              >
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
             </div>
-          </div>
 
-          {/* Mute toggle */}
-          <button
-            type="button"
-            data-video-sound=""
-            onClick={toggleMute}
-            className="w-10 h-10 shrink-0 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center transition-transform hover:scale-110 active:scale-95"
-            style={{ pointerEvents: controlsOpacity > 0.1 ? "auto" : "none" }}
-            aria-label={isMuted ? "Unmute video" : "Mute video"}
-          >
-            {isMuted ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-                <path d={SOUND_OFF_PATH} />
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-                <path d={SOUND_ON_PATH} />
-              </svg>
-            )}
-          </button>
-        </div>
+            {/* Mute toggle */}
+            <button
+              type="button"
+              data-video-sound=""
+              onClick={toggleMute}
+              className="w-10 h-10 shrink-0 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center transition-transform hover:scale-110 active:scale-95"
+              style={{ pointerEvents: controlsOpacity > 0.1 ? "auto" : "none" }}
+              aria-label={isMuted ? "Unmute video" : "Mute video"}
+            >
+              {isMuted ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                  <path d={SOUND_OFF_PATH} />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                  <path d={SOUND_ON_PATH} />
+                </svg>
+              )}
+            </button>
+          </div>
+        )}
 
         {/* TAP FOR SOUND: shown while the browser keeps the video muted */}
-        {needsTap && (
+        {needsTap && hasVideo && (
           <button
             type="button"
             data-video-sound=""

@@ -3,7 +3,7 @@ import React, { useRef } from "react";
 import { gsap } from "gsap";
 
 // A link when given `href` (newTab opens it in a new tab), a plain button otherwise.
-const Btn = ({ text = "Get to know us", bgColor = 'bg-white', href, newTab = false }) => {
+const Btn = ({ text, bgColor = "bg-white", href, newTab = false }) => {
   const buttonRef = useRef(null);
 
   const handleMouseMove = (e) => {
@@ -40,7 +40,7 @@ const Btn = ({ text = "Get to know us", bgColor = 'bg-white', href, newTab = fal
     });
   };
 
-  const className = `relative inline-block px-[1vw] py-[0.5vw] cursor-pointer w-fit font-body uppercase text-black text-[0.7vw] font-semibold rounded-sm ${bgColor}`;
+  const className = `relative inline-flex items-center h-[clamp(36px,2.6vw,48px)] px-[clamp(14px,1.2vw,22px)] cursor-pointer w-fit font-body uppercase tracking-[0.12em] text-black text-[clamp(11px,0.75vw,13px)] font-semibold rounded-[clamp(4px,0.35vw,7px)] ${bgColor}`;
   if (href) {
     return (
       <a ref={buttonRef} href={href} {...(newTab ? { target: "_blank", rel: "noopener noreferrer" } : {})} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} className={className}>

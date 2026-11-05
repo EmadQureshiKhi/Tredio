@@ -1,46 +1,72 @@
-// Tiles on the Signal card: where the attention index comes from.
-// Logo files live in public/assets/logos; their sources and the brand terms that cover them are
-// listed in ASSETS.md. A tile with `cover` fills with that picture instead of a centred logo, and a
-// tile with `marks` stacks several partners' marks (each with its own size, link or text badge).
-// Wikimedia allows its logos only as a link to a Wikimedia site, hence `href` on the Wikipedia tile;
-// CoinGecko's attribution guide asks for its logos to link to its sites, hence theirs.
-export const SIGNAL_LOGOS = [
+// The "Built with" section: what Tredio runs on and where its attention data comes from.
+// Logo files live in public/assets/logos, each taken unmodified from the vendor's own brand kit;
+// sources and terms are in ASSETS.md. A vendor without a published kit, or whose terms ask for
+// written permission before its logo is shown, appears by name only (no `logo`).
+// `ratio` is the logo file's width / height, so every logo can be sized to the same optical area;
+// `scale` corrects for padding and visual weight inside each file.
+export const STACK = [
   {
-    name: "Elfa and Bluesky",
-    role: "Social mentions",
-    background: "#FFFFFF",
-    foreground: "#1B1530",
-    // Bluesky asks for clear space around its logo equal to the butterfly's height.
-    gap: "12%",
-    marks: [
-      { name: "Elfa", src: "/assets/logos/elfa.svg", width: "46%", height: "17%" },
-      { name: "Bluesky", src: "/assets/logos/bluesky.svg", width: "40%", height: "9%" },
-    ],
+    name: "NEAR",
+    role: "Accounts, markets and settlement",
+    logo: { src: "/assets/logos/near.svg", ratio: 1440 / 351, scale: 0.84 },
+    href: "https://near.org",
+  },
+  {
+    name: "NEAR Intents",
+    role: "Deposits from 38 chains",
+    logo: { src: "/assets/logos/near-intents.svg", ratio: 1748.82 / 359.71, scale: 1.02 },
+  },
+  {
+    name: "NEAR AI Cloud",
+    role: "Verifiable AI review",
+    logo: { src: "/assets/logos/near-ai.svg", ratio: 730 / 138, scale: 0.74, minWidth: 120 },
+    href: "https://near.ai",
+  },
+  {
+    name: "OutLayer",
+    role: "TEE attention oracle",
+    href: "https://outlayer.ai",
+  },
+  {
+    name: "Hyperliquid",
+    role: "Perps on the underlying asset",
+    logo: { src: "/assets/logos/hyperliquid.svg", ratio: 856 / 200, scale: 1.04 },
+    href: "https://hyperliquid.xyz",
+  },
+  {
+    name: "Rhea Finance",
+    role: "Where trend coins graduate",
+    href: "https://rhea.finance",
+  },
+];
+
+// Attention data sources. CoinGecko's attribution guide asks for its logos to link to its sites with
+// "Data powered by" beside them; Wikimedia allows its marks only as a link to a Wikimedia site.
+export const DATA_SOURCES = [
+  { name: "Elfa", role: "Social mentions", href: "https://www.elfa.ai" },
+  {
+    name: "Nansen",
+    role: "Smart-money data powered by Nansen",
+    logo: { src: "/assets/logos/nansen.svg", ratio: 117.98 / 47.85, scale: 1.3 },
+    href: "https://www.nansen.ai",
+  },
+  {
+    name: "CoinGecko",
+    role: "Data powered by CoinGecko",
+    logo: { src: "/assets/logos/coingecko.svg", ratio: 1000 / 219, scale: 0.94 },
+    href: "https://www.coingecko.com/",
+  },
+  {
+    name: "GeckoTerminal",
+    role: "On-chain data powered by GeckoTerminal",
+    logo: { src: "/assets/logos/geckoterminal.svg", ratio: 1002 / 191, scale: 0.94 },
+    href: "https://www.geckoterminal.com/",
   },
   {
     name: "Wikipedia",
     role: "Pageviews",
-    src: "/assets/logos/wikipedia-wordmark.svg",
+    logo: { src: "/assets/logos/wikipedia-wordmark.svg", ratio: 119 / 18, scale: 0.78 },
     href: "https://www.wikipedia.org/",
-    background: "#0F0F12",
-    width: "62%",
   },
-  {
-    name: "Nansen",
-    role: "Smart-money flows",
-    src: "/assets/logos/nansen.svg",
-    background: "#08140F",
-    width: "50%",
-  },
-  {
-    name: "Hacker News, CoinGecko and GeckoTerminal",
-    role: "Trending lists",
-    background: "#0D1217",
-    gap: "7%",
-    marks: [
-      { name: "Hacker News", text: "Hacker News", href: "https://news.ycombinator.com/", color: "#000000", background: "#FF6600" },
-      { name: "CoinGecko", src: "/assets/logos/coingecko.svg", href: "https://www.coingecko.com/", width: "44%", height: "10%" },
-      { name: "GeckoTerminal", src: "/assets/logos/geckoterminal.svg", href: "https://www.geckoterminal.com/", width: "48%", height: "10%" },
-    ],
-  },
+  { name: "Bluesky", role: "Posts and trending topics", href: "https://bsky.app" },
 ];

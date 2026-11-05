@@ -4,8 +4,10 @@ import { flushSync } from "react-dom";
 import { gsap } from "gsap";
 import Image from "next/image";
 import { APP_URL } from "@/config/links";
+import { HOW_IT_WORKS } from "@/config/content";
 
-const HighlightedProjects = () => {
+// The phone layout's "How it works": the same five steps as the desktop slider, one per slide.
+const HowItWorksMobile = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [nextSlide, setNextSlide] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -13,32 +15,7 @@ const HighlightedProjects = () => {
   const currentTextRef = useRef(null);
   const isFirstMount = useRef(true);
 
-  const slides = [
-    {
-      id: 1,
-      ticker: "BTC",
-      assetClass: "Crypto",
-      network: "Testnet",
-      quote: "Bitcoin is all over the feed. Will its attention index end the day above where it opened? Buy UP or DOWN on the order book: each winning token redeems for 1 USDC, and each losing token for nothing.",
-      bgImage: "/assets/img/topics-trend-every-day.jpg",
-    },
-    {
-      id: 2,
-      ticker: "HANTA",
-      assetClass: "Topic",
-      network: "Testnet",
-      quote: "A news cycle has no ticker, but its attention does. Go long while the story spreads, or short it as the feed moves on, with an attention perp.",
-      bgImage: "/assets/img/hantavirus.avif",
-    },
-    {
-      id: 3,
-      ticker: "AAPL",
-      assetClass: "Equity",
-      network: "Testnet",
-      quote: "Keynote day. Back the conversation early with the trend's own coin on its bonding curve, or trade its attention Up or Down.",
-      bgImage: "/assets/img/apple-keynote.jpg",
-    },
-  ];
+  const slides = HOW_IT_WORKS;
 
   // Runs synchronously after DOM update, so GSAP targets the actual new nodes
   useLayoutEffect(() => {
@@ -127,7 +104,7 @@ const HighlightedProjects = () => {
       <div
         className="absolute inset-0 w-full h-full"
         style={{
-          backgroundImage: `url(${slides[currentSlide].bgImage})`,
+          backgroundImage: `url(${slides[currentSlide].image})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
@@ -138,29 +115,31 @@ const HighlightedProjects = () => {
           ref={currentTextRef}
           className="relative z-10 flex flex-col justify-center h-full px-8 pb-20"
         >
-          <div className="absolute top-16 left-8">
-            <p className="text-white/60 font-display text-xs tracking-[0.3em] uppercase">
-              Example markets
+          <div className="absolute top-16 left-8 right-8 flex items-center justify-between">
+            <p className="text-white/60 font-body font-semibold text-xs tracking-[0.3em] uppercase">
+              How it works
+            </p>
+            <p className="text-white/60 font-body font-semibold text-xs tracking-[0.2em] tabular-nums">
+              {String(currentSlide + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}
             </p>
           </div>
 
-          <div className="flex flex-col gap-8">
-            <div className="flex gap-3">
-              <span className="highlight-project-text px-2.5 py-1 bg-[#9C93E8]/10 border border-[#9C93E8]/20 rounded text-[#9C93E8] text-[10px] font-bold uppercase tracking-wider">
-                {slides[currentSlide].assetClass}
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-wrap gap-2">
+              <span className="highlight-project-text px-2.5 py-1 bg-[#9C93E8]/15 border border-[#9C93E8]/30 rounded text-[#C9C3F5] text-[11px] font-semibold uppercase tracking-wider">
+                {slides[currentSlide].label}
               </span>
-              <span className="highlight-project-text px-2.5 py-1 bg-white/5 border border-white/10 rounded text-white/50 text-[10px] font-bold uppercase tracking-wider">
-                {slides[currentSlide].network}
+              <span className="highlight-project-text px-2.5 py-1 bg-white/5 border border-white/15 rounded text-white/70 text-[11px] font-semibold uppercase tracking-wider">
+                {slides[currentSlide].detail}
               </span>
             </div>
 
-            <h2 className="highlight-project-text text-white text-6xl font-bold leading-none tracking-tighter">
-              {slides[currentSlide].ticker}
-              <span className="text-[#9C93E8]">.</span>
+            <h2 className="highlight-project-text text-white text-[clamp(30px,8.5vw,48px)] font-semibold leading-[1.08] tracking-[-0.01em]">
+              {slides[currentSlide].heading}
             </h2>
 
-            <p className="highlight-project-text text-white/85 text-lg font-medium leading-snug">
-              {slides[currentSlide].quote}
+            <p className="highlight-project-text text-white/80 text-[clamp(15px,4.4vw,20px)] leading-snug">
+              {slides[currentSlide].description}
             </p>
           </div>
         </div>
@@ -172,7 +151,7 @@ const HighlightedProjects = () => {
         className="absolute inset-0 w-full h-full pointer-events-none z-20"
         style={{
           clipPath: "polygon(100% 50%, 100% 50%, 100% 50%, 0% 50%, 100% 50%, 100% 50%)",
-          backgroundImage: `url(${slides[nextSlide].bgImage})`,
+          backgroundImage: `url(${slides[nextSlide].image})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
@@ -189,13 +168,13 @@ const HighlightedProjects = () => {
             rel="noopener noreferrer"
             className="bg-[#9C93E8] text-black px-8 py-4 rounded-full font-bold text-[11px] tracking-[0.2em] uppercase active:scale-95 transition-transform"
           >
-            Open App
+            Launch App
           </a>
 
           <div className="flex gap-4">
             <button
               onClick={() => animateSlideChange("prev")}
-              aria-label="Previous market"
+              aria-label="Previous step"
               disabled={isAnimating}
               className="w-14 h-14 rounded-full bg-white/5 border border-white/10 backdrop-blur-xl flex items-center justify-center active:bg-white/10 transition-colors"
             >
@@ -203,7 +182,7 @@ const HighlightedProjects = () => {
             </button>
             <button
               onClick={() => animateSlideChange("next")}
-              aria-label="Next market"
+              aria-label="Next step"
               disabled={isAnimating}
               className="w-14 h-14 rounded-full bg-white/5 border border-white/10 backdrop-blur-xl flex items-center justify-center active:bg-white/10 transition-colors"
             >
@@ -216,4 +195,4 @@ const HighlightedProjects = () => {
   );
 };
 
-export default HighlightedProjects;
+export default HowItWorksMobile;

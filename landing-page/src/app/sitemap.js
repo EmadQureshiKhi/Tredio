@@ -7,5 +7,6 @@ export default function sitemap() {
     { url: `${SITE_URL}/terms`, lastModified: LAST_UPDATED_ISO, changeFrequency: "yearly", priority: 0.3 },
     { url: `${SITE_URL}/privacy`, lastModified: LAST_UPDATED_ISO, changeFrequency: "yearly", priority: 0.3 },
     { url: `${SITE_URL}/cookies`, lastModified: LAST_UPDATED_ISO, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${SITE_URL}/contact`, changeFrequency: "yearly", priority: 0.4 },
   ];
 }

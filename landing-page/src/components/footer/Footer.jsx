@@ -2,7 +2,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { gsap } from "gsap";
 import Link from "next/link";
-import { LEGAL_LINKS, NAV_ITEMS } from "@/config/links";
+import { CONTACT_EMAIL, LEGAL_LINKS, NAV_ITEMS } from "@/config/links";
+import { WIDE_VIEWBOX, WIDE_WORD } from "@/components/brand/Logo";
 import useSectionNav from "@/components/hooks/useSectionNav";
 import ScrollTrigger from "gsap/dist/ScrollTrigger";
 gsap.registerPlugin(ScrollTrigger);
@@ -90,10 +91,13 @@ const Footer = () => {
             <p className="text-[4vw] font-third leading-[1.2]">
               Trade the <br /> World&apos;s Attention
             </p>
-            <div className="text-[1vw] leading-[1.6vw] font-light text-gray-300 mt-auto">
-              <p>Tredio</p>
+            <div className="text-[clamp(13px,1vw,18px)] leading-[1.6] text-gray-300 mt-auto">
+              <p>Attention markets on NEAR</p>
               <p>Settled in USDC</p>
-              <p>Live on Testnet</p>
+              <p>Live on NEAR testnet</p>
+              <a href={`mailto:${CONTACT_EMAIL}`} className="mt-[0.8vw] inline-block text-white underline decoration-white/30 underline-offset-4 transition-colors hover:decoration-[#9C93E8]">
+                {CONTACT_EMAIL}
+              </a>
             </div>
           </div>
 
@@ -101,7 +105,7 @@ const Footer = () => {
           <div className="flex justify-between opacity-90 h-full px-[4vw] w-[30vw]">
             {/* EXPLORE */}
             <div className="flex flex-col">
-              <span className="uppercase text-[0.7vw] font-semibold mb-[1vw] tracking-[0.05em]">
+              <span className="uppercase text-[clamp(10px,0.7vw,13px)] font-semibold mb-[1vw] tracking-[0.12em]">
                 Explore
               </span>
               <ul className="font-display text-[2vw] leading-[1.4vw] space-y-[0.6vw]">
@@ -146,21 +150,13 @@ const Footer = () => {
               <Link
                 key={item.href}
                 href={item.href}
-                className="h-[1vw] relative group overflow-hidden cursor-pointer hover:text-white"
+                className="h-[var(--line)] relative group overflow-hidden cursor-pointer hover:text-white [--line:clamp(14px,1vw,18px)]"
               >
-                <span
-                  className="
-      w-full h-[2vw]
-      transition-none
-      group-hover:transition-all group-hover:duration-300
-      group-hover:translate-y-[-1vw]
-      flex flex-col items-start justify-end
-    "
-                >
-                  <span className="text-[0.7vw] leading-[1vw] uppercase font-body font-semibold">
+                <span className="flex h-[calc(var(--line)*2)] w-full flex-col items-start justify-end transition-none group-hover:-translate-y-[var(--line)] group-hover:transition-transform group-hover:duration-300">
+                  <span className="text-[clamp(10px,0.7vw,13px)] leading-[var(--line)] uppercase tracking-[0.06em] font-body font-semibold">
                     {item.title}
                   </span>
-                  <span aria-hidden="true" className="text-[0.7vw] leading-[1vw] uppercase font-semibold font-body">
+                  <span aria-hidden="true" className="text-[clamp(10px,0.7vw,13px)] leading-[var(--line)] uppercase tracking-[0.06em] font-semibold font-body">
                     {item.title}
                   </span>
                 </span>
@@ -169,7 +165,7 @@ const Footer = () => {
           </nav>
 
           <div className="items-center flex gap-[1.5vw] pr-[5vw]">
-            <span className="text-[0.7vw] uppercase menu-top font-body font-semibold">
+            <span className="text-[clamp(10px,0.7vw,13px)] uppercase tracking-[0.06em] font-body font-semibold">
               &copy; 2026 Tredio
             </span>
           </div>
@@ -180,34 +176,23 @@ const Footer = () => {
           {/* BASE SVG */}
           <svg
             aria-hidden="true"
-            preserveAspectRatio="none"
+            preserveAspectRatio="xMidYMax meet"
             width="100%"
             height="100%"
-            viewBox="0 0 1856 266"
-            className="absolute inset-0 object-contain w-full h-full"
+            viewBox={WIDE_VIEWBOX}
+            className="absolute inset-0 w-full h-full"
           >
-            <text
-              x="928"
-              y="230"
-              textAnchor="middle"
-              fontFamily="Arial, Helvetica, sans-serif"
-              fontSize="248"
-              fontWeight="800"
-              fill="#1E1E1E"
-              letterSpacing="120"
-            >
-              TREDIO
-            </text>
+            <path d={WIDE_WORD} fill="#1E1E1E" />
           </svg>
 
           {/* MASKED SVG */}
           <svg
             aria-hidden="true"
-            preserveAspectRatio="none"
+            preserveAspectRatio="xMidYMax meet"
             width="100%"
             height="100%"
-            viewBox="0 0 1856 266"
-            className="absolute inset-0"
+            viewBox={WIDE_VIEWBOX}
+            className="absolute inset-0 w-full h-full"
           >
             <defs>
               <linearGradient
@@ -236,18 +221,7 @@ const Footer = () => {
               </mask>
             </defs>
             <g mask="url(#cursorMask)">
-              <text
-                x="928"
-                y="230"
-                textAnchor="middle"
-                fontFamily="Arial, Helvetica, sans-serif"
-                fontSize="248"
-                fontWeight="800"
-                fill="#9C93E8"
-                letterSpacing="120"
-              >
-                TREDIO
-              </text>
+              <path d={WIDE_WORD} fill="#9C93E8" />
             </g>
           </svg>
         </div>

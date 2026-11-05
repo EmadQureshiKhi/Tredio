@@ -194,9 +194,9 @@ export default function NotFound() {
         {/* Desc */}
         <p
           ref={descRef}
-          className="font-body text-white/35 text-center mb-[4vw] max-sm:mb-[10vw] max-sm:max-w-[80vw]"
+          className="font-body text-white/55 text-center mb-[4vw] max-sm:mb-[10vw] max-sm:max-w-[80vw]"
           style={{
-            fontSize: "clamp(12px, 0.9vw, 16px)",
+            fontSize: "clamp(14px, 0.95vw, 17px)",
             lineHeight: "1.7",
             maxWidth: "clamp(260px, 30vw, 480px)",
           }}
@@ -220,54 +220,32 @@ export default function NotFound() {
               borderRadius: "clamp(6px, 0.5vw, 10px)",
             }}
           >
-            <div
-              className="flex flex-col group-hover:-translate-y-[1.4vw] transition-transform duration-300 gap-[0.2vw] items-center justify-center"
-              style={{ maxHeight: "clamp(16px, 1.1vw, 20px)", overflow: "hidden" }}
-            >
-              <span
-                className="block font-body font-semibold text-black tracking-[0.1em] leading-none"
-                style={{ fontSize: "clamp(10px, 0.7vw, 13px)" }}
-              >
-                BACK TO HOME
+            <span className="relative flex h-[var(--l)] overflow-hidden [--l:clamp(14px,1vw,18px)]">
+              <span className="flex flex-col transition-transform duration-300 group-hover:-translate-y-[var(--l)]">
+                <span className="block font-body font-semibold text-black tracking-[0.1em] leading-[var(--l)] text-[clamp(10px,0.7vw,13px)]">BACK TO HOME</span>
+                <span className="block font-body font-semibold text-black tracking-[0.1em] leading-[var(--l)] text-[clamp(10px,0.7vw,13px)]" aria-hidden="true">BACK TO HOME</span>
               </span>
-              <span
-                className="block font-body font-semibold text-black tracking-[0.1em] leading-none"
-                style={{ fontSize: "clamp(10px, 0.7vw, 13px)" }}
-                aria-hidden="true"
-              >
-                BACK TO HOME
-              </span>
-            </div>
+            </span>
           </Link>
 
           {/* Secondary */}
-          <Link
+          <a
             href={APP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="group relative flex justify-center overflow-hidden cursor-pointer outline-none border border-white/[0.10] hover:border-white/20 transition-colors duration-200 max-sm:w-full"
             style={{
               padding: "clamp(10px, 0.65vw, 14px) clamp(20px, 2.2vw, 36px)",
               borderRadius: "clamp(6px, 0.5vw, 10px)",
             }}
           >
-            <div
-              className="flex flex-col group-hover:-translate-y-[1.4vw] transition-transform duration-300 gap-[0.2vw] items-center justify-center"
-              style={{ maxHeight: "clamp(16px, 1.1vw, 20px)", overflow: "hidden" }}
-            >
-              <span
-                className="block font-body font-semibold text-white/50 group-hover:text-white tracking-[0.1em] leading-none transition-colors duration-200"
-                style={{ fontSize: "clamp(10px, 0.7vw, 13px)" }}
-              >
-                LAUNCH APP
+            <span className="relative flex h-[var(--l)] overflow-hidden [--l:clamp(14px,1vw,18px)]">
+              <span className="flex flex-col transition-transform duration-300 group-hover:-translate-y-[var(--l)]">
+                <span className="block font-body font-semibold text-white/60 group-hover:text-white tracking-[0.1em] leading-[var(--l)] text-[clamp(10px,0.7vw,13px)] transition-colors duration-200">LAUNCH APP</span>
+                <span className="block font-body font-semibold text-white/60 group-hover:text-white tracking-[0.1em] leading-[var(--l)] text-[clamp(10px,0.7vw,13px)]" aria-hidden="true">LAUNCH APP</span>
               </span>
-              <span
-                className="block font-body font-semibold text-white/50 tracking-[0.1em] leading-none"
-                style={{ fontSize: "clamp(10px, 0.7vw, 13px)" }}
-                aria-hidden="true"
-              >
-                LAUNCH APP
-              </span>
-            </div>
-          </Link>
+            </span>
+          </a>
         </div>
       </div>
     </main>

@@ -6,7 +6,7 @@ export const metadata = legalMetadata({
   path: "/terms",
   title: "Legal notice & terms of use",
   description:
-    "Who operates Tredio at tredio.bid and the terms for using the Tredio website and the Testnet app at app.tredio.bid.",
+    "Who operates Tredio at tredio.bid and the terms for using the Tredio website and the app on NEAR testnet at app.tredio.bid.",
 });
 
 const sections = [
@@ -44,35 +44,38 @@ const sections = [
     body: (
       <>
         <p>
-          Tredio turns social attention into markets. A radar built on Elfa, Bluesky, CoinGecko, GeckoTerminal,
-          Wikipedia, GDELT, Hacker News, Nansen and an AI review proposes trends. An oracle records an attention
-          index from 0 to 100 for each trend. Passkey accounts can then trade:
+          Tredio turns social attention into markets on the NEAR network. A radar reads Elfa, Bluesky, Nansen,
+          CoinGecko, GeckoTerminal, Wikipedia and other public sources and proposes trends. A model on{" "}
+          <ExternalLink href="https://near.ai">NEAR AI Cloud</ExternalLink> reviews each one and signs its verdict.
+          An oracle running in an OutLayer trusted execution environment (TEE) computes an attention index from 0 to
+          100 for each listed trend and records it on NEAR. Passkey accounts can then trade:
         </p>
         <ul>
-          <li>Up/Down outcome series on an order book, settled in USDC;</li>
-          <li>attention perps on a trend&apos;s index;</li>
-          <li>trend coins on bonding curves;</li>
-          <li>asset perps on the asset behind a trend.</li>
+          <li>Up/Down outcome series on Tredio&apos;s own order book, settled in USDC;</li>
+          <li>attention perps on a trend&apos;s index, at up to 3x leverage;</li>
+          <li>trend coins on bonding curves, which can graduate into a Rhea Finance pool;</li>
+          <li>Hyperliquid perps on the asset behind a trend, placed from your NEAR account through Chain Signatures.</li>
         </ul>
         <p>
-          Tredio also offers Autopilot rules, copy-trading, a social feed, notifications, leaderboards and a
-          portfolio built from public market data.
+          Tredio also offers Autopilot rules, copy-trading, public calls with a leaderboard, curation rewards, share
+          cards, notifications, an MCP server and a pay-per-call API for software agents, and a portfolio built from
+          public market data.
         </p>
       </>
     ),
   },
   {
     id: "testnet",
-    title: "Testnet only, tokens of no value",
+    title: "NEAR testnet only, tokens of no value",
     body: (
       <>
         <p>
-          Tredio currently runs on <strong>Testnet</strong> only. Nothing on Tredio is live on Mainnet.
+          Tredio currently runs on <strong>NEAR testnet</strong> only. Nothing on Tredio is live on mainnet.
         </p>
         <ul>
           <li>
-            Testnet USDC, outcome tokens, trend coins, perp positions and every other balance on
-            Tredio are <strong>test assets with no monetary value</strong>. They cannot be sold for money or
+            Testnet USDC, outcome tokens, trend coins, perp positions, Hyperliquid testnet positions and every other
+            balance on Tredio are <strong>test assets with no monetary value</strong>. They cannot be sold for money or
             exchanged for anything of value, and we will never buy them back.
           </li>
           <li>
@@ -82,7 +85,10 @@ const sections = [
             Testnet networks, contracts, markets and balances can be reset, redeployed, paused or wiped at any time,
             without notice.
           </li>
-          <li>Never send real funds or Mainnet assets to a Tredio address. They may be lost for good.</li>
+          <li>
+            Deposits from other chains through NEAR Intents are planned for mainnet only; on testnet the app shows
+            quotes at most. Never send real funds or mainnet assets to a Tredio address. They may be lost for good.
+          </li>
         </ul>
       </>
     ),
@@ -93,7 +99,8 @@ const sections = [
     body: (
       <>
         <p>
-          A Tredio account is controlled by a passkey on your device. Tredio is non-custodial:
+          A Tredio account is a NEAR account controlled by a passkey on your device, such as Face ID or a security
+          key. Tredio is non-custodial:
         </p>
         <ul>
           <li>Your passkey never leaves your device or your password manager. We never see or hold it.</li>
@@ -103,13 +110,13 @@ const sections = [
             and backed up through your device or password manager.
           </li>
           <li>
-            Trading session keys and Autopilot grants act only within the permissions you approve, until they
-            expire or you revoke them.
+            Trading sessions, Autopilot grants and policy wallets act only within the permissions and limits you
+            approve with your passkey, until they expire or you revoke them.
           </li>
         </ul>
         <p>
-          A relayer may pay network fees for your transactions within daily and hourly limits. We can change
-          or stop that sponsorship at any time.
+          A relayer may pay network fees for your transactions within daily and hourly limits. We can change or stop
+          that sponsorship at any time.
         </p>
       </>
     ),
@@ -139,18 +146,18 @@ const sections = [
       <>
         <ul>
           <li>
-            The attention index is computed from third-party data (social mentions on X, Telegram and Bluesky,
-            news coverage, Wikipedia pageviews, Hacker News mentions and smart-money flows), on trends an AI review
-            helped choose. That data can be wrong, late, incomplete or unavailable, and the index may not
-            match what you expect.
+            The attention index is computed from third-party data (social mentions, news coverage, Wikipedia
+            pageviews, trending lists and smart-money flows), on trends an AI review helped choose. That data can be
+            wrong, late, incomplete or unavailable, and the index may not match what you expect. An attested
+            computation shows how a value was produced from its inputs; it does not make the inputs right.
           </li>
           <li>
-            Markets settle by the rules in their smart contracts and the values the oracle records.
-            Settled outcomes are final, even when an input later turns out to be wrong.
+            Markets settle by the rules in their smart contracts and the values the oracle records. Settled outcomes
+            are final, even when an input later turns out to be wrong.
           </li>
           <li>
-            Smart contracts, the relayer, keepers and market makers are experimental software and can have bugs,
-            stop or behave unexpectedly. Positions can be liquidated, and trends can be retired.
+            Smart contracts, the relayer, keepers and market makers are experimental software and can have bugs, stop
+            or behave unexpectedly. Positions can be liquidated, and trends can be retired.
           </li>
           <li>
             Transactions are public and cannot be undone. Check every transaction before you approve it.
@@ -164,7 +171,8 @@ const sections = [
     title: "Autopilot and copy-trading",
     body: (
       <p>
-        Autopilot rules and copy-trading place trades for you automatically, within the permissions you grant. They
+        Autopilot rules and copy-trading place trades for you automatically, within the permissions you grant, and
+        agents you connect through the MCP server or the API act on what you allow them to. They
         can fail, trigger late, fill at different prices or not at all, and a leader you follow can lose. You are
         responsible for every rule you enable and every account you follow. You can pause, stop or revoke them at
         any time in the app.
@@ -181,9 +189,28 @@ const sections = [
           when you use them through Tredio:
         </p>
         <ul>
-          <li>the network Tredio&apos;s accounts and markets run on, and the infrastructure providers that connect to it;</li>
-          <li>the provider of perps on underlying assets;</li>
-          <li>the issuer of USDC, the settlement asset;</li>
+          <li>
+            <ExternalLink href="https://near.org">NEAR</ExternalLink>, the network Tredio&apos;s accounts and markets run
+            on, its Chain Signatures service, and the RPC and data providers that connect to it;
+          </li>
+          <li>
+            <ExternalLink href="https://near.ai">NEAR AI Cloud</ExternalLink>, which reviews proposed trends with
+            verifiable models;
+          </li>
+          <li>
+            <ExternalLink href="https://outlayer.ai">OutLayer</ExternalLink>, whose trusted execution environment runs
+            the attention oracle;
+          </li>
+          <li>
+            <ExternalLink href="https://hyperliquid.xyz">Hyperliquid</ExternalLink>, which runs the perps on underlying
+            assets (its testnet while Tredio is on NEAR testnet);
+          </li>
+          <li>
+            <ExternalLink href="https://rhea.finance">Rhea Finance</ExternalLink>, where trend coins graduate into
+            liquidity pools;
+          </li>
+          <li>NEAR Intents, which will carry deposits and withdrawals from other chains on mainnet;</li>
+          <li>the issuer of USDC, the settlement asset on mainnet (testnet USDC is a Tredio test token);</li>
           <li>
             <ExternalLink href="https://www.elfa.ai">Elfa</ExternalLink>,{" "}
             <ExternalLink href="https://bsky.app">Bluesky</ExternalLink>,{" "}
@@ -196,9 +223,8 @@ const sections = [
           <li>
             <ExternalLink href="https://www.coingecko.com">CoinGecko</ExternalLink> and{" "}
             <ExternalLink href="https://www.geckoterminal.com">GeckoTerminal</ExternalLink>, whose trending coins and
-            pools the radar reads;
+            pools the radar reads.
           </li>
-          <li>AI providers (OpenAI and Google Gemini), which review proposed trends.</li>
         </ul>
         <p>
           Names and logos of these services belong to their owners. Tredio shows them to say which services it uses;
@@ -280,7 +306,7 @@ const sections = [
     body: (
       <>
         <p>
-          We may update these terms, for example before Tredio launches on Mainnet. The date at the top shows
+          We may update these terms, for example before Tredio launches on NEAR mainnet. The date at the top shows
           the latest version. If you keep using Tredio after a change, the new terms apply.
         </p>
         <p>
@@ -306,7 +332,7 @@ export default function TermsPage() {
     <LegalPage
       path="/terms"
       title="Legal notice & terms of use"
-      intro="Who runs Tredio, and the rules for using the website and the Testnet app."
+      intro="Who runs Tredio, and the rules for using the website and the app on NEAR testnet."
       sections={sections}
     />
   );

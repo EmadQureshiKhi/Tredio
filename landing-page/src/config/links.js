@@ -13,23 +13,27 @@ export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://tredio.bid"
 export const SITE_NAME = "Tredio";
 export const SITE_TITLE = "Tredio | Trade the World's Attention";
 export const SITE_DESCRIPTION =
-  "Tredio turns social attention into tradeable markets. An oracle records a 0 to 100 attention index for every trend, and passkey accounts trade it gas-free: Up/Down outcomes, attention perps and trend coins.";
+  "Attention markets on NEAR. An AI radar finds trends, a TEE oracle scores each one from 0 to 100 on chain, and you trade the index from a passkey account: Up/Down outcomes, attention perps, trend coins and Hyperliquid perps.";
+
+// The one address for every question (support, partners, press, security).
+export const CONTACT_EMAIL = "contact@tredio.bid";
 
 // Footer legal pages, shared by the desktop and mobile footers.
 export const LEGAL_LINKS = [
   { title: "Cookie policy", href: "/cookies" },
   { title: "Legal notice & terms of use", href: "/terms" },
   { title: "Privacy policy", href: "/privacy" },
+  { title: "Contact", href: "/contact" },
 ];
 
 // Site menu, shared by the navbar and both footers. `scrollTo` targets a home page section;
 // on any other page the item opens the home page at that section instead.
 export const NAV_ITEMS = [
   { title: "Home", scrollTo: "#hero" },
-  { title: "About", scrollTo: "#about" },
-  { title: "Markets", scrollTo: "#markets" },
-  { title: "How It Works", scrollTo: "#insights" },
-  { title: "Examples", scrollTo: "#casee-study" },
+  { title: "How it works", scrollTo: "#about" },
+  { title: "Tracks", scrollTo: "#tracks" },
+  { title: "Markets", scrollTo: "#examples" },
+  { title: "Built with", scrollTo: "#stack" },
   { title: "Waitlist", scrollTo: "#waitlist" },
   { title: "Launch App", href: APP_URL, newTab: true },
 ];

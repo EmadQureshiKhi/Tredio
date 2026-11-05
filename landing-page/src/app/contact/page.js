@@ -1,12 +1,12 @@
-import React from 'react'
-import Contact from '@/components/contact/Contact'
+import Contact from "@/components/contact/Contact";
+import { legalMetadata } from "@/config/legal";
 
-const page = () => {
-  return (
-    <>
-        <Contact />
-    </>
-  )
+export const metadata = legalMetadata({
+  path: "/contact",
+  title: "Contact",
+  description: "Write to Tredio at contact@tredio.bid: help with the app, partners and press, security reports and data requests.",
+});
+
+export default function ContactPage() {
+  return <Contact />;
 }
-
-export default page

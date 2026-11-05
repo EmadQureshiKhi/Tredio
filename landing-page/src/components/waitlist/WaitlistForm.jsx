@@ -113,7 +113,7 @@ export default function WaitlistForm({ tone = "dark", autoFocus = false }) {
         <div className="min-w-0">
           <p className="font-third text-[22px] leading-tight">You&rsquo;re on the list</p>
           <p className="mt-1 text-[15px] leading-[1.45] text-white [overflow-wrap:anywhere]">{state.email}</p>
-          <p className={`mt-1.5 text-pretty text-[14px] leading-[1.55] ${t.successSub}`}>We&rsquo;ll email you when Tredio opens on Mainnet, with your beta access.</p>
+          <p className={`mt-1.5 text-pretty text-[14px] leading-[1.55] ${t.successSub}`}>We&rsquo;ll email you when Tredio opens on mainnet, with your beta access.</p>
         </div>
       </div>
     );
@@ -198,7 +198,7 @@ export default function WaitlistForm({ tone = "dark", autoFocus = false }) {
       )}
 
       <p className={`text-pretty text-[12px] leading-[1.55] ${t.note}`}>
-        We send nothing before Mainnet opens. See the{" "}
+        We send nothing before mainnet opens. See the{" "}
         <a href="/privacy#waitlist" className={`underline underline-offset-2 ${t.link}`}>
           privacy policy
         </a>

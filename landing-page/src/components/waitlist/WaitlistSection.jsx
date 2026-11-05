@@ -10,10 +10,10 @@ export default function WaitlistSection() {
         <div>
           <p className="font-body text-[12px] font-semibold uppercase tracking-[0.18em] text-black/65">Mainnet waitlist</p>
           <h2 id="waitlist-heading" className="mt-5 text-balance font-third text-[clamp(40px,5.2vw,96px)] leading-[1.02] tracking-[-0.01em]">
-            Tredio is live on Testnet. <span className="text-black/45">Mainnet is next.</span>
+            Tredio is live on NEAR testnet. <span className="text-black/45">Mainnet is next.</span>
           </h2>
           <p className="mt-6 max-w-[560px] text-pretty font-body text-[clamp(16px,1.2vw,20px)] leading-[1.55] text-black/75">
-            Every market you can trade today runs on Testnet with test tokens. Leave your email and you will hear the moment real attention markets open on Mainnet, with early access to the beta.
+            Every market you can trade today runs on NEAR testnet with test USDC. Leave your email and you will hear the moment real attention markets open on mainnet, with early access to the beta.
           </p>
         </div>
         <div className="w-full lg:pt-[3.2vw]">

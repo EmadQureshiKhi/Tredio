@@ -96,10 +96,10 @@ function WaitlistModal({ onClose }) {
           Mainnet waitlist
         </span>
         <h2 id="waitlist-title" className="mt-4 pr-8 font-third text-[30px] leading-[1.1]">
-          Be first on Mainnet
+          Be first on mainnet
         </h2>
         <p id="waitlist-intro" className="mt-3 text-pretty font-body text-[15px] leading-[1.6] text-white/70">
-          Tredio is live on Testnet. Leave your email to hear the moment Mainnet opens and to get early access to the beta.
+          Tredio is live on NEAR testnet. Leave your email to hear the moment mainnet opens and to get early access to the beta.
         </p>
         <div className="mt-6">
           <WaitlistForm tone="dark" autoFocus />

@@ -5,7 +5,6 @@ import MobileFooter from "@/components/footer/MobileFooter";
 import { APP_URL, LEGAL_LINKS } from "@/config/links";
 import { COMPANY, CONTACT_EMAIL, GOVERNING_LAW, JURISDICTION, LAST_UPDATED, LAST_UPDATED_ISO } from "@/config/legal";
 
-
 export const Company = () => <>{COMPANY}</>;
 export const Jurisdiction = () => <>{JURISDICTION}</>;
 export const GoverningLaw = () => <>{GOVERNING_LAW}</>;
@@ -62,7 +61,7 @@ export function Table({ head, rows }) {
 }
 
 /**
- * Shared layout of the legal pages: title, last-updated date, a Testnet notice, a section index
+ * Shared layout of the legal pages: title, last-updated date, a testnet notice, a section index
  * (sticky beside the text on wide screens) and the sections themselves.
  * `sections` is a list of { id, title, body }.
  */
@@ -88,8 +87,8 @@ export default function LegalPage({ title, intro, path, sections }) {
               </p>
             )}
             <p className="mt-6 rounded-xl border border-[#9C93E8]/30 bg-[#9C93E8]/[0.08] px-5 py-4 font-body text-[15px] leading-[1.6] text-white/85">
-              <strong className="text-white">Testnet product.</strong> Tredio runs on Testnet.
-              Every token, balance and position in it is a test asset with no monetary value.
+              <strong className="text-white">Testnet product.</strong> Tredio runs on NEAR testnet.
+              Every token, balance and position in it, testnet USDC included, is a test asset with no monetary value.
             </p>
           </header>
 
