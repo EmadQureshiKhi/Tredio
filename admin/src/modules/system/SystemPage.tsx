@@ -10,6 +10,7 @@ import { Card, Row, Rows } from "@/src/modules/operations/parts";
 import type { Problem, SystemReport } from "@/src/types/admin";
 import { ElfaAction, ElfaSection, SYSTEM_KEY, Tile } from "./ElfaSection";
 import { Age, Chip, SEVERITY, Section, StateChip } from "./parts";
+import { ChainSection, WalletsSection } from "./NearSection";
 import { ServicesTable } from "./ServicesTable";
 import { SourcesSection } from "./SourcesSection";
 
@@ -110,6 +111,7 @@ function Summary({ r }: { r: SystemReport }) {
   const tiles = [
     { href: "#services", label: "Services up", value: `${up} of ${services.length}`, tone: up === services.length ? "ok" : r.services.some((s) => s.state === "down" && s.core) ? "bad" : "warn" },
     { href: "#services", label: "Database", value: r.database.ok ? `${r.database.latencyMs} ms` : "down", tone: r.database.ok ? undefined : "bad" },
+    { href: "#wallets", label: "Treasury", value: r.wallets.treasury ? `${Number(r.wallets.treasury.balance).toFixed(1)} NEAR` : "unknown", hint: r.wallets.treasury?.runwayDays != null ? `${r.wallets.treasury.runwayDays.toFixed(1)} days of runway` : undefined, tone: r.wallets.treasury?.low ? "bad" : undefined },
     { href: "#oracle", label: "Oracle report", value: r.oracle.lastRunAgeSec !== null ? `${duration(r.oracle.lastRunAgeSec)} ago` : "never", hint: r.oracle.liveTrends !== null ? `${r.oracle.liveTrends} live trends` : undefined, tone: r.oracle.ok ? undefined : "bad" },
     { href: "#elfa", label: "Elfa keys working", value: r.elfa.configured ? `${keysOk} of ${r.elfa.keys.length}` : "off", tone: !r.elfa.configured || keysOk === r.elfa.keys.length ? undefined : keysOk === 0 ? "bad" : "warn" },
     { href: "#sources", label: "Sources working", value: `${sourcesOk} of ${r.sources.length}`, tone: sourcesOk === r.sources.length ? undefined : sourcesOk === 0 ? "bad" : "warn" },
@@ -118,9 +120,15 @@ function Summary({ r }: { r: SystemReport }) {
     { href: "#errors", label: "Errors, last 24h", value: formatNumber(r.errors.length), hint: "distinct messages", tone: undefined },
   ] as const;
   return (
-    <nav aria-label="Summary" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {tiles.map((t) => (
-        <a key={t.label} href={t.href} className="block h-full rounded-xl outline-offset-2 transition-transform hover:-translate-y-px" data-testid="summary-tile">
+    <nav aria-label="Summary" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {tiles.map((t, i) => (
+        <a
+          key={t.label}
+          href={t.href}
+          // On two columns an odd last tile spans the row instead of sitting alone.
+          className={`block h-full rounded-xl outline-offset-2 transition-transform hover:-translate-y-px ${i === tiles.length - 1 && tiles.length % 2 === 1 ? "col-span-2 sm:col-span-1" : ""}`}
+          data-testid="summary-tile"
+        >
           <Tile label={t.label} value={t.value} hint={"hint" in t ? t.hint : undefined} tone={t.tone} />
         </a>
       ))}
@@ -140,7 +148,7 @@ function OracleCard({ r, now }: { r: SystemReport; now: number }) {
           </span>
           {run ? (
             <span className="block text-xs text-subtle">
-              {run.updated} updated, {run.created} listed, {run.settled} settled
+              {run.updated} updated, {run.created} listed, {run.marks} marks
             </span>
           ) : null}
         </Row>
@@ -288,8 +296,19 @@ export default function SystemPage() {
             <ServicesTable services={r.services} now={now} />
           </Section>
 
-          <Section id="oracle" title="Oracle">
-            <OracleCard r={r} now={now} />
+          <Section id="oracle" title="Oracle, chain and indexer">
+            <div className="grid gap-3 lg:grid-cols-3">
+              <OracleCard r={r} now={now} />
+              <ChainSection r={r} now={now} />
+            </div>
+          </Section>
+
+          <Section
+            id="wallets"
+            title="Wallets and gas keys"
+            description="The treasury, every account a service sends from with its NEAR, and the gas keys each signs with. The top-up service refills accounts under their minimum from the treasury."
+          >
+            <WalletsSection wallets={r.wallets} />
           </Section>
 
           <Section

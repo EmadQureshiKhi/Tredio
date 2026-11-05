@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 
-export function shortAddress(address: string): string {
-  return address.length > 12 ? `${address.slice(0, 6)}…${address.slice(-4)}` : address;
+/** A NEAR account for tight spaces: named accounts in full, long implicit and universal ones cut in the middle. */
+export function shortAddress(account: string): string {
+  return account.length > 24 ? `${account.slice(0, 8)}…${account.slice(-6)}` : account;
 }
 
 const numberFormat = new Intl.NumberFormat("en-US");

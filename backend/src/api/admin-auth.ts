@@ -24,6 +24,14 @@ const b64url = (b: Buffer) => b.toString("base64url");
 /** Who a token speaks for: an admin account, an app account, or a caller identity. A token of one never passes as another. */
 export type Role = "admin" | "user" | "identity";
 
+const TOKEN_FIELD_SEPARATOR = "|";
+
+/** When a token expires (unix seconds), read without checking it: for signing out a token already accepted. */
+export function tokenExpiry(token: string): number {
+  const [payload] = token.split(".");
+  return Number(Buffer.from(payload ?? "", "base64url").toString().split(TOKEN_FIELD_SEPARATOR)[2] ?? 0);
+}
+
 /**
  * A session token for `address` in `role`, valid until `expiresAt` (seconds). A random id makes
  * every token unique, so signing one out never ends another issued in the same second. App tokens
@@ -32,8 +40,9 @@ export type Role = "admin" | "user" | "identity";
 export function issueSession(secret: string, address: string, expiresAt: number, role: Role = "admin", signer?: string): string {
   const id = randomBytes(9).toString("base64url");
   // Account ids are lowercase on NEAR; keys are base58 and case-sensitive, so they are kept as is.
+  // Fields are joined with "|", which no account id, key or id can contain (account ids have dots).
   const fields = [role, address.toLowerCase(), String(expiresAt), id, ...(signer ? [signer] : [])];
-  const payload = b64url(Buffer.from(fields.join(".")));
+  const payload = b64url(Buffer.from(fields.join(TOKEN_FIELD_SEPARATOR)));
   return `${payload}.${b64url(createHmac("sha256", secret).update(payload).digest())}`;
 }
 
@@ -44,7 +53,7 @@ export function readSession(secret: string, token: string, nowSec: number, role:
   const expected = createHmac("sha256", secret).update(payload).digest();
   const given = Buffer.from(mac, "base64url");
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
-  const [tokenRole, address, expiry, , signer] = Buffer.from(payload, "base64url").toString().split(".");
+  const [tokenRole, address, expiry, , signer] = Buffer.from(payload, "base64url").toString().split(TOKEN_FIELD_SEPARATOR);
   const expiresAt = Number(expiry);
   if (tokenRole !== role || !address || !isAccount(address) || !(expiresAt > nowSec)) return null;
   return { address, expiresAt, signer: signer && signer.startsWith("ed25519:") ? signer : null };

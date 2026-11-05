@@ -4,11 +4,14 @@
  */
 export const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000").replace(/\/+$/, "");
 
+/** The NEAR network the admin wallet signs in on. */
+export const NEAR_NETWORK: "testnet" | "mainnet" = process.env.NEXT_PUBLIC_NEAR_NETWORK === "mainnet" ? "mainnet" : "testnet";
+
 /**
  * Accounts expected to be admins. Only a hint for the sign-in screen: the backend checks its own
- * ADMIN_ADDRESSES on every request, so this list grants nothing.
+ * ADMIN_ACCOUNTS on every request, so this list grants nothing.
  */
-export const ADMIN_WALLET_HINT: readonly string[] = (process.env.NEXT_PUBLIC_ADMIN_WALLETS ?? "")
+export const ADMIN_ACCOUNT_HINT: readonly string[] = (process.env.NEXT_PUBLIC_ADMIN_ACCOUNTS ?? "")
   .split(",")
   .map((w) => w.trim().toLowerCase())
   .filter(Boolean);

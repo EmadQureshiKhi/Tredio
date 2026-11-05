@@ -272,11 +272,50 @@ export interface RecentError {
   lastSeenAt: number;
 }
 
+/** An account a service sends from, NEAR amounts as decimal strings. */
+export interface WalletRow {
+  name: string;
+  account: string;
+  balance: string | null;
+  min: string | null;
+  target: string | null;
+  burnPerDay: string | null;
+  /** Gas keys the account signs with, and the NEAR they hold for gas. */
+  gasKeys: number;
+  gasKeyBalance: string | null;
+  state: string | null;
+  lastError: string | null;
+  from: "topup" | "service";
+}
+
+export interface TreasuryReport {
+  account: string;
+  balance: string;
+  floor: string;
+  spendable: string;
+  burnPerDay: string | null;
+  runwayDays: number | null;
+  low: boolean;
+}
+
 export interface SystemReport {
   at: number;
   status: "ok" | "degraded" | "critical";
   problems: Problem[];
   database: { ok: boolean; latencyMs: number | null; error: string | null };
+  chain: { ok: boolean; network: string; head: number | null; headAt: number | null; headAgeSec: number | null; error: string | null };
+  indexer: {
+    configured: boolean;
+    ok: boolean;
+    progressBlock: number | null;
+    sourceBlock: number | null;
+    lagBlocks: number | null;
+    lagSec: number | null;
+    eventsProcessed: number | null;
+    eventsPerMin: number | null;
+    error: string | null;
+  };
+  wallets: { treasury: TreasuryReport | null; rows: WalletRow[] };
   oracle: {
     ok: boolean;
     lastRunAt: number | null;
@@ -287,7 +326,7 @@ export interface SystemReport {
     staleTrends: number | null;
     oldestUpdateAgeSec: number | null;
     retireWindowSec: number | null;
-    lastIndexedRun: { runId: number; created: number; updated: number; settled: number; rejected: number; at: number } | null;
+    lastIndexedRun: { runId: number; created: number; updated: number; marks: number; rejected: number; at: number } | null;
     lastSettlementAt: number | null;
     settlements24h: number | null;
     error: string | null;

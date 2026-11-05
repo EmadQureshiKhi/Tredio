@@ -176,3 +176,17 @@ describe("activation tickets", () => {
     await expect(t.issue("p256:abc", "198.51.100.7")).rejects.toThrow(/already exists/);
   });
 });
+
+describe("session tokens", () => {
+  test("carry named accounts (with dots) and session keys, and expire", async () => {
+    const { issueSession, readSession, tokenExpiry } = await import("../src/api/admin-auth");
+    const secret = "s".repeat(32);
+    const admin = issueSession(secret, "ops.tredio.testnet", NOW + 60);
+    expect(readSession(secret, admin, NOW)).toEqual({ address: "ops.tredio.testnet", expiresAt: NOW + 60, signer: null });
+    expect(readSession(secret, admin, NOW + 61)).toBeNull();
+    expect(tokenExpiry(admin)).toBe(NOW + 60);
+    const user = issueSession(secret, "alice.testnet", NOW + 60, "user", "ed25519:BiXU9Gv6Z2AmTAy3CwXYiKYFpbcKphFi55AYbB6JaDeP");
+    expect(readSession(secret, user, NOW, "user")?.signer).toBe("ed25519:BiXU9Gv6Z2AmTAy3CwXYiKYFpbcKphFi55AYbB6JaDeP");
+    expect(readSession(secret, user, NOW, "admin")).toBeNull();
+  });
+});

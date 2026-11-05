@@ -31,7 +31,7 @@ import type { Jobs } from "../jobs";
 import type { Gdelt } from "../sources/gdelt";
 import type { Fetch } from "../sources/http";
 import { type Candidate, type CandidateStatus, type Reading, type Rotation, SOURCES, type SourceName, type Store, type TrendMeta } from "../store";
-import { ADMIN_SESSION_SEC, adminAuth, bearer, issueSession, tokenHash } from "./admin-auth";
+import { ADMIN_SESSION_SEC, adminAuth, bearer, issueSession, tokenExpiry, tokenHash } from "./admin-auth";
 import { byIp, rateLimit } from "./rate-limit";
 import type { IndexerReader } from "../indexer";
 import { depositRoutes } from "../deposits/routes";
@@ -550,8 +550,7 @@ export function createApp(d: AppDeps): Hono {
   admin.post("/session/revoke", async (c) => {
     const token = c.get("token");
     if (!token) return c.json({ error: "sign out applies to session tokens" }, 400);
-    const [payload] = token.split(".");
-    const expiry = Number(Buffer.from(payload ?? "", "base64url").toString().split(".")[2] ?? 0);
+    const expiry = tokenExpiry(token);
     await d.store.revoke(tokenHash(token), expiry);
     return c.json({ ok: true });
   });

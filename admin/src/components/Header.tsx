@@ -89,11 +89,11 @@ export default function Header() {
           <div className="flex items-center gap-2">
             <span
               className="flex h-8 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 font-mono text-[13px] text-fg"
-              title={`Signed in as ${session.address} until ${formatDate(session.expiresAt * 1000)}`}
-              data-testid="session-address"
+              title={`Signed in as ${session.account} until ${formatDate(session.expiresAt * 1000)}`}
+              data-testid="session-account"
             >
               <span aria-hidden className="size-2 rounded-full bg-ok" />
-              {shortAddress(session.address)}
+              {shortAddress(session.account)}
             </span>
             <button
               type="button"

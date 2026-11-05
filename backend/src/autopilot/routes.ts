@@ -3,7 +3,7 @@ import { ownerRequests } from "@tredio/contracts";
 import { type HyperliquidInfo, hyperliquidAddressOf } from "@tredio/hyperliquid";
 import { Hono } from "hono";
 import { z } from "zod";
-import { tokenHash } from "../api/admin-auth";
+import { tokenExpiry, tokenHash } from "../api/admin-auth";
 import type { AccessKeyReader } from "../api/near-auth";
 import type { OwnerApprovals } from "../api/owner-approval";
 import { rateLimit } from "../api/rate-limit";
@@ -125,7 +125,7 @@ export function autopilotRoutes(d: AutopilotRouteDeps) {
 
   app.post("/auth/session/revoke", auth, async (c) => {
     const token = c.get("token");
-    const expiry = Number(Buffer.from(token.split(".")[0] ?? "", "base64url").toString().split(".")[2] ?? 0);
+    const expiry = tokenExpiry(token);
     await d.revoke(tokenHash(token), expiry);
     return c.json({ ok: true });
   });
