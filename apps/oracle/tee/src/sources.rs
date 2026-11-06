@@ -100,7 +100,10 @@ pub fn trends(rpc: &str, registry: &str) -> Result<Vec<Trend>> {
 /// order on it signs, which account v2's guard checks against the mark.
 #[derive(Clone, Debug, PartialEq)]
 pub struct HlMark {
+    /// Upper case, for matching tickers and trend assets.
     pub asset: String,
+    /// Hyperliquid's own symbol (`kPEPE`): the registry stores the mark under it, since orders name it.
+    pub symbol: String,
     pub price: f64,
     pub asset_index: u32,
 }
@@ -122,8 +125,10 @@ pub fn parse_marks(v: &Value) -> Result<Vec<HlMark>> {
         .enumerate()
         .filter(|(_, (u, _))| u.get("isDelisted").and_then(Value::as_bool) != Some(true))
         .filter_map(|(i, (u, c))| {
+            let name = u.get("name")?.as_str()?;
             Some(HlMark {
-                asset: u.get("name")?.as_str()?.to_uppercase(),
+                asset: name.to_uppercase(),
+                symbol: name.to_string(),
                 price: c.get("markPx")?.as_str()?.parse::<f64>().ok()?,
                 asset_index: u32::try_from(i).ok()?,
             })
@@ -145,8 +150,8 @@ mod tests {
         assert_eq!(
             m,
             vec![
-                HlMark { asset: "BTC".into(), price: 65000.5, asset_index: 0 },
-                HlMark { asset: "ETH".into(), price: 3000.0, asset_index: 2 },
+                HlMark { asset: "BTC".into(), symbol: "BTC".into(), price: 65000.5, asset_index: 0 },
+                HlMark { asset: "ETH".into(), symbol: "eth".into(), price: 3000.0, asset_index: 2 },
             ]
         );
     }

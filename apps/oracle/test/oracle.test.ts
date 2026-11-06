@@ -118,7 +118,7 @@ describe("marks", () => {
     // Universe: BTC (0), a delisted market (1), ETH (2), kPEPE (3).
     const answer = [
       { universe: [{ name: "BTC", szDecimals: 5, maxLeverage: 40 }, { name: "OLD", szDecimals: 0, maxLeverage: 3, isDelisted: true }, { name: "ETH", szDecimals: 4, maxLeverage: 25 }, { name: "kPEPE", szDecimals: 0, maxLeverage: 10 }] },
-      [{ markPx: "65000.5" }, { markPx: "1" }, { markPx: "3000" }, { markPx: "0" }],
+      [{ markPx: "65000.5" }, { markPx: "1" }, { markPx: "3000" }, { markPx: "0.0123" }],
     ];
     const info = new HyperliquidInfo("testnet", async () => new Response(JSON.stringify(answer)));
     const markets = await info.perpMarkets();
@@ -126,6 +126,8 @@ describe("marks", () => {
     expect(reportMarks(markets, new Set(["BTC", "ETH", "KPEPE", "SOL"]))).toEqual([
       { asset: "BTC", price: "6500050000000", asset_index: 0 },
       { asset: "ETH", price: "300000000000", asset_index: 2 },
+      // Matched without regard to case, stored under Hyperliquid's own symbol, which orders name.
+      { asset: "kPEPE", price: "1230000", asset_index: 3 },
     ]);
   });
 });

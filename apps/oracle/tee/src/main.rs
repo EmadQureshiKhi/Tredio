@@ -141,7 +141,7 @@ fn run() -> Result<serde_json::Value, String> {
     let marks: Vec<Mark> = marks
         .into_iter()
         .filter(|m| wanted.contains(&m.asset) && m.price > 0.0)
-        .map(|m| Mark { asset: m.asset, price: format!("{}", (m.price * 1e8).round() as u128), asset_index: m.asset_index })
+        .map(|m| Mark { asset: m.symbol, price: format!("{}", (m.price * 1e8).round() as u128), asset_index: m.asset_index })
         .collect();
     if new_trends.is_empty() && updates.is_empty() && marks.is_empty() {
         return Ok(serde_json::json!({ "report_json": null, "observed_at": observed_at, "warnings": warnings }));

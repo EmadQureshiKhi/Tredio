@@ -123,7 +123,9 @@ export function decide(
  * report wants, each with its asset index, the `a` an order on it signs. Account v2's order guard
  * checks an order's index against it, so a mark cannot vouch for another asset. The index is the
  * market's position in Hyperliquid's universe, delisted markets included (`perpMarkets` keeps it).
+ * Markets match case-insensitively, but a mark is stored under Hyperliquid's own symbol (`kPEPE`),
+ * which is what an order names when the account looks its mark up.
  */
 export function reportMarks(markets: ReadonlyArray<{ symbol: string; index: number; markPx: number }>, wanted: ReadonlySet<string>): Report["marks"] {
-  return markets.filter((x) => wanted.has(x.symbol.toUpperCase()) && x.markPx > 0).map((x) => ({ asset: x.symbol.toUpperCase(), price: Math.round(x.markPx * 1e8).toString(), asset_index: x.index }));
+  return markets.filter((x) => wanted.has(x.symbol.toUpperCase()) && x.markPx > 0).map((x) => ({ asset: x.symbol, price: Math.round(x.markPx * 1e8).toString(), asset_index: x.index }));
 }

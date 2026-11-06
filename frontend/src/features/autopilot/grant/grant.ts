@@ -1,8 +1,10 @@
 "use client";
 import { useQueryClient } from "@tanstack/react-query";
 import { seal } from "@tredio/autopilot";
+import { keepsGasKeys } from "@tredio/contracts";
 import { useCallback, useState } from "react";
 import { describeError, useAccount } from "@/lib/account/AccountProvider";
+import { accountVersion } from "@/lib/account/version";
 import { ApiError, autopilot } from "@/lib/api";
 import { newKeyPair } from "@/lib/chain/keys";
 import { ownerActions } from "@/lib/trade/calls";
@@ -97,7 +99,10 @@ export function useGrantActions() {
       setError(null);
       setWorking(true);
       try {
-        const sent = await tx.run(() => account.ownerExecute([ownerActions.revokeSession(key)]), { action: "Revoke Autopilot access", done: "Autopilot access revoked", pending: "Confirm with your passkey" });
+        // A grant's key is never reused (a new grant makes a new one), so on v2, where revoking would
+        // keep the key dormant toward the account's key limit, it is deleted instead.
+        const deleteKey = account.address ? keepsGasKeys(await accountVersion(account.address)) : false;
+        const sent = await tx.run(() => account.ownerExecute([ownerActions.revokeSession(key, deleteKey)]), { action: "Revoke Autopilot access", done: "Autopilot access revoked", pending: "Confirm with your passkey" });
         if (!sent) return false;
         const [{ rules }, { follows }] = await Promise.all([autopilot.rules(), autopilot.follows()]);
         await Promise.all([
