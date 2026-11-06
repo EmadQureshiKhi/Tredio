@@ -30,6 +30,7 @@ The hosted app at app.tredio.bid goes live before judging; until then, run it lo
 | Hyperliquid orders are guarded on chain | Same file | A session can only sign within 2% of a fresh oracle mark (two minutes old at most on account code v1, five on v2), at most 10x leverage; the unit tests cover each refusal; v2 also binds the mark to the signed asset (H-1 in [AUDIT.md](contracts/AUDIT.md)), and testnet accounts still run v1 |
 | Deposits from any chain | Deposit page | 1Click quotes from [`packages/intents`](packages/intents); on testnet the quotes are dry runs, since 1Click settles on mainnet |
 | Services run on gas-key lanes | Status page | `view_access_key` on `tredio-keeper.testnet`, `tredio-mm.testnet` and `tredio-relayer.testnet` shows gas keys with several nonces |
+| The same code is ready for mainnet | [MAINNET.md](MAINNET.md), [`deployments/mainnet.json`](deployments/mainnet.json) | `cd contracts && cargo test -p tredio-sandbox-tests --test mainnet` deploys the mainnet plan on a local NEAR sandbox against the code mainnet runs today for Circle's USDC and Rhea, and trades through to a coin graduating into a Rhea pool; `grep -rn "#mainnet"` lists what differs |
 | Agents can use and pay for the data | [`packages/mcp`](packages/mcp), [`backend/src/x402`](backend/src/x402) | `GET /v1/x402` lists the paid resources; a paid route answers 402 with x402 v2 NEAR `exact` requirements, settles a signed USDC delegate action through Tredio's relayer, and returns the data; [`scripts/x402-demo.ts`](scripts/x402-demo.ts) pays one on testnet |
 
 ## Testnet records
@@ -60,5 +61,7 @@ The hosted app at app.tredio.bid goes live before judging; until then, run it lo
 - Crypto candidates the radar approves list only once smart-money inflow confirms them (Nansen), so the trends listed from NEAR AI reviews so far are topics, people and equities; the first live trends (World Cup, AI agents) were added by hand and carry no review.
 - Hyperliquid answers "user does not exist" for derived addresses that hold no Hyperliquid testnet USDC; the orders are signed and sent, and they fill once an address is funded.
 - 1Click settles only on mainnet, so testnet deposits stop at a dry quote.
+- Mainnet is not deployed: the code, the deploy script and a sandbox rehearsal are ready, and the accounts and funds are not ([MAINNET.md](MAINNET.md)).
+  Hyperliquid withdrawals and the NEAR Intents return route have been checked against Hyperliquid's signing vectors and testnet, not yet with funds.
 - The collectors run on Tredio's server, outside the enclave; [`apps/oracle/docs/tee.md`](apps/oracle/docs/tee.md) says what the attestation does and does not prove.
 - The screens, admin panel, website and much of the backend come from an earlier Tredio prototype on another chain; everything on NEAR was built during the hackathon.

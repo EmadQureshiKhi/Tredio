@@ -212,6 +212,21 @@ mod tests {
     }
 
     #[test]
+    fn a_claim_whose_transfer_failed_is_restored() {
+        let mut c = setup();
+        pay(&mut c, "perps.testnet", 100, r#"{"trend":"topic:a","surfacer":"alice.testnet"}"#);
+        ctx("alice.testnet");
+        let _ = c.claim();
+        assert_eq!(c.claimable_of("alice.testnet".parse().unwrap()).0, 0);
+        assert_eq!(c.totals().1 .0, 100, "counted as claimed while the transfer is in flight");
+        // No promise result: the transfer failed (for example, alice holds no USDC storage).
+        ctx("curation.testnet");
+        assert_eq!(c.after_claim("alice.testnet".parse().unwrap(), U128(100)).0, 0);
+        assert_eq!(c.claimable_of("alice.testnet".parse().unwrap()).0, 100);
+        assert_eq!(c.totals().1 .0, 0);
+    }
+
+    #[test]
     #[should_panic(expected = "nothing to claim")]
     fn claim_needs_a_balance() {
         let mut c = setup();

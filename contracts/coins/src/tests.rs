@@ -347,3 +347,54 @@ fn a_lost_graduation_callback_expires() {
         .build());
     let _ = c.graduate("topic:openai".into());
 }
+
+/// The calls the contract scheduled since the last context: (receiver, method, JSON args).
+fn calls() -> Vec<(String, String, near_sdk::serde_json::Value)> {
+    near_sdk::test_utils::get_created_receipts()
+        .into_iter()
+        .flat_map(|r| {
+            let to = r.receiver_id.to_string();
+            r.actions.into_iter().filter_map(move |a| match a {
+                near_sdk::mock::MockAction::FunctionCallWeight { method_name, args, .. } => Some((
+                    to.clone(),
+                    String::from_utf8(method_name).unwrap(),
+                    near_sdk::serde_json::from_slice(&args).unwrap_or_default(),
+                )),
+                _ => None,
+            })
+        })
+        .collect()
+}
+
+#[test]
+fn deliveries_that_failed_are_claimed_once() {
+    let mut c = setup();
+    buy(&mut c, 10 * ONE_USDC, 40_000_000);
+    // A mint and a USDC payout that failed are owed, not lost.
+    ctx("coins.testnet", vec![PromiseResult::Failed]);
+    c.after_mint("topic:openai".into(), acc("alice.testnet"), U128(123));
+    ctx("coins.testnet", vec![PromiseResult::Failed]);
+    c.after_pay("topic:openai".into(), acc("alice.testnet"), U128(4 * ONE_USDC));
+    assert_eq!(c.owed("topic:openai".into(), acc("alice.testnet")), (U128(123), U128(4 * ONE_USDC)));
+
+    ctx("alice.testnet", vec![]);
+    c.claim_owed("topic:openai".into());
+    let sent = calls();
+    assert!(sent.iter().any(|(to, m, a)| to == "topic-openai.coins.testnet" && m == "mint" && a["account_id"] == "alice.testnet" && a["amount"] == "123"));
+    assert!(sent.iter().any(|(to, m, a)| to == "usdc.testnet" && m == "ft_transfer" && a["receiver_id"] == "alice.testnet" && a["amount"] == (4 * ONE_USDC).to_string()));
+    assert_eq!(c.owed("topic:openai".into(), acc("alice.testnet")), (U128(0), U128(0)));
+    assert!(panics(|| c.claim_owed("topic:openai".into())), "nothing is owed twice");
+}
+
+#[test]
+fn protocol_fees_sweep_to_the_treasury() {
+    let mut c = setup();
+    buy(&mut c, 10 * ONE_USDC, 40_000_000);
+    let fees = c.protocol_fees;
+    assert!(fees > 0, "a buy books protocol fees");
+    ctx("anyone.testnet", vec![]);
+    c.sweep_protocol_fees();
+    assert!(calls().iter().any(|(to, m, a)| to == "usdc.testnet" && m == "ft_transfer" && a["receiver_id"] == "treasury.testnet" && a["amount"] == fees.to_string()));
+    assert_eq!(c.protocol_fees, 0);
+    assert!(panics(|| c.sweep_protocol_fees()), "a second sweep finds nothing");
+}

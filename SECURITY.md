@@ -17,8 +17,10 @@ Results from 2026-11-06, on the code deployed on NEAR testnet under `tredio.test
 | Dependencies of the deployed wasm | `cargo deny` with [contracts/deny.toml](contracts/deny.toml) | advisories ok, bans ok, sources ok |
 | Every dependency, tests included | `cargo audit` (RustSec, 1,422 advisories) | 436 crates: 3 advisories, none in a way that touches the deployed contracts (below) |
 | Oracle enclave dependencies | `cargo audit` on `apps/oracle/tee` | 87 crates, no advisories |
-| Unit tests | `cargo test --workspace` | 159 pass |
-| Integration tests on a real NEAR node | `cargo test -p tredio-sandbox-tests` (near-workspaces, nearcore sandbox) | 15 flows pass |
+| Unit tests | `cargo test --workspace` | 165 pass |
+| Test coverage | `pnpm coverage:contracts` (`cargo llvm-cov`, unit tests) | 84.0% of lines, 74.0% of functions, 81.6% of regions (below) |
+| Integration tests on a real NEAR node | `cargo test -p tredio-sandbox-tests` (near-workspaces, nearcore sandbox) | 16 flows pass |
+| Mainnet rehearsal | the same sandbox, with Circle's USDC and Rhea imported from mainnet ([MAINNET.md](MAINNET.md)) | the mainnet plan deploys and trades through to a graduation into Rhea |
 | End to end on testnet | `bun scripts/e2e-testnet.ts`, live browser specs | pass (see [JUDGES.md](JUDGES.md)) |
 
 Run them yourself:
@@ -111,6 +113,30 @@ No caller can reach that: every string it encodes is a constant (`"Gtc"`, `"orde
 
 `cargo deny` also allows exactly one git source, NEAR's own `near/intents` repository at a pinned revision, for the NEP-245 multi-token types.
 
+## Test coverage
+
+`pnpm coverage:contracts` runs the contracts' unit tests under `cargo llvm-cov` (2026-11-07).
+Integration flows on the sandbox run the compiled wasm inside a NEAR node, which line coverage cannot see, so these numbers count unit tests only.
+
+| Contract | Lines | Functions | Regions |
+| --- | --- | --- | --- |
+| `curation` | 95.2% | 94.1% | 95.3% |
+| `common` (math, pricing, storage ledger) | 92.4% | 93.5% | 89.3% |
+| `registry` | 88.1% | 68.0% | 85.9% |
+| `book` | 86.7% | 74.3% | 82.7% |
+| `coins` | 85.6% | 72.0% | 83.4% |
+| `perps` | 84.0% | 68.3% | 80.6% |
+| `accounts` | 83.5% | 88.9% | 84.0% |
+| `account` | 83.1% | 81.6% | 77.3% |
+| `outcomes` | 80.0% | 65.8% | 78.0% |
+| `coin` | 66.4% | 50.0% | 72.8% |
+| `usdc` (testnet only) | 62.4% | 57.7% | 69.4% |
+| All | 84.0% | 74.0% | 81.6% |
+
+Most of what the unit tests leave out is views, owner setters and the NEP-141, NEP-145 and NEP-245 plumbing, plus entry points such as `liquidate`, `settle_retired` and `create_account` that only schedule a registry read or a cross-contract call.
+The callbacks that hold their logic (`on_liquidate`, `on_settle_retired`, `on_created`) are unit tested, and the entry points run in the sandbox flows.
+The first coverage run found five payout paths with no unit test, and each has one now: a claimable perps payout, a failed coin delivery claimed back from the coin factory, both fee sweeps (anyone may sweep, only the treasury is paid), and curation restoring a claim whose transfer failed.
+
 ## Audit summary
 
 [contracts/AUDIT.md](contracts/AUDIT.md) is a self-audit: done by the Tredio team with an AI engineering agent, not an independent firm.
@@ -140,7 +166,6 @@ Each finding got a failing test first, then the fix.
 
 - No independent audit firm has reviewed the contracts; the audit above is a self-audit.
 - BlockSec's Rustle, a static analyzer built for NEAR contracts, has not been run yet: it needs its own toolchain installed, which waits on approval.
-- Test coverage is not measured: `cargo-llvm-cov` is not installed yet.
 - The off-chain services (relayer, keeper, market maker, oracle runner, indexer, API, app) are outside the contract audit; their tests run in CI and `pnpm verify`.
 - The testnet contract accounts keep full-access keys so the team can redeploy; before mainnet they are removed or moved behind a timelocked multisig ([AUDIT.md](contracts/AUDIT.md), "Trust assumptions").
 

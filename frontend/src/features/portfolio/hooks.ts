@@ -184,7 +184,8 @@ export function usePortfolioData() {
           };
         });
       const inPositions = positions.reduce((a, p) => a + p.marginUsdc + p.pnl, 0);
-      return { address: r.address, balance: Math.max(0, (r.state?.accountValue ?? 0) - inPositions), positions };
+      // `balance` splits the account's value from its positions for the totals; `withdrawable` is what Hyperliquid lets leave now.
+      return { address: r.address, balance: Math.max(0, (r.state?.accountValue ?? 0) - inPositions), withdrawable: Math.max(0, r.state?.withdrawable ?? 0), positions };
     },
   });
   const curation = useQuery({ queryKey: [...key, SLOW, "curation"], enabled: Boolean(address), refetchInterval: 30_000, placeholderData: keepPreviousData, queryFn: () => readCuration(address!) });

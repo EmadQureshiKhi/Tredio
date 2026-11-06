@@ -202,7 +202,7 @@ function Holdings({ data }: { data: Data }) {
       {/* Always mounted (each renders its card only when it has rows) so open sheets survive the last row closing. */}
       <OutcomeSection holdings={outcomeRows} total={totals.outcomePriced ? totals.outcomeTotal : null} />
       <PerpSection positions={perpRows} total={totals.perpEquity} />
-      <AssetPerpSection positions={assetPerpRows} balance={assetPerpBalance} labels={labels} total={totals.assetPerpTotal} />
+      <AssetPerpSection positions={assetPerpRows} free={assetPerps.data?.withdrawable ?? 0} labels={labels} total={totals.assetPerpTotal} />
       <CoinSection coins={coinRows} total={totals.coinTotal} />
       {curation.data ? <CurationCard claimable={curation.data.claimable} earned={curation.data.earned} trends={trends.data?.trends ?? []} /> : null}
       {data.address ? <TradeHistory address={data.address} trends={trends.data?.trends ?? []} /> : null}

@@ -15,7 +15,7 @@ import { deposits } from "@/lib/api";
 import { TxFailed } from "@/lib/chain/outcome";
 import { HL_NETWORK, IS_MAINNET } from "@/lib/config";
 import { shortAddress, tokenAmount, tokenNumber } from "@/lib/format";
-import { type HlRoute, INTENTS_USD_SEND_SURCHARGE, intentsSendAmount, routeFee, signTransfer, transferPlan } from "@/lib/trade/hyperliquid";
+import { type HlRoute, INTENTS_MIN_DEPOSIT, INTENTS_USD_SEND_SURCHARGE, intentsSendAmount, routeFee, signTransfer, transferPlan } from "@/lib/trade/hyperliquid";
 import { useTx } from "@/lib/trade/useTx";
 
 /**
@@ -75,6 +75,14 @@ export function HlWithdrawSheet({ open, onOpenChange }: { open: boolean; onOpenC
   const fee = routeFee(route);
   const needsApi = route === "near" && !account.backendReady;
   const amountText = amount ? tokenAmount(amount, 6) : null;
+  // What lands follows from the amount alone, so it shows before the address is in.
+  const receive = plan?.receive ?? (amount !== null && !amountError && amount > fee ? amount - fee : null);
+  const amountHint =
+    route === "near"
+      ? `At least ${tokenAmount(INTENTS_USD_SEND_SURCHARGE + INTENTS_MIN_DEPOSIT, 6)} USDC.`
+      : route === "arbitrum"
+        ? `More than ${tokenAmount(fee, 6)} USDC, which the bridge keeps.`
+        : "Any amount up to what is free; it lands in that address's perps balance.";
 
   const submit = async () => {
     if (!plan || !own) return;
@@ -154,7 +162,7 @@ export function HlWithdrawSheet({ open, onOpenChange }: { open: boolean; onOpenC
             }}
             options={ROUTES}
           />
-          <AmountField label="Amount" unit="USDC" value={text} onChange={setText} balance={withdrawable ?? undefined} decimals={6} error={amountError} testId="hl-withdraw-amount" />
+          <AmountField label="Amount" unit="USDC" value={text} onChange={setText} balance={withdrawable ?? undefined} decimals={6} error={amountError} hint={amountHint} testId="hl-withdraw-amount" />
           {route === "near" ? null : (
             <Field
               label={route === "arbitrum" ? `Address on ${ARBITRUM}` : "Hyperliquid address"}
@@ -172,7 +180,7 @@ export function HlWithdrawSheet({ open, onOpenChange }: { open: boolean; onOpenC
           <div className="flex flex-col gap-2 rounded-xl border border-line px-3.5 py-3">
             {route === "near" ? <Row label="Arrives in" value={`${shortAddress(account.address)} on NEAR`} /> : null}
             <Row label={route === "near" ? "NEAR Intents keeps" : route === "arbitrum" ? "Bridge fee" : "Fee"} value={fee === 0n ? "None" : `${tokenAmount(fee, 6)} USDC`} tone="muted" />
-            <Row label="Arrives" value={plan ? `${fee === 0n ? "" : "About "}${tokenAmount(plan.receive, 6)} USDC` : "-"} />
+            <Row label="Arrives" value={receive !== null ? `${fee === 0n ? "" : "About "}${tokenAmount(receive, 6)} USDC` : "-"} />
             <Row label="Takes" value={TAKES[route]} tone="muted" />
           </div>
           {needsApi ? <ApiSignIn purpose="to get a NEAR Intents quote" /> : null}

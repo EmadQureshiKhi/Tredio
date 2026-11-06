@@ -279,3 +279,53 @@ fn only_owners_add_margin() {
     }));
     assert!(r.is_err());
 }
+
+/// The ft_transfer calls the contract scheduled since the last context: (receiver, amount).
+fn transfers() -> Vec<(String, u128)> {
+    near_sdk::test_utils::get_created_receipts()
+        .into_iter()
+        .filter(|r| r.receiver_id.as_str() == "usdc.testnet")
+        .flat_map(|r| r.actions)
+        .filter_map(|a| match a {
+            near_sdk::mock::MockAction::FunctionCallWeight { method_name, args, .. } if method_name == b"ft_transfer" => {
+                let v: near_sdk::serde_json::Value = near_sdk::serde_json::from_slice(&args).unwrap();
+                Some((v["receiver_id"].as_str().unwrap().to_string(), v["amount"].as_str().unwrap().parse().unwrap()))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_claimable_payout_is_withdrawn_once() {
+    let mut c = setup(10_000 * ONE_USDC);
+    ctx("perps.testnet", T0, 0);
+    c.after_send(acc("alice.testnet"), U128(5 * ONE_USDC));
+    ctx("alice.testnet", T0 + 60, 0);
+    let _ = c.withdraw_claimable();
+    assert_eq!(transfers(), vec![("alice.testnet".to_string(), 5 * ONE_USDC)]);
+    // Taken before the transfer goes out; a failed transfer makes it claimable again (a_failed_payout_becomes_claimable).
+    assert_eq!(c.claimable_of(acc("alice.testnet")).0, 0);
+}
+
+#[test]
+#[should_panic(expected = "nothing to withdraw")]
+fn nothing_claimable_is_refused() {
+    let mut c = setup(0);
+    ctx("bob.testnet", T0, 0);
+    let _ = c.withdraw_claimable();
+}
+
+#[test]
+fn protocol_fees_sweep_to_the_treasury_only() {
+    let mut c = setup(0);
+    c.protocol_fees = 7 * ONE_USDC;
+    ctx("mallory.testnet", T0, 0);
+    let _ = c.sweep_protocol_fees();
+    assert_eq!(transfers(), vec![("treasury.testnet".to_string(), 7 * ONE_USDC)], "anyone may sweep; only the treasury is paid");
+    assert_eq!(c.protocol_fees, 0);
+    let again = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _ = c.sweep_protocol_fees();
+    }));
+    assert!(again.is_err(), "a second sweep finds nothing");
+}

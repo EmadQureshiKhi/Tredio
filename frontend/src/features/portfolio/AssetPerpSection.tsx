@@ -20,17 +20,17 @@ export type AssetPerpTag = "autopilot" | "copy" | null;
  * balance there. Closing is a session order the account contract signs; withdrawing the balance is
  * a transfer the passkey approves (the Hyperliquid withdraw sheet).
  */
-export function AssetPerpSection({ positions, balance, labels, total }: { positions: AssetPerpPosition[]; balance: number; labels: Map<number, AssetPerpTag>; total: number }) {
+export function AssetPerpSection({ positions, free, labels, total }: { positions: AssetPerpPosition[]; free: number; labels: Map<number, AssetPerpTag>; total: number }) {
   const open = useSheets((s) => s.open);
-  if (positions.length === 0 && balance < 0.005) return null;
+  if (positions.length === 0 && free < 0.005) return null;
   return (
     <SectionCard id="asset-perps-title" testId="asset-perp-section" title="Hyperliquid perps" count={positions.length} subtitle="Perps on the assets behind trends, from your account's own Hyperliquid address." total={usdc(total)} totalLabel="Value">
-      {balance >= 0.005 ? (
+      {free >= 0.005 ? (
         <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 sm:px-6">
           <p className="text-[13px] text-text-2">
-            Free on Hyperliquid <span className="num font-strong text-text">{usdc(balance)} USDC</span>
+            Free on Hyperliquid <span className="num font-strong text-text">{usdc(free)} USDC</span>
           </p>
-          {balance >= 0.01 ? (
+          {free >= 0.01 ? (
             <Button tone="secondary" size="sm" className="shrink-0" onClick={() => open("hl-withdraw")} data-testid="asset-perp-withdraw">
               Withdraw
             </Button>

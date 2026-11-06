@@ -101,6 +101,18 @@ People trade from their own account contracts, and the services keep markets quo
 Account ids, global code hashes and the oracle key are in [`deployments/testnet.json`](deployments/testnet.json).
 The contracts were self-audited against the near-contract-audit checklist and then reviewed independently; findings, fixes, what is still open on testnet and the team's remaining powers are in [`contracts/AUDIT.md`](contracts/AUDIT.md).
 
+## Ready for mainnet
+
+The same code runs on NEAR mainnet: one switch (`NEAR_NETWORK=mainnet`) moves every service and the app to [`deployments/mainnet.json`](deployments/mainnet.json), which names Circle's native USDC, Rhea's `v2.ref-finance.near`, the `v1.signer` Chain Signatures contract and OutLayer's `outlayer.near`.
+What is left is deploying and funding: [`contracts/scripts/deploy.sh mainnet`](contracts/scripts/deploy.sh) deploys only reproducible builds of a clean commit, so NearBlocks can verify every contract from this repository.
+A mainnet rehearsal runs the whole plan on a local NEAR sandbox against the code mainnet runs today for USDC and Rhea, through to a trend coin graduating into a real Rhea pool:
+
+```bash
+cd contracts && cargo test -p tredio-sandbox-tests --test mainnet
+```
+
+What changes on mainnet, the steps and the budget are in [MAINNET.md](MAINNET.md).
+
 ## Repository
 
 <img src="assets/readme/repository.png" alt="What is in the repository: Rust contracts, Bun services and shared packages, the Hono backend and three Next.js sites" width="960">
@@ -126,7 +138,7 @@ The launch film is a Remotion project in [`video/`](video).
 pnpm verify
 ```
 
-`pnpm verify` reads NEAR testnet and checks the claims in [JUDGES.md](JUDGES.md): every contract holds code, and that code hashes byte for byte like the wasm `pnpm build:contracts` makes from this checkout; user accounts run published global code and derive from their passkeys, a live session gas key, the oracle key the registry trusts and how fresh its last report is, a Hyperliquid order signed through Chain Signatures, the OutLayer attestation of an enclave run, and an x402 payment; then it runs every test suite.
+`pnpm verify` reads NEAR testnet and checks the claims in [JUDGES.md](JUDGES.md): every contract holds code, and that code hashes byte for byte like its build from this checkout (the reproducible build of the commit the contract names, or `pnpm build:contracts` for the global code); user accounts run published global code and derive from their passkeys, a live session gas key, the oracle key the registry trusts and how fresh its last report is, a Hyperliquid order signed through Chain Signatures, the OutLayer attestation of an enclave run, and an x402 payment; then it runs every test suite.
 
 ## Security
 
@@ -140,7 +152,7 @@ Details and how to rerun each one are in [SECURITY.md](SECURITY.md).
 | NEAR rules (`pnpm security`) | private callbacks, token receivers check their token, overflow checks, no `unsafe`: all hold |
 | Clippy security lints on the wasm build | 0 panics; every truncating cast, unwrap and slice index reviewed |
 | `cargo deny` on the deployed wasm's dependencies | advisories, bans and sources ok |
-| Tests | 159 unit tests, 15 integration flows on a real NEAR node, end to end on testnet |
+| Tests | 165 unit tests (84% line coverage), 16 integration flows on a real NEAR node including a mainnet rehearsal, end to end on testnet |
 
 ```bash
 pnpm security
