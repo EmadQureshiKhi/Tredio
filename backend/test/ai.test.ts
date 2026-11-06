@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { sha256 } from "@noble/hashes/sha2.js";
 import { type Assessment, assess, fence, SYSTEM_PROMPT, verdict } from "../src/ai/assess";
+import { checkReviewBodies, reviewHash, sha256Hex } from "../src/ai/evidence";
+import { type NearAiClient, nearAi } from "../src/ai/nearai";
 import { Ai, benchMs, type Provider } from "../src/ai/providers";
-import { type NearAiClient, nearAi, reviewHash } from "../src/ai/nearai";
 import { REJECTED_KEY_MS } from "../src/budget";
 import { BudgetError, HttpError } from "../src/sources/http";
+import { EVIDENCE, MODEL, REQUEST, REQUEST_HASH, RESPONSE, RESPONSE_HASH, SCHEMA, SIGNATURE, SIGNED_TEXT, SIGNING_ADDRESS, SYSTEM, USER } from "./fixtures/review";
 import { fakeFetch, json } from "./helpers";
 
 const base: Assessment = {
@@ -224,39 +227,106 @@ describe("Ai fallback", () => {
 });
 
 describe("NEAR AI Cloud provider", () => {
-  const schema = {
-    type: "object" as const,
-    additionalProperties: false as const,
-    required: ["name"],
-    properties: { name: { type: "string" as const, enum: ["a", "b"] } },
-  };
-  const client = (kind: "provider_tee" | "gateway", content: string) => {
-    const bodies: Record<string, unknown>[] = [];
+  const hex = (b: Uint8Array) => Buffer.from(b).toString("hex");
+  const sha = (text: string) => hex(sha256(new TextEncoder().encode(text)));
+  /**
+   * The SDK's side, faked: it sends the request bytes it is given, serves `response`, and signs the
+   * model with the hashes of the bytes it saw (`signerSaw` stands in for a transport that saw other
+   * bytes than the provider read).
+   */
+  const client = (o: { kind?: "provider_tee" | "gateway"; response?: BodyInit; status?: number; signerSaw?: string } = {}) => {
+    const sent: string[] = [];
     const c: NearAiClient = {
-      chat: { completions: { create: async (body) => (bodies.push(body), { id: "chatcmpl-1", choices: [{ message: { content } }] }) } },
-      verifyResponse: async (id) => ({ signatureKind: kind, signature: { signedText: `req:${id}:res`, signature: "0xsig", signer: { signingAlgo: "ecdsa", signingAddress: "0xabc" } } }),
+      complete: async (requestJson) => (sent.push(requestJson), new Response(o.response ?? RESPONSE, { status: o.status ?? 200, headers: { "content-type": "application/json" } })),
+      verifyResponse: async () => ({
+        signatureKind: o.kind ?? "provider_tee",
+        signature: { signedText: `${MODEL}:${sha(sent[0]!)}:${sha(o.signerSaw ?? RESPONSE)}`, signature: SIGNATURE, signer: { signingAlgo: "ed25519", signingAddress: SIGNING_ADDRESS } },
+      }),
     };
-    return { c, bodies };
+    return { c, sent };
   };
 
-  test("returns the answer with the enclave's signed evidence", async () => {
-    const { c, bodies } = client("provider_tee", '```json\n{"name":"b"}\n```');
-    const out = await nearAi(c, "z-ai/glm-5.3-flash", () => new Date(0)).generate("sys", "user", schema, "n");
+  test("returns the answer with the enclave's signed evidence and the exact bodies it covers", async () => {
+    const { c, sent } = client();
+    const out = await nearAi(c, MODEL, () => new Date(0)).generate(SYSTEM, USER, SCHEMA, "n");
     expect(out.value).toEqual({ name: "b" });
-    expect(out.evidence).toMatchObject({ provider: "near-ai-cloud", model: "z-ai/glm-5.3-flash", completionId: "chatcmpl-1", signatureKind: "provider_tee", signingAddress: "0xabc", verifiedAt: "1970-01-01T00:00:00.000Z" });
-    expect(bodies[0]).toMatchObject({ model: "z-ai/glm-5.3-flash", response_format: { type: "json_object" } });
-    expect(String((bodies[0]!.messages as Array<{ content: string }>)[1]!.content)).toContain('"additionalProperties":false');
-    expect(reviewHash(out.evidence!)).toMatch(/^[0-9a-f]{64}$/);
+    // The request is sent as the very string that is stored, in the fixture's wire format.
+    expect(sent).toEqual([REQUEST]);
+    expect(out.review!.request).toBe(REQUEST);
+    expect(out.review!.response).toBe(RESPONSE);
+    expect(out.review!.evidence).toEqual({ ...EVIDENCE, verifiedAt: "1970-01-01T00:00:00.000Z" });
+    expect(out.review!.evidence.signedText).toBe(SIGNED_TEXT);
+    expect(checkReviewBodies(out.review!.evidence, out.review!).ok).toBe(true);
+    expect(reviewHash(out.review!.evidence)).toMatch(/^[0-9a-f]{64}$/);
   });
 
   test("refuses an answer only the gateway signed", async () => {
-    const { c } = client("gateway", '{"name":"a"}');
-    await expect(nearAi(c, "m").generate("s", "u", schema, "n")).rejects.toThrow(/not signed by a model enclave/);
+    await expect(nearAi(client({ kind: "gateway" }).c, MODEL).generate(SYSTEM, USER, SCHEMA, "n")).rejects.toThrow(/not signed by a model enclave/);
+  });
+
+  test("refuses an answer whose signed text does not cover the bodies it would store", async () => {
+    const { c } = client({ signerSaw: `${RESPONSE}\n` });
+    await expect(nearAi(c, MODEL).generate(SYSTEM, USER, SCHEMA, "n")).rejects.toThrow(/does not cover this request and response/);
+  });
+
+  test("an HTTP refusal keeps its body, so a billing refusal benches the provider", async () => {
+    const { c } = client({ status: 429, response: '{"error":{"message":"insufficient_quota: add credits"}}' });
+    const e = await nearAi(c, MODEL).generate(SYSTEM, USER, SCHEMA, "n").catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(HttpError);
+    expect((e as HttpError).status).toBe(429);
+    expect(benchMs(e as HttpError)).toBe(3_600_000);
+  });
+
+  test("refuses a body that is not UTF-8 or not a completion", async () => {
+    await expect(nearAi(client({ response: new Uint8Array([0x7b, 0xff, 0x7d]) }).c, MODEL).generate(SYSTEM, USER, SCHEMA, "n")).rejects.toThrow(/not UTF-8/);
+    await expect(nearAi(client({ response: '{"choices":[]}' }).c, MODEL).generate(SYSTEM, USER, SCHEMA, "n")).rejects.toThrow(/no id/);
   });
 
   test("the review hash is stable under key order", () => {
-    const e = { provider: "near-ai-cloud" as const, model: "m", completionId: "c", signatureKind: "provider_tee" as const, signingAlgo: "ecdsa", signingAddress: "0x1", signedText: "t", signature: "s", verifiedAt: "x", verifyUrl: "u" };
-    const shuffled = Object.fromEntries(Object.entries(e).reverse()) as typeof e;
-    expect(reviewHash(shuffled)).toBe(reviewHash(e));
+    const shuffled = Object.fromEntries(Object.entries(EVIDENCE).reverse()) as typeof EVIDENCE;
+    expect(reviewHash(shuffled)).toBe(reviewHash(EVIDENCE));
+  });
+});
+
+describe("checkReviewBodies", () => {
+  const bodies = { request: REQUEST, response: RESPONSE };
+
+  test("recomputes both hashes from the stored bodies and finds them in the signed text", () => {
+    expect(checkReviewBodies(EVIDENCE, bodies)).toEqual({
+      requestHash: REQUEST_HASH,
+      responseHash: RESPONSE_HASH,
+      requestModel: MODEL,
+      expectedText: SIGNED_TEXT,
+      requestHashMatches: true,
+      responseHashMatches: true,
+      modelMatches: true,
+      signedTextMatches: true,
+      ok: true,
+    });
+  });
+
+  test("one changed byte in either body fails its hash", () => {
+    const answer = checkReviewBodies(EVIDENCE, { ...bodies, response: RESPONSE.replace('\\"b\\"', '\\"a\\"') });
+    expect(answer).toMatchObject({ requestHashMatches: true, responseHashMatches: false, signedTextMatches: false, ok: false });
+    const asked = checkReviewBodies(EVIDENCE, { ...bodies, request: REQUEST.replace("café", "cafe") });
+    expect(asked).toMatchObject({ requestHashMatches: false, responseHashMatches: true, modelMatches: true, ok: false });
+    // Trailing bytes count too: the bodies are compared as sent and received, not as parsed JSON.
+    expect(checkReviewBodies(EVIDENCE, { ...bodies, response: `${RESPONSE}\n` }).responseHashMatches).toBe(false);
+  });
+
+  test("the model must be the one the request asked and the signed text names", () => {
+    expect(checkReviewBodies({ ...EVIDENCE, model: "z-ai/glm-5.3" }, bodies)).toMatchObject({ modelMatches: false, signedTextMatches: true, ok: false });
+    const renamed = checkReviewBodies({ ...EVIDENCE, signedText: `z-ai/glm-5.3:${REQUEST_HASH}:${RESPONSE_HASH}` }, bodies);
+    expect(renamed).toMatchObject({ requestHashMatches: true, responseHashMatches: true, signedTextMatches: false, ok: false });
+    const notJson = checkReviewBodies(EVIDENCE, { ...bodies, request: "model=z-ai/glm-5.3-flash" });
+    expect(notJson).toMatchObject({ requestModel: null, modelMatches: false, signedTextMatches: false, ok: false });
+  });
+
+  test("a model id with a colon still parses, and a gateway signature covers the two hashes only", () => {
+    const request = REQUEST.replace(MODEL, "org/model:v2");
+    const signedText = `org/model:v2:${sha256Hex(request)}:${RESPONSE_HASH}`;
+    expect(checkReviewBodies({ ...EVIDENCE, model: "org/model:v2", signedText }, { request, response: RESPONSE }).ok).toBe(true);
+    expect(checkReviewBodies({ ...EVIDENCE, signatureKind: "gateway", signedText: `${REQUEST_HASH}:${RESPONSE_HASH}` }, bodies).ok).toBe(true);
+    expect(checkReviewBodies({ ...EVIDENCE, signatureKind: "gateway" }, bodies).signedTextMatches).toBe(false);
   });
 });

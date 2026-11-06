@@ -16,7 +16,7 @@ It runs on stdio with Bun and is private to this workspace (it is not published 
 | `get_market` | An Up/Down series with fair value, last prices and book depth per side |
 | `get_perp_market` | Attention perp open interest, funding, mark, open interest cap and pool |
 | `get_coin` | Trend coin curve, spot price and an optional buy quote |
-| `get_review` | NEAR AI Cloud review evidence, with the hash and the TEE signature re-checked |
+| `get_review` | NEAR AI Cloud review evidence and the exact request and response it signed, with the hash, the TEE signature and both body hashes re-checked |
 | `verify_index` | The newest checkpoint's oracle report, its ed25519 signature checked as the registry does |
 | `get_account` | USDC, perp positions, sessions, curation fees, outcome holdings and open orders |
 | `get_leaders` | Trader, caller or Hyperliquid leaderboards |

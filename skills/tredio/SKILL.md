@@ -51,8 +51,9 @@ Tredio's API mirrors every checkpoint, so its history goes back further than the
 
 - MCP `verify_index`: finds the `submit_report` transaction behind a trend's newest checkpoint, reads it from NEAR RPC, verifies the ed25519 signature with the registry's oracle key, and checks that the transaction succeeded and wrote that value.
 - By hand: read `history({"id": ...})` and `get_oracle({})` on the registry; find the `submit_report` transaction to the registry whose report has that `observed_at` (any NEAR explorer); check `ed25519_verify(signature, sha256(report_json), key)`; confirm its `index_updated` event for the trend.
-- Reviews: `GET /v1/reviews/{hash}` returns the evidence; its SHA-256 over the JSON with sorted keys must equal the trend's `review_hash`, and `signature` (an Ethereum `personal_sign` signature over `signedText`, secp256k1) must recover `signingAddress`; `signatureKind: "provider_tee"` means the model's TEE signed it.
-  MCP `get_review` runs both checks.
+- Reviews: `GET /v1/reviews/{hash}` returns the evidence with the exact `request` (the JSON sent to NEAR AI Cloud) and `response` (the body it answered) that its signature covers.
+  The evidence's SHA-256 over its JSON with sorted keys must equal the trend's `review_hash`; `signature` must be `signingAddress`'s over `signedText` (Ed25519 over its UTF-8 bytes, or for ECDSA an Ethereum `personal_sign` signature that recovers the address); and `signedText` must be `<model>:<sha256(request)>:<sha256(response)>`, lowercase hex over the exact UTF-8 bytes.
+  `signatureKind: "provider_tee"` means the model's TEE signed it; MCP `get_review` runs all three checks.
 - Trends an admin added by hand have no review hash.
 
 ## API
@@ -67,7 +68,7 @@ The API serves JSON at `TREDIO_API_URL` (locally `http://localhost:4000`; `GET /
 | `GET /v1/trends/{identifier}/stats` | Volume, traders, open interest, coin state |
 | `GET /v1/trends/{identifier}/thread` | Calls and posts on the trend |
 | `GET /v1/candidates` | Approved topics waiting for a live slot |
-| `GET /v1/reviews/{hash}` | NEAR AI Cloud review evidence |
+| `GET /v1/reviews/{hash}` | NEAR AI Cloud review evidence, with the request and response it signed |
 | `GET /v1/accounts/{account}` | Trading summary (`?optional=1`: `null` instead of 404) |
 | `GET /v1/accounts/{account}/activity`, `/outcomes`, `/orders` | Trade history, outcome holdings, open book orders |
 | `GET /v1/leaderboard/traders`, `GET /v1/callers/leaderboard` | Leaderboards |

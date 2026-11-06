@@ -8,7 +8,7 @@ import { NEAR_AI_VERIFY_URL } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
 import { copyText } from "@/lib/toast";
 
-/** What one verified completion proves (backend/src/ai/nearai.ts ReviewEvidence). */
+/** What one verified completion proves (backend/src/ai/evidence.ts ReviewEvidence). */
 interface Evidence {
   provider?: string;
   model?: string;

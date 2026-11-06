@@ -5,6 +5,7 @@ import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { z } from "zod";
 import { assess } from "../ai/assess";
+import { reviewRoutes } from "../ai/routes";
 import { autopilotAdminRoutes, autopilotRoutes } from "../autopilot/routes";
 import type { AutopilotService } from "../autopilot/service";
 import type { AutopilotStore } from "../autopilot/store";
@@ -434,7 +435,7 @@ export function createApp(d: AppDeps): Hono {
     const requestId = await d.store.addLinkRequest(parsed.data.url, surfacer);
     try {
       const info = await resolveLink(parsed.data.url, d.fetchImpl);
-      const { results } = await assess(
+      const { results, review } = await assess(
         d.ai,
         [{ kind: "link", url: info.url, platform: info.platform, title: info.title, author: info.author, text: info.text }],
         await d.store.knownIdentifiers(),
@@ -444,7 +445,9 @@ export function createApp(d: AppDeps): Hono {
         await d.store.finishLinkRequest(requestId, "failed", null, "could not identify a topic");
         return c.json({ requestId, status: "failed", reason: "We could not tell what that link is about." }, 422);
       }
-      const p = await d.radar.propose(a, "link", { url: info.url, platform: info.platform, title: info.title }, surfacer);
+      // The verifiable model's signed review goes with the proposal, as the radar's does.
+      const reviewHash = review ? await d.store.saveReview(review) : null;
+      const p = await d.radar.propose(a, "link", { url: info.url, platform: info.platform, title: info.title }, surfacer, reviewHash);
       await d.store.finishLinkRequest(requestId, p.status === "rejected" ? "rejected" : "proposed", p.id, p.reason);
       return c.json({ requestId, status: p.status, identifier: p.identifier, displayName: a.displayName, summary: a.summary, reason: p.reason, firstSurfacer: p.created });
     } catch (e) {
@@ -857,15 +860,9 @@ export function createApp(d: AppDeps): Hono {
     return c.json({ available: true, contract: d.cfg.deployment.contracts.usdc, amount, cooldownSec, nextAt });
   });
 
-  // The signed evidence behind a listing's AI review (ai/nearai.ts): its hash is what the registry
-  // stores with the trend, and the bundle re-checks at NEAR AI Cloud's verifier.
-  app.get("/v1/reviews/:hash", async (c) => {
-    const hash = c.req.param("hash").toLowerCase();
-    if (!/^[0-9a-f]{64}$/.test(hash)) return c.json({ error: "bad review hash" }, 400);
-    const r = await d.store.review(hash);
-    if (!r) return c.json({ error: "no such review" }, 404);
-    return c.json({ hash: r.hash, evidence: r.evidence, createdAt: r.createdAt.toISOString() });
-  });
+  // The signed evidence behind a listing's AI review and the bodies it covers (ai/routes.ts): its
+  // hash is what the registry stores with the trend.
+  app.route("/v1", reviewRoutes(d.store));
 
   // Public status: every service, the oracle and the chain head, as up or down. Cached briefly.
   let statusCache: { at: number; body: Awaited<ReturnType<typeof status>> } | null = null;

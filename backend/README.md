@@ -10,7 +10,7 @@ The [root README](../README.md) explains the project as a whole.
 ```bash
 bun install
 bun run dev        # port 4000, applies every migration on start
-bun run test       # database tests need TEST_DATABASE_URL
+bun run test       # skips the database tests, with a notice, unless TEST_DATABASE_URL is set
 bun run typecheck
 ```
 

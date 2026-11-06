@@ -1,4 +1,4 @@
-import { reviewHash, type ReviewEvidence } from "./ai/nearai";
+import { checkReviewBodies, reviewHash, type ReviewEvidence, type SignedReview } from "./ai/evidence";
 import type { Sql } from "./db";
 import { assetClassOf } from "./identifiers";
 
@@ -61,6 +61,16 @@ export interface NewCandidate {
   decidedBy: string | null;
   /** SHA-256 of the verified NEAR AI Cloud review that assessed it (ai_reviews). */
   reviewHash?: string | null;
+}
+
+/** A verified NEAR AI Cloud review as stored (ai_reviews), keyed by its review hash. */
+export interface StoredReview {
+  hash: string;
+  evidence: ReviewEvidence;
+  /** The exact request JSON and response body the signature covers; null if stored before they were kept. */
+  request: string | null;
+  response: string | null;
+  createdAt: Date;
 }
 
 export interface TrendMeta {
@@ -175,20 +185,26 @@ export class Store {
     return { candidate: existing, created: false };
   }
 
-  /** Stores a verified review's evidence under its hash (idempotent) and returns the hash. */
-  async saveReview(evidence: ReviewEvidence): Promise<string> {
-    const hash = reviewHash(evidence);
+  /**
+   * Stores a verified review under its hash (idempotent) and returns the hash: the evidence and the
+   * exact request and response bodies its signature covers, which must hash to its signed text.
+   */
+  async saveReview(r: SignedReview): Promise<string> {
+    if (!checkReviewBodies(r.evidence, r).ok) throw new Error("review bodies do not hash to the signed text");
+    const hash = reviewHash(r.evidence);
     await this.sql`
-      INSERT INTO ai_reviews (review_hash, model, completion_id, evidence)
-      VALUES (${hash}, ${evidence.model}, ${evidence.completionId}, ${this.sql.json(evidence as never)})
+      INSERT INTO ai_reviews (review_hash, model, completion_id, evidence, request_body, response_body)
+      VALUES (${hash}, ${r.evidence.model}, ${r.evidence.completionId}, ${this.sql.json(r.evidence as never)}, ${r.request}, ${r.response})
       ON CONFLICT (review_hash) DO NOTHING`;
     return hash;
   }
 
-  async review(hash: string): Promise<{ hash: string; evidence: ReviewEvidence; createdAt: Date } | null> {
-    const rows = await this.sql<{ review_hash: string; evidence: ReviewEvidence; created_at: Date }[]>`
-      SELECT review_hash, evidence, created_at FROM ai_reviews WHERE review_hash = ${hash}`;
-    return rows[0] ? { hash: rows[0].review_hash, evidence: rows[0].evidence, createdAt: rows[0].created_at } : null;
+  /** A stored review; `request` and `response` are null for one stored before the bodies were kept. */
+  async review(hash: string): Promise<StoredReview | null> {
+    const rows = await this.sql<{ review_hash: string; evidence: ReviewEvidence; request_body: string | null; response_body: string | null; created_at: Date }[]>`
+      SELECT review_hash, evidence, request_body, response_body, created_at FROM ai_reviews WHERE review_hash = ${hash}`;
+    const row = rows[0];
+    return row ? { hash: row.review_hash, evidence: row.evidence, request: row.request_body, response: row.response_body, createdAt: row.created_at } : null;
   }
 
   async candidateByIdentifier(identifier: string): Promise<Candidate | null> {

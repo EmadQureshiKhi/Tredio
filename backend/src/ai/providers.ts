@@ -1,7 +1,7 @@
 import { scrub } from "../errors";
 import { REJECTED_KEY_MS } from "../budget";
 import { BudgetError, type Fetch, fetchJson, HttpError } from "../sources/http";
-import type { ReviewEvidence } from "./nearai";
+import type { SignedReview } from "./evidence";
 
 /**
  * Language-model providers behind one call that returns JSON matching a schema. Providers are
@@ -18,15 +18,15 @@ export type Schema =
 
 export interface Provider {
   readonly name: string;
-  generate(system: string, user: string, schema: Schema, schemaName: string): Promise<{ value: unknown; evidence?: ReviewEvidence }>;
+  generate(system: string, user: string, schema: Schema, schemaName: string): Promise<{ value: unknown; review?: SignedReview }>;
 }
 
 /** Strict JSON Schema for OpenAI structured outputs: nullable becomes a type union. */
 export interface AiResult<T> {
   value: T;
   provider: string;
-  /** Verification evidence when the provider supplies it (NEAR AI Cloud). */
-  evidence?: ReviewEvidence;
+  /** The signed review (evidence and the bodies it covers) when the provider supplies it (NEAR AI Cloud). */
+  review?: SignedReview;
 }
 
 /** A daily allowance of provider requests (a KeyRing): `take` reserves one, or returns null when spent. */
@@ -111,7 +111,7 @@ export class Ai {
         const value = parse(out.value);
         stats.ok++;
         stats.lastOkAt = this.now();
-        return { value, provider: p.name, evidence: out.evidence };
+        return { value, provider: p.name, review: out.review };
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         stats.failures++;

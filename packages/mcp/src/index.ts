@@ -8,7 +8,7 @@ import { createServer } from "./server";
 export { ApiError, TredioApi } from "./api";
 export { type ChainViews, FastNearTxIndex, type IndexedTx, type TxIndex } from "./chain";
 export { createServer, SERVER_NAME, SERVER_VERSION, type ServerDeps } from "./server";
-export { checkReview, recoverSigner, reportSignatureValid, reviewHashOf, verifyIndex } from "./verify";
+export { checkReview, checkReviewBodies, ed25519SignatureValid, recoverSigner, reportSignatureValid, type ReviewBodies, type ReviewBodiesCheck, type ReviewCheck, type ReviewEvidence, reviewHashOf, verifyIndex } from "./verify";
 
 const list = (v: string | undefined) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 

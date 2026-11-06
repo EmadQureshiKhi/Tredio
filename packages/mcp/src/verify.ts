@@ -14,7 +14,8 @@ import type { ChainViews, TxIndex } from "./chain";
  *   oracle key the registry trusts, checked as the registry checks it (ed25519 over SHA-256 of
  *   the exact report JSON), in a transaction that succeeded and wrote that value.
  * - `checkReview`: a NEAR AI Cloud review's evidence hashes to the review hash the registry
- *   stores, and its ECDSA signature recovers the signing address the evidence names.
+ *   stores, its signature (ECDSA or Ed25519) is the signing address's over the signed text, and
+ *   (`checkReviewBodies`) the request and response bodies the API serves hash into that text.
  */
 
 const utf8 = (s: string) => new TextEncoder().encode(s);
@@ -121,7 +122,7 @@ export async function verifyIndex(o: { identifier: string; chain: ChainViews; tx
   };
 }
 
-/** The NEAR AI Cloud evidence stored for a review (backend `ai/nearai.ts` ReviewEvidence). */
+/** The NEAR AI Cloud evidence stored for a review (backend `ai/evidence.ts` ReviewEvidence). */
 export interface ReviewEvidence {
   provider: string;
   model: string;
@@ -156,7 +157,83 @@ export function recoverSigner(text: string, signatureHex: string): string | null
   }
 }
 
-export function checkReview(hash: string, e: ReviewEvidence): { hashMatches: boolean; recoveredSigner: string | null; signatureMatchesSigner: boolean } {
-  const recovered = e.signingAlgo.toLowerCase() === "ecdsa" ? recoverSigner(e.signedText, e.signature) : null;
-  return { hashMatches: reviewHashOf(e) === hash.toLowerCase(), recoveredSigner: recovered, signatureMatchesSigner: recovered !== null && recovered.toLowerCase() === e.signingAddress.toLowerCase() };
+/** Whether `signatureHex` is the Ed25519 signature of the key `publicKeyHex` (32 bytes) over the UTF-8 bytes of `text`. */
+export function ed25519SignatureValid(text: string, signatureHex: string, publicKeyHex: string): boolean {
+  try {
+    const sig = Buffer.from(signatureHex.replace(/^0x/i, ""), "hex");
+    const key = Buffer.from(publicKeyHex.replace(/^0x/i, ""), "hex");
+    return sig.length === 64 && key.length === 32 && ed25519.verify(new Uint8Array(sig), utf8(text), new Uint8Array(key));
+  } catch {
+    return false;
+  }
+}
+
+/** The exact bodies a review's signature covers, as GET /v1/reviews/<hash> serves them. */
+export interface ReviewBodies {
+  request: string;
+  response: string;
+}
+
+/** What `checkReviewBodies` recomputed and compared. */
+export interface ReviewBodiesCheck {
+  /** SHA-256 (hex) of the exact UTF-8 bytes of the request and of the response. */
+  requestHash: string;
+  responseHash: string;
+  /** The model the request names, or null when the request is not JSON with a string `model`. */
+  requestModel: string | null;
+  /** The text the signer must have signed for these bodies. */
+  expectedText: string;
+  requestHashMatches: boolean;
+  responseHashMatches: boolean;
+  /** The request asked the model the evidence names. */
+  modelMatches: boolean;
+  /** `signedText` is exactly `expectedText`: the signature covers these bodies. */
+  signedTextMatches: boolean;
+  ok: boolean;
+}
+
+/**
+ * Recomputes the request and response hashes from the bodies and checks them against the signed
+ * text, which NEAR AI Cloud forms as `<model>:<sha256(request)>:<sha256(response)>` for a model
+ * enclave (`provider_tee`) and `<sha256(request)>:<sha256(response)>` for the gateway. The same
+ * check as the backend's `checkReviewBodies` (ai/evidence.ts), written again here so this server
+ * trusts nothing of the API's.
+ */
+export function checkReviewBodies(e: Pick<ReviewEvidence, "model" | "signatureKind" | "signedText">, b: ReviewBodies): ReviewBodiesCheck {
+  const requestHash = hex(sha256(utf8(b.request)));
+  const responseHash = hex(sha256(utf8(b.response)));
+  let requestModel: string | null = null;
+  try {
+    const model = (JSON.parse(b.request) as { model?: unknown } | null)?.model;
+    requestModel = typeof model === "string" ? model : null;
+  } catch {
+    // Not JSON: no model, and nothing matches.
+  }
+  const enclave = e.signatureKind === "provider_tee";
+  const expectedText = enclave ? `${requestModel ?? ""}:${requestHash}:${responseHash}` : `${requestHash}:${responseHash}`;
+  // The hashes are the last two fields; a model id may itself contain a colon.
+  const fields = e.signedText.split(":");
+  const requestHashMatches = fields.length >= 2 && fields.at(-2) === requestHash;
+  const responseHashMatches = fields.length >= 2 && fields.at(-1) === responseHash;
+  const modelMatches = requestModel !== null && requestModel === e.model;
+  const signedTextMatches = (!enclave || requestModel !== null) && e.signedText === expectedText;
+  return { requestHash, responseHash, requestModel, expectedText, requestHashMatches, responseHashMatches, modelMatches, signedTextMatches, ok: requestHashMatches && responseHashMatches && modelMatches && signedTextMatches };
+}
+
+export interface ReviewCheck {
+  /** The evidence hashes to the review hash asked for. */
+  hashMatches: boolean;
+  /** ECDSA only: the address the signature recovers. */
+  recoveredSigner: string | null;
+  /** The signature is the named signer's over the signed text (ECDSA or Ed25519). */
+  signatureMatchesSigner: boolean;
+  /** The bodies recomputed against the signed text; null when the API serves none. */
+  bodies: ReviewBodiesCheck | null;
+}
+
+export function checkReview(hash: string, e: ReviewEvidence, bodies: ReviewBodies | null = null): ReviewCheck {
+  const algo = e.signingAlgo.toLowerCase();
+  const recovered = algo === "ecdsa" ? recoverSigner(e.signedText, e.signature) : null;
+  const signatureMatchesSigner = algo === "ecdsa" ? recovered !== null && recovered.toLowerCase() === e.signingAddress.toLowerCase() : algo === "ed25519" && ed25519SignatureValid(e.signedText, e.signature, e.signingAddress);
+  return { hashMatches: reviewHashOf(e) === hash.toLowerCase(), recoveredSigner: recovered, signatureMatchesSigner, bodies: bodies ? checkReviewBodies(e, bodies) : null };
 }

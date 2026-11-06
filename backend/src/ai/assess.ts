@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ReviewEvidence } from "./nearai";
+import type { SignedReview } from "./evidence";
 import { ASSET_CLASSES, type AssetClassName, CRYPTO, EQUITY, makeIdentifier } from "../identifiers";
 import type { Ai, Schema } from "./providers";
 
@@ -221,7 +221,7 @@ export async function assess(
   ai: Ai,
   signals: readonly Signal[],
   existing: readonly string[],
-): Promise<{ results: Array<Assessment | null>; provider: string; evidence?: ReviewEvidence }> {
+): Promise<{ results: Array<Assessment | null>; provider: string; review?: SignedReview }> {
   if (signals.length === 0) return { results: [], provider: "none" };
   const known = new Set(existing);
   const user = [
@@ -230,7 +230,7 @@ export async function assess(
     "Signals:",
     ...signals.map(describe),
   ].join("\n");
-  const { value, provider, evidence } = await ai.json(SYSTEM_PROMPT, user, responseSchema, "trend_assessments", (raw) =>
+  const { value, provider, review } = await ai.json(SYSTEM_PROMPT, user, responseSchema, "trend_assessments", (raw) =>
     z.object({ items: z.array(z.unknown()) }).parse(raw).items,
   );
   const results: Array<Assessment | null> = signals.map(() => null);
@@ -241,5 +241,5 @@ export async function assess(
     if (!signal || results[parsed.data.index]) continue;
     results[parsed.data.index] = toAssessment(parsed.data, signal, known);
   }
-  return { results, provider, evidence };
+  return { results, provider, review };
 }

@@ -6,7 +6,7 @@ Contracts come from `deployments/<network>.json` through `@tredio/contracts`; ne
 
 ## Commands
 
-- `npm run lint`, `npm test` (bun tests in `test/`), `npm run build`.
+- `npm run lint`, `npm run typecheck` (`next typegen` writes the route types `PageProps` needs, then `tsc`), `npm test` (bun tests in `test/`), `npm run build`.
 - Check a production build without touching `.next`: `NEXT_DIST_DIR=.next-check npm run build && NEXT_DIST_DIR=.next-check npx next start -p 3010`.
 - Live end-to-end specs (real testnet, each run creates a passkey account and costs the relayer testnet NEAR): `npx playwright test -c playwright.live.config.ts` against a running app.
 

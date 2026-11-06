@@ -27,7 +27,8 @@ pnpm dev           # API, services and app against testnet
 pnpm test:contracts
 ```
 
-- Backend tests need a Postgres test database: `TEST_DATABASE_URL=postgres://.../tredio_test bun test test/` in `backend/`.
+- Database tests (backend, Autopilot, indexer) need `TEST_DATABASE_URL`, a Postgres database they may truncate; without it `pnpm test` skips them with a notice (the backend refuses to skip under `CI`), and CI runs them on Postgres 16.
+- CI (`.github/workflows/ci.yml`): typecheck, lint and every package's tests; contracts fmt, clippy and unit tests; the enclave crate's clippy and tests (it is not rustfmt-formatted); the sandbox crates run only locally.
 - Contract sandbox flows: `cd contracts && cargo test -p tredio-sandbox-tests` (downloads a nearcore sandbox once).
 - Release wasm: `pnpm build:contracts` (`cargo near build`).
 - Live browser specs in `frontend/e2e` and `admin/e2e` run against testnet and spend testnet NEAR; see `frontend/CLAUDE.md`.

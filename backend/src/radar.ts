@@ -255,7 +255,7 @@ export class Radar {
       );
       results = out.results;
       report.provider = out.provider;
-      if (out.evidence) reviewHash = await this.store.saveReview(out.evidence);
+      if (out.review) reviewHash = await this.store.saveReview(out.review);
     } catch (e) {
       report.skipped.push(`ai: ${message(e)}`);
       return false;

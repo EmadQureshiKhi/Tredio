@@ -365,13 +365,25 @@ export function createServer(d: ServerDeps): McpServer {
     {
       title: "NEAR AI Cloud review",
       description:
-        "The signed NEAR AI Cloud evidence behind a listing's AI review, by the review hash the registry stores with the trend: the verifiable model, the signature kind (provider_tee: signed inside the model's TEE), the signed text, signer address and signature. Also checks it here: the evidence hashes to the review hash, and the ECDSA signature recovers the named signer. The signer's hardware attestation is at verifyUrl.",
+        "The signed NEAR AI Cloud evidence behind a listing's AI review, by the review hash the registry stores with the trend: the verifiable model, the signature kind (provider_tee: signed inside the model's TEE), the signed text, signer address and signature, and the exact request (what the model was asked) and response (what it answered) that the signature covers. " +
+        "Also checks it here, trusting nothing of the API's: the evidence hashes to the review hash, the signature (ECDSA or Ed25519) is the named signer's over the signed text, and the SHA-256 of the request and of the response are the hashes in the signed text. verified is true when all of these hold. The signer's hardware attestation is at verifyUrl.",
       inputSchema: { hash: z.string().trim().toLowerCase().regex(/^[0-9a-f]{64}$/, "a 64-hex review hash").describe("review hash from get_trend or list_trends") },
       annotations: READ_ONLY,
     },
     run(async ({ hash }: { hash: string }) => {
-      const r = await d.api.get<{ hash: string; evidence: ReviewEvidence; createdAt: string }>(`/v1/reviews/${hash}`);
-      return { hash: r.hash, createdAt: r.createdAt, evidence: r.evidence, checks: checkReview(hash, r.evidence) };
+      const r = await d.api.get<{ hash: string; evidence: ReviewEvidence; request?: string | null; response?: string | null; createdAt: string }>(`/v1/reviews/${hash}`);
+      const bodies = typeof r.request === "string" && typeof r.response === "string" ? { request: r.request, response: r.response } : null;
+      const checks = checkReview(hash, r.evidence, bodies);
+      return {
+        hash: r.hash,
+        createdAt: r.createdAt,
+        evidence: r.evidence,
+        // Null for a review stored before Tredio kept the bodies: then only the signature can be checked.
+        request: bodies?.request ?? null,
+        response: bodies?.response ?? null,
+        checks,
+        verified: checks.hashMatches && checks.signatureMatchesSigner && checks.bodies?.ok === true,
+      };
     }),
   );
 

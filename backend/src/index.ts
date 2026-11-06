@@ -103,7 +103,7 @@ const coingecko = new CoinGecko(undefined, keyless("coingecko"));
 const geckoterminal = new GeckoTerminal(undefined, keyless("geckoterminal"));
 
 // The review cascade: NEAR AI Cloud's verifiable models, cheapest first; every answer is checked
-// with verifyResponse() and its signed evidence is kept (ai/nearai.ts).
+// with verifyResponse(), and its signed evidence and the exact bodies it covers are kept (ai/nearai.ts).
 const providers: Provider[] = [];
 if (cfg.NEARAI_API_KEY) {
   const client = nearAiClient(cfg.NEARAI_API_KEY, cfg.NEARAI_API_BASE);
