@@ -12,6 +12,8 @@ import { sealPublicKey } from "./seal";
 import { AUTOPILOT_POLICY, hyperliquidApi, Nonces, relayerFunding, SessionVenue } from "./venue";
 import { nearGrantChain, nearSessionChain, type VenueRequest, Venues } from "./venues";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 const cfg = loadConfig(process.env);
 const log = jsonLog("autopilot");
 const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpc);

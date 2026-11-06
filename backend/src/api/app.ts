@@ -43,6 +43,8 @@ import type { SystemMonitor } from "../system";
 import { type Alert, type Alerts, MAX_ALERTS } from "../alerts";
 import { x402Routes } from "../x402/routes";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 /** Topics one account can wait on at once (each wait also counts toward community picks). */
 const MAX_WATCHES = 25;
 

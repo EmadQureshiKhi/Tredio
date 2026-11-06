@@ -19,6 +19,8 @@ import { useTx } from "@/lib/trade/useTx";
 import { faucetButton, faucetState, isCooldown, untilText } from "./faucet-claims";
 import { HlWithdrawSheet } from "./HlWithdrawSheet";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 /** The panels any screen can open: add funds, withdraw from Hyperliquid, propose a trend from a link, and the Mainnet waitlist. */
 export default function GlobalSheets() {
   const { current, close } = useSheets();

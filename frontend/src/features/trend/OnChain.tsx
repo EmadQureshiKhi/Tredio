@@ -6,6 +6,8 @@ import { shortAddress } from "@/lib/format";
 import { useCoinSymbol } from "./CoinTicket";
 import { useAssetPerpMarket, useCurve, useSeries } from "./data";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 /**
  * Where this trend lives on NEAR: the registry that records its index, the outcomes ledger and
  * book of its series, the perps, its coin, and the contracts behind them. Each links to NearBlocks.

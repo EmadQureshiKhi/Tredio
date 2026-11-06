@@ -18,6 +18,8 @@ import { shortAddress, tokenAmount, tokenNumber } from "@/lib/format";
 import { type HlRoute, INTENTS_MIN_DEPOSIT, INTENTS_USD_SEND_SURCHARGE, intentsSendAmount, routeFee, signTransfer, transferPlan } from "@/lib/trade/hyperliquid";
 import { useTx } from "@/lib/trade/useTx";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 /**
  * USDC out of the account's Hyperliquid balance. No session may move it: the passkey approves one
  * `mpc_sign` owner request over the transfer's EIP-712 digest, the relayer submits it, the account's

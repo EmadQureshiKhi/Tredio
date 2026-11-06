@@ -3,6 +3,8 @@ import { type Deployment, deployment as deploymentOf } from "@tredio/contracts";
 import { z } from "zod";
 import { NEAR, parseTargets, type Target, USDC } from "./targets";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 const list = (v: string | undefined) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const optional = <T extends z.ZodType>(inner: T) => z.preprocess((v) => (v === "" ? undefined : v), inner.optional());
 const near = (fallback: number) => z.coerce.number().nonnegative().default(fallback).transform((v) => (BigInt(Math.round(v * 1e6)) * NEAR) / 1_000_000n);

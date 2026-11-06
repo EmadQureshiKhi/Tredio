@@ -11,7 +11,7 @@ Results from 2026-11-07, on the code deployed on NEAR testnet under `tredio.test
 | Check | Tool | Result |
 | --- | --- | --- |
 | Line-by-line audit | `near-contract-audit` checklist and manual review ([AUDIT.md](contracts/AUDIT.md)) | 11 findings (1 high, 7 medium, 3 low): 10 fixed with a test each, 1 open by design (M-4) |
-| Deployed code is this source | Reproducible builds in SourceScan's Docker image (NEP-330), `near contract verify`, `pnpm verify` | 10 of 10 match byte for byte: the 8 contracts are reproducible builds of commit `d634a0e`, ready for NearBlocks verification once it is public; the global coin and account code match the local build |
+| Deployed code is this source | Reproducible builds in SourceScan's Docker image (NEP-330), `near contract verify`, `pnpm verify` | 10 of 10 match byte for byte: the 8 contracts are reproducible builds of commit `d976aea`, ready for NearBlocks verification once it is public; the global coin and account code match the local build |
 | NEAR rules | `pnpm security` | 6 of 6 hold: overflow checks, no `unsafe`, 30 of 30 callbacks private, 6 of 6 token receivers check their token, no `signer_account_id`, no joint promise returned |
 | Static analysis | Clippy's security lints on the wasm32 build | 0 panics; every truncating cast, unwrap and slice index reviewed (below) |
 | Static analysis built for NEAR | BlockSec's Rustle, every detector, ported to LLVM 22 ([contracts/RUSTLE.md](contracts/RUSTLE.md)) | 0 high, 0 medium; 2 low findings, both fixed and gone on a second run; the rest triaged as false positives or by design |
@@ -48,10 +48,10 @@ On an EVM chain a block explorer shows "verified source".
 On NEAR an account's `code_hash` is the SHA-256 of the wasm it runs, and global code is addressed by that hash, so the proof is a build that hashes the same.
 
 - **Reproducible builds.**
-  The eight contract accounts run wasm that `contracts/scripts/build.sh --reproducible` built in SourceScan's pinned Docker image (`sourcescan/cargo-near:0.22.0-rust-1.98.1`, by digest) from commit `d634a0e` of this repository, redeployed on 2026-11-07 with no change to their state.
+  The eight contract accounts run wasm that `contracts/scripts/build.sh --reproducible` built in SourceScan's pinned Docker image (`sourcescan/cargo-near:0.22.0-rust-1.98.1`, by digest) from commit `d976aea` of this repository, redeployed on 2026-11-07 with no change to their state.
   Each records the repository, the commit and the build command (NEP-330 `contract_source_metadata`), so NearBlocks' contract tab can rebuild it from the public source and mark it verified, and anyone can rebuild it with Docker alone.
 - **Checked here before it is public.**
-  `near contract verify --use-contract-source-code-path <checkout of d634a0e> deployed-at registry.tredio.testnet network-config testnet now` rebuilt `registry` the way SourceScan does and answered that the code on chain and the code built from the repository are the same.
+  `near contract verify --use-contract-source-code-path <checkout of d976aea> deployed-at <contract> network-config testnet now` rebuilt `registry` and `perps` the way SourceScan does and answered, for each, that the code on chain and the code built from the repository are the same.
   Without `--use-contract-source-code-path` it fetches the source from GitHub, which works once the commit is pushed.
 - **Global code.**
   The coin code and account code v1 and v2 were published from the local build (rustc 1.98.1, cargo-near 0.22.0) before reproducible builds existed here.
@@ -61,14 +61,14 @@ On NEAR an account's `code_hash` is the SHA-256 of the wasm it runs, and global 
 
 | Contract | Account | Build | Size | Code hash (base58 SHA-256) |
 | --- | --- | --- | --- | --- |
-| `usdc` (testnet only) | `usdc.tredio.testnet` | reproducible | 182 KB | `D6Mnyv2UTXMFUfsw5Mtc85cFXqfv6qdtzZG47omYcWwJ` |
-| `registry` | `registry.tredio.testnet` | reproducible | 251 KB | `BUUPDeupeUtmBsxpgwB1RE3SZUiMULbNwUm8hsXouUB` |
-| `outcomes` | `outcomes.tredio.testnet` | reproducible | 294 KB | `878oduptqJWH2MBZGKHrBAHuyM4JFWxvq8NrfhL7f7TE` |
-| `book` | `book.tredio.testnet` | reproducible | 303 KB | `8JWcJxXPfW7ZcRtsaL7kGMfMpdhy9jf5uTeZeNTd7GHP` |
-| `perps` | `perps.tredio.testnet` | reproducible | 276 KB | `9K79MFbFzc1Zphn3enTot489GSfe9GLqsufuLEfPwq4E` |
-| `curation` | `curation.tredio.testnet` | reproducible | 172 KB | `4a2cx5RKMGoCFNak267yuLjCdFEYgK1H4PAJaoAoTQAw` |
-| `coins` | `coins.tredio.testnet` | reproducible | 275 KB | `H1jazKjK4q4NRiK7vq9SpmJw3RHncWdLC56M782qT8X1` |
-| `accounts` | `accounts.tredio.testnet` | reproducible | 191 KB | `9EvhicGrLGNCqMddaQw8PxfebPNmLCMvX66qSVZ9Kc8L` |
+| `usdc` (testnet only) | `usdc.tredio.testnet` | reproducible | 182 KB | `6y7XtXeX5aNjH9nG6XDUFEJTiyxkewLkXdaQNuBq8yut` |
+| `registry` | `registry.tredio.testnet` | reproducible | 250 KB | `6cqSBbzyv6GvSpQPyNKfUqgeysMALQzT8v9xGsAHAENt` |
+| `outcomes` | `outcomes.tredio.testnet` | reproducible | 294 KB | `3WpvWnioDU9HN42HxkVu82J4UuuASoz95F4emHDzV8AZ` |
+| `book` | `book.tredio.testnet` | reproducible | 303 KB | `3ogUcNJ7GojTRrdvDd7MqS1Wf291vVzo4ndd7rkbxSCc` |
+| `perps` | `perps.tredio.testnet` | reproducible | 277 KB | `8VSJFGfyX1CN12tkwNp82s4ZQpgPHyK8ko1MAHeZi1Fd` |
+| `curation` | `curation.tredio.testnet` | reproducible | 172 KB | `A3BdN2Rcu7T36J7YNfUKXkoXtFRkQR1yVcmfxd8VdMBX` |
+| `coins` | `coins.tredio.testnet` | reproducible | 275 KB | `9s3Ex87Wh1v1hCh6xmrzdYrB51jGHkpdZHtsWqtUfd2p` |
+| `accounts` | `accounts.tredio.testnet` | reproducible | 190 KB | `3K45nWx35rU2ap27ASJWu3QT4KUW5Q4aPxDdZhAzvw7P` |
 | `coin` (global code, every trend coin) | by hash | local | 157 KB | `DsgtQXqNL8Jat89BX27i8S34fGu7L2MHxcLTL7BcYV8s` |
 | `account` v2 (global code, every passkey account) | by hash | local | 315 KB | `BsFqhAcYESJ5Fyn55Xa6HwPyJaYy3VyEu4ZGh2iTdBMf` |
 

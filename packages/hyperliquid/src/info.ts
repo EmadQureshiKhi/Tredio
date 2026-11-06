@@ -3,6 +3,7 @@
  * positions and fills, candles, and the public leaderboard (the traders Tredio accounts can copy).
  */
 
+// #mainnet: each network has its own hosts below; Hyperliquid's leaderboard exists on mainnet only.
 export type HlNetwork = "testnet" | "mainnet";
 
 export const API_URL: Record<HlNetwork, string> = {

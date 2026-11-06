@@ -7,6 +7,8 @@ import { Card, Row, Rows } from "@/src/modules/operations/parts";
 import type { SystemReport, WalletRow } from "@/src/types/admin";
 import { Age, StateChip } from "./parts";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 const near = (v: string | null) => (v === null ? "?" : `${Number(v).toLocaleString("en-US", { maximumFractionDigits: Number(v) >= 100 ? 0 : 3 })} NEAR`);
 const secs = (s: number) => (s < 90 ? `${s}s` : s < 5400 ? `${Math.round(s / 60)}m` : `${(s / 3600).toFixed(1)}h`);
 const NEARBLOCKS: Record<string, string> = { testnet: "https://testnet.nearblocks.io", mainnet: "https://nearblocks.io" };

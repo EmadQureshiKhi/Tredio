@@ -19,6 +19,8 @@ import { useTx } from "@/lib/trade/useTx";
 import { useAssetPerpMarket, useHlAccount, useMark } from "./data";
 import { AmountField, Note, Section, SubmitButton, useNow } from "./ticket";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 /**
  * Hyperliquid perps on the asset behind a trend, traded from the account's own Hyperliquid address:
  * the EVM address of its NEAR Chain Signatures key. The session asks the account to sign each order;

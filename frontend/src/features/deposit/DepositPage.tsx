@@ -17,6 +17,8 @@ import { owner, ownerCall, storage } from "@/lib/trade/calls";
 import { isRegistered } from "@/lib/trade/reads";
 import { useTx } from "@/lib/trade/useTx";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 /**
  * Any-chain deposits and withdrawals through NEAR Intents 1Click: pick what you hold and where,
  * see a quote, then (on mainnet) send to a one-time deposit address; 1Click delivers USDC to the

@@ -16,6 +16,8 @@ import { compact } from "@/lib/format";
 import { type DirectoryLeader, useLeaderDirectory } from "./leaders";
 import { COPY_MAX_LEVERAGE, FOLLOW_DEFAULTS, type FollowForm as Form, formOf, validateFollow } from "./follow-form";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 /**
  * Following a leader: how big each copy is (a ratio of the leader's size or a fixed margin), the
  * caps that bound it, the worst price a copy may pay and the loss that closes every copy, explained

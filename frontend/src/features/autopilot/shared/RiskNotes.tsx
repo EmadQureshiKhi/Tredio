@@ -2,6 +2,8 @@ import { AlertTriangle, Coins, History, Zap } from "lucide-react";
 import { cn } from "@/components/ui";
 import { IS_MAINNET } from "@/lib/config";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 /**
  * The plain risks of automated leveraged trading, said before anything runs. With a leverage the
  * liquidation distance is worked out for that rule.

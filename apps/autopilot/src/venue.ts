@@ -21,6 +21,8 @@ import {
 } from "@tredio/hyperliquid";
 import { classify, SESSION_MAX_LEVERAGE } from "./orders";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 /**
  * A venue is one account trading Hyperliquid through one session key: the Tredio bot's own
  * account, or an account that granted Autopilot a session. Every order is a `session_call` the

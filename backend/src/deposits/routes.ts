@@ -5,6 +5,8 @@ import type { Sql } from "../db";
 import type { Log } from "../log";
 import { rateLimit } from "../api/rate-limit";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 /**
  * Any-chain deposits and withdrawals through NEAR Intents 1Click (packages/intents), and USDC to and
  * from the account's Hyperliquid perps balance. On mainnet a quote opens a deposit address that

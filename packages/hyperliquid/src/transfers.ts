@@ -3,6 +3,8 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import { concat, domainSeparator, keccakText, typedDataDigest, word } from "./eip712";
 import type { HlNetwork } from "./info";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 /**
  * USDC out of a Hyperliquid account: `withdraw3` (through Hyperliquid's bridge to an address on
  * Arbitrum) and `usdSend` (to another Hyperliquid address's perps balance). These are

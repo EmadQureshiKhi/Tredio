@@ -5,6 +5,8 @@ import { TredioApi } from "./api";
 import { FastNearTxIndex } from "./chain";
 import { createServer } from "./server";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 export { ApiError, TredioApi } from "./api";
 export { type ChainViews, FastNearTxIndex, type IndexedTx, type TxIndex } from "./chain";
 export { createServer, SERVER_NAME, SERVER_VERSION, type ServerDeps } from "./server";

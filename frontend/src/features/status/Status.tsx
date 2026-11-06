@@ -9,6 +9,8 @@ import { useTrends } from "@/lib/hooks/queries";
 import { useNow } from "@/features/portfolio/parts";
 import { serviceInfo, useStatusPage } from "./data";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 /** Seconds as "8s", "4m 12s" or "3h 5m". */
 function age(sec: number): string {
   const s = Math.max(0, Math.round(sec));

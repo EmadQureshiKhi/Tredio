@@ -4,7 +4,7 @@
  */
 export const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000").replace(/\/+$/, "");
 
-/** The NEAR network the admin wallet signs in on. */
+/** The NEAR network the admin wallet signs in on. #mainnet */
 export const NEAR_NETWORK: "testnet" | "mainnet" = process.env.NEXT_PUBLIC_NEAR_NETWORK === "mainnet" ? "mainnet" : "testnet";
 
 /**

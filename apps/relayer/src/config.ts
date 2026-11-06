@@ -2,6 +2,8 @@ import { type RpcEndpoint, rpcEndpoints } from "@tredio/chain";
 import { type Deployment, deployment as deploymentOf } from "@tredio/contracts";
 import { z } from "zod";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 const list = (v: string | undefined) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const optional = <T extends z.ZodType>(inner: T) => z.preprocess((v) => (v === "" ? undefined : v), inner.optional());
 const near = (v: string) => BigInt(Math.round(Number(v) * 1e6)) * 10n ** 18n;

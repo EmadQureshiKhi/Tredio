@@ -17,6 +17,8 @@ import { LeaderCard, LeaderCardSkeleton } from "@/features/autopilot/shared/Lead
 import { FollowSheet } from "./FollowSheet";
 import { useLeaderDirectory } from "./leaders";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 /** /copy: the leaders you follow with their caps and switches, and leaders worth following. */
 export default function CopyPage() {
   const account = useAccount();

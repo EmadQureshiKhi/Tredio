@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 /** Empty values count as unset, so `.env` files can keep every key. */
 const opt = <T extends z.ZodType>(t: T) => z.preprocess((v) => (v === "" ? undefined : v), t.optional());
 const int = (def: number, min = 0) => z.preprocess((v) => (v === "" ? undefined : v), z.coerce.number().int().min(min).default(def));

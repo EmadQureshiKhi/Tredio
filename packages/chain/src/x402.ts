@@ -17,6 +17,8 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { Near, parseKey, type PrivateKey } from "near-kit";
 import { base58Decode, base58Encode } from "./proofs";
 
+// #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
+
 export const X402_VERSION = 2;
 
 /** CAIP-2 network ids of the NEAR `exact` scheme. */
