@@ -141,10 +141,11 @@ function Positions({ trend, index }: { trend: Trend; index: number | undefined }
   const account = useAccount();
   const positions = usePerpPositions(account.address);
   const mine = (positions.data ?? []).filter((p) => p.trend === trend.id);
-  if (mine.length === 0) return null;
+  // data-state tells a test (and nothing visible) whether the list has loaded or is simply empty.
+  if (mine.length === 0) return <div hidden data-testid="perp-positions" data-state={positions.isFetched ? "loaded" : "loading"} />;
   return (
     <Section title="Your positions" className="border-t border-line pt-5">
-      <ul className="flex flex-col gap-3">
+      <ul className="flex flex-col gap-3" data-testid="perp-positions" data-state="loaded">
         {mine.map((p) => (
           <PositionRow key={p.id} p={p} index={index} retired={trend.status === "retired"} />
         ))}

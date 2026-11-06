@@ -81,14 +81,9 @@ test("an attention perp takes more margin with one prompt and closes through the
   const positions = panel.getByTestId("perp-position");
   // Positions from earlier runs may be open: wait for the new one before acting on it, not just any last card.
   await expect(panel.getByTestId("perp-margin")).toBeVisible({ timeout: 30_000 });
-  // The positions list loads from chain after the ticket: count once it holds steady.
-  let held = -1;
-  await expect(async () => {
-    const first = await positions.count();
-    await page.waitForTimeout(2_000);
-    held = await positions.count();
-    expect(held).toBe(first);
-  }).toPass({ timeout: 45_000 });
+  // The positions list loads from chain after the ticket: count once it has.
+  await expect(panel.getByTestId("perp-positions")).toHaveAttribute("data-state", "loaded", { timeout: 45_000 });
+  const held = await positions.count();
   await panel.getByTestId("perp-margin").fill("2");
   const open = panel.getByTestId("perp-submit");
   await expect(open).toBeEnabled({ timeout: 30_000 });
