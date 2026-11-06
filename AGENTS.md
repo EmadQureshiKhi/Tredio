@@ -13,6 +13,8 @@ The product overview is in [README.md](README.md); the judges' checklist is in [
 - `packages/`: `chain` (sender, viewer, proofs, the x402 paying client), `contracts-ts` (`@tredio/contracts`: typed calls and deployments), `hyperliquid`, `intents` (1Click), `autopilot` (rule engine), `mcp` (MCP server).
 - `skills/tredio/SKILL.md`: the agent skill for using Tredio.
 - `scripts/`: `dev.ts` (run everything), `verify.ts` (check the claims against testnet), `e2e-testnet.ts` (one full flow on testnet), `x402-demo.ts` (pay for an x402 route on testnet), `gas-keys.ts`.
+- `contracts/scripts/`: `build.sh` (local, or `--reproducible [commit]` in SourceScan's Docker image) and `deploy.sh testnet|mainnet`.
+- [MAINNET.md](MAINNET.md): what changes on mainnet, the rehearsal and the deploy steps.
 - `tools/make_readme_art.py`: the README figures (Pillow, colours from `frontend/app/globals.css`).
 
 ## Commands
@@ -25,12 +27,14 @@ pnpm lint
 pnpm verify        # read testnet and check the claims in JUDGES.md
 pnpm dev           # API, services and app against testnet
 pnpm test:contracts
+pnpm security      # NEAR rules, Clippy security lints, cargo deny and cargo audit
+pnpm coverage:contracts
 ```
 
 - Database tests (backend, Autopilot, indexer) need `TEST_DATABASE_URL`, a Postgres database they may truncate; without it `pnpm test` skips them with a notice (the backend refuses to skip under `CI`), and CI runs them on Postgres 16.
 - CI (`.github/workflows/ci.yml`): typecheck, lint and every package's tests; contracts fmt, clippy and unit tests; the enclave crate's clippy and tests (it is not rustfmt-formatted); the sandbox crates run only locally.
-- Contract sandbox flows: `cd contracts && cargo test -p tredio-sandbox-tests` (downloads a nearcore sandbox once).
-- Release wasm: `pnpm build:contracts` (`cargo near build`).
+- Contract sandbox flows: `cd contracts && cargo test -p tredio-sandbox-tests` (downloads a nearcore sandbox once); `--test mainnet` is the mainnet rehearsal, which imports Circle's USDC and Rhea from mainnet over RPC.
+- Release wasm: `pnpm build:contracts` (`cargo near build`, to `target/near`); `contracts/scripts/build.sh --reproducible [commit]` builds a commit in Docker to `target/near-reproducible/<commit>`, which is what mainnet deploys and NearBlocks verifies.
 - Live browser specs in `frontend/e2e` and `admin/e2e` run against testnet and spend testnet NEAR; see `frontend/CLAUDE.md`.
 
 ## How the pieces trust each other
@@ -44,6 +48,7 @@ pnpm test:contracts
 ## Conventions
 
 - Never hardcode a contract id: read it from `deployments/<network>.json` through `@tredio/contracts`.
+- One switch: `NEAR_NETWORK` in every service, `NEXT_PUBLIC_NEAR_NETWORK` in the app and admin. `deployments/mainnet.json` is the plan (`status: "planned"`) until `deploy.sh mainnet` writes the live file; code that differs on mainnet carries a `#mainnet` comment.
 - Units: USDC and outcome tokens 6 decimals, index 6 decimals (1e6 is one point), trend coins 18 decimals.
 - Prose and docs: no em dash; in long Markdown, one sentence per line.
 - Lines are long (about 160 columns) and code is not run through Prettier at its default width; match the file you are in.
@@ -66,3 +71,7 @@ pnpm test:contracts
   near-kit clients run with `retryConfig: { maxRetries: 0 }`, since its own retries wait up to 15 s on one provider before Tredio's failover moves on.
 - 1Click quotes need an existing mainnet recipient, and confidential quotes need a partner JWT.
 - Hyperliquid testnet has no leaderboard; leaders come from mainnet's.
+- Regular RPC nodes drop transactions after about five epochs (2.5 days): look recorded proofs up on an archival node (`archival-rpc.<network>.fastnear.com`), as `verify.ts` does.
+- Publishing global code burns 10 times the storage price: 31.55 NEAR for the 316 KB account code. Re-running `deploy.sh` never republishes it; `PUBLISH_ACCOUNT_CODE=1` does, on purpose.
+- A reproducible build records its commit, so never rewrite history past a deployed commit: NearBlocks and `pnpm verify` need that commit in the public repository.
+- There is no Biome in this repo: `npx biome` runs an unrelated npm package. Lint with `pnpm lint`.

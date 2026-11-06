@@ -6,14 +6,15 @@
  *
  *   bun scripts/gas-keys.ts <account> [lanes=4] [fund NEAR=1]
  *
- * The account signs with its current key (env `<ACCOUNT>_KEY` or ~/.near-credentials). A gas key
- * pays at the prepaid gas price for the gas a transaction attaches (about 0.3 NEAR for 300 Tgas)
- * and gets the unused part back, so fund at least 0.3 NEAR per lane that sends large calls.
+ * NEAR_NETWORK picks the network (testnet unless set; #mainnet service accounts need gas keys too).
+ * The account signs with its current key (env `<ACCOUNT>_KEY` or ~/.near-credentials/<network>).
+ * A gas key pays at the prepaid gas price for the gas a transaction attaches (about 0.3 NEAR for
+ * 300 Tgas) and gets the unused part back, so fund at least 0.3 NEAR per lane that sends large calls.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58Encode, toNear } from "@tredio/chain";
-import { senderFor, viewer } from "./lib/testnet";
+import { senderFor, viewer } from "./lib/network";
 
 const [account, lanesArg = "4", fundArg = "1"] = process.argv.slice(2);
 if (!account) throw new Error("usage: bun scripts/gas-keys.ts <account> [lanes] [fund NEAR]");

@@ -1,6 +1,7 @@
 "use client";
 import { Check, ChevronRight, Rocket } from "lucide-react";
 import { cn } from "@/components/ui";
+import { IS_MAINNET } from "@/lib/config";
 import { useSheets } from "@/lib/sheets";
 import { shortEmail } from "./email";
 import { joinedFor, useWaitlistMemory } from "./store";
@@ -10,8 +11,12 @@ import { joinedFor, useWaitlistMemory } from "./store";
  * account provider the rest of the waitlist reads.
  */
 
-/** Phones: the waitlist's line in the account sheet, which closes before the waitlist opens. */
+/** Phones: the waitlist's line in the account sheet, which closes before the waitlist opens. None on Mainnet (#mainnet). */
 export function WaitlistEntry({ account, onOpen }: { account: string; onOpen: () => void }) {
+  return IS_MAINNET ? null : <EntryLine account={account} onOpen={onOpen} />;
+}
+
+function EntryLine({ account, onOpen }: { account: string; onOpen: () => void }) {
   const open = useSheets((s) => s.open);
   const joined = joinedFor(useWaitlistMemory(), account);
   return (

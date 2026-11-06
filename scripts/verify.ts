@@ -4,6 +4,7 @@
  *   pnpm verify                 chain checks and tests
  *   pnpm verify --chain-only    chain checks only (no Rust or Postgres needed)
  *   pnpm verify --build         also rebuild the oracle's enclave program and require the attested run's sha256
+ *   pnpm verify --rebuild       also make the reproducible contract builds the chain names (Docker; minutes each)
  *
  * Read-only: it sends no transaction and needs no key. NEAR_NETWORK picks the network (testnet),
  * TREDIO_API_URL the API to ask (https://api.tredio.bid, then http://localhost:4000).
@@ -20,7 +21,9 @@ import { accountCodeHashes, deployment, type Network } from "@tredio/contracts";
 const ROOT = join(import.meta.dir, "..");
 const NETWORK = (process.env.NEAR_NETWORK ?? "testnet") as Network;
 const D = deployment(NETWORK);
-const proofs = JSON.parse(readFileSync(join(ROOT, `deployments/${NETWORK}-proofs.json`), "utf8")) as {
+const PROOFS_FILE = join(ROOT, `deployments/${NETWORK}-proofs.json`);
+/** What a check proves from a recorded transaction; a network without the file (#mainnet before its first runs) skips those checks. */
+const recorded = (existsSync(PROOFS_FILE) ? JSON.parse(readFileSync(PROOFS_FILE, "utf8")) : null) as {
   passkeyAccounts: string[];
   chainSignaturesOrder: { tx: string; sender: string };
   outlayerRun: {
@@ -37,9 +40,20 @@ const proofs = JSON.parse(readFileSync(join(ROOT, `deployments/${NETWORK}-proofs
   x402Payment: { tx: string; relayer: string; payer: string; amount: string };
   settledSeries: { series: number; trend: string; window: number; openTx: string; settleTx: string; keeper: string };
   graduation: { trend: string; pool: number; keeper: string; steps: string[] };
-};
+} | null;
+class NoProofs extends Error {}
+const proofs = new Proxy({} as NonNullable<typeof recorded>, {
+  get: (_, key) => {
+    if (!recorded) throw new NoProofs();
+    return recorded[key as keyof typeof recorded];
+  },
+});
 const args = new Set(process.argv.slice(2));
-const viewer = new Viewer(NETWORK, rpcEndpoints(NETWORK, [], (process.env.FASTNEAR_API_KEYS ?? "").split(",")));
+const FASTNEAR_KEYS = (process.env.FASTNEAR_API_KEYS ?? "").split(",").map((k) => k.trim()).filter(Boolean);
+const viewer = new Viewer(NETWORK, rpcEndpoints(NETWORK, [], FASTNEAR_KEYS));
+/** Recorded transactions age out of regular nodes after about five epochs (2.5 days); FastNEAR's archival nodes keep them. */
+const ARCHIVAL_RPC: Record<Network, string> = { testnet: "https://archival-rpc.testnet.fastnear.com", mainnet: "https://archival-rpc.mainnet.fastnear.com" };
+const archive = new Viewer(NETWORK, [...FASTNEAR_KEYS.map((key) => ({ url: ARCHIVAL_RPC[NETWORK], headers: { authorization: `Bearer ${key}` } })), { url: ARCHIVAL_RPC[NETWORK] }]);
 const nowSec = () => Math.floor(Date.now() / 1000);
 const sha256 = (data: string) => createHash("sha256").update(data).digest();
 
@@ -54,7 +68,7 @@ async function check(section: string, name: string, run: () => Promise<Result>) 
   try {
     r = await run();
   } catch (e) {
-    r = fail(String((e as Error).message ?? e).slice(0, 160));
+    r = e instanceof NoProofs ? skip(`no deployments/${NETWORK}-proofs.json yet`) : fail(String((e as Error).message ?? e).slice(0, 160));
   }
   results.push({ section, name, ...r });
   const mark = r.ok === null ? "skip" : r.ok ? "ok  " : "FAIL";
@@ -116,22 +130,61 @@ async function chain() {
     return problems.length ? fail(problems.join("; ")) : ok(`${entries.length} of ${entries.length} accounts hold code`);
   });
 
-  // A block explorer's "verified source", checked here: NEAR's code hash is the sha256 of the wasm, so each contract
-  // (and the global coin and account v2 code) must hash like the wasm `pnpm build:contracts` makes from this checkout.
-  // The build is not containerized, so a match needs the toolchain and cargo-near versions SECURITY.md records.
-  await check(S, "Deployed code matches this source", async () => {
-    const wasm = (crate: string) => join(ROOT, "contracts/target/near", `tredio_${crate}`, `tredio_${crate}.wasm`);
-    const pairs: Array<{ name: string; file: string; onChain: () => Promise<string> }> = [
-      ...Object.entries(D.contracts).map(([name, account]) => ({ name, file: wasm(name), onChain: async () => (await viewAccount(account)).code_hash })),
-      { name: "coin (global)", file: wasm("coin"), onChain: async () => D.globalCode.coin },
-      ...(D.globalCode.accountV2 ? [{ name: "account v2 (global)", file: wasm("account"), onChain: async () => D.globalCode.accountV2! }] : []),
+  // A block explorer's "verified source", checked here. NEAR's code hash is the sha256 of the wasm. Code from a
+  // reproducible build (SourceScan's pinned Docker image) records this repository and its commit (NEP-330): its
+  // contract's source must be unchanged since that commit, and it must hash like `scripts/build.sh --reproducible
+  // <commit>`. Code deployed from a local build (testnet's global code) must hash like `pnpm build:contracts`, which
+  // needs the toolchain SECURITY.md records. #mainnet: Circle's USDC is not Tredio's code and is left out.
+  await check(S, "Deployed code is this source", async () => {
+    const repo = /^repository = "(.*)"$/m.exec(readFileSync(join(ROOT, "contracts/Cargo.toml"), "utf8"))?.[1] ?? "";
+    const ownUsdc = D.contracts.usdc.endsWith(`.${D.root}`);
+    const code = async (item: { account?: string; hash?: string }) => {
+      const r = item.account
+        ? await viewer.rpc<{ code_base64: string; hash: string }>("query", { request_type: "view_code", finality: "final", account_id: item.account })
+        : await viewer.rpc<{ code_base64: string }>("query", { request_type: "view_global_contract_code", finality: "final", code_hash: item.hash });
+      const bytes = Buffer.from(r.code_base64, "base64");
+      return { hash: base58Encode(createHash("sha256").update(bytes).digest()), rev: new RegExp(`git\\+${repo.replace(/[.?]/g, "\\$&")}\\?rev=([0-9a-f]{40})`).exec(bytes.toString("latin1"))?.[1] ?? null };
+    };
+    const items = [
+      ...Object.entries(D.contracts)
+        .filter(([role]) => role !== "usdc" || ownUsdc)
+        .map(([crate, account]) => ({ name: crate, crate, account })),
+      { name: "coin (global)", crate: "coin", hash: D.globalCode.coin },
+      { name: `account v${D.globalCode.accountV2 ? 2 : 1} (global)`, crate: "account", hash: D.globalCode.accountV2 ?? D.globalCode.account },
     ];
-    const built = pairs.filter((p) => existsSync(p.file));
-    if (built.length === 0) return skip("no local build: run `pnpm build:contracts` first");
-    const differ: string[] = [];
-    for (const p of built) if (base58Encode(createHash("sha256").update(readFileSync(p.file)).digest()) !== (await p.onChain())) differ.push(p.name);
-    if (differ.length) return fail(`${differ.join(", ")} differ from the local build (rebuild with the recorded toolchain, or the deployment is behind the source)`);
-    return built.length === pairs.length ? ok(`${pairs.length} of ${pairs.length} hash like the local build, byte for byte`) : skip(`${built.length} match; not built: ${pairs.filter((p) => !built.includes(p)).map((p) => p.name).join(", ")}`);
+    const git = (...a: string[]) => run(["git", ...a], ".");
+    const local = (crate: string) => join(ROOT, "contracts/target/near", `tredio_${crate}`, `tredio_${crate}.wasm`);
+    const reproducible = (rev: string, crate: string) => join(ROOT, "contracts/target/near-reproducible", rev, `tredio_${crate}.wasm`);
+    const sha = (file: string) => base58Encode(createHash("sha256").update(readFileSync(file)).digest());
+    const problems: string[] = [];
+    const unbuilt: string[] = [];
+    const revs = new Set<string>();
+    let matched = 0;
+    for (const item of items) {
+      const onChain = await code(item);
+      let file = local(item.crate);
+      if (onChain.rev) {
+        revs.add(onChain.rev);
+        if (git("cat-file", "-e", `${onChain.rev}^{commit}`).code !== 0) {
+          problems.push(`${item.name} was built from ${onChain.rev.slice(0, 12)}, which this checkout does not have`);
+          continue;
+        }
+        const source = [`contracts/${item.crate}`, "contracts/common", "contracts/Cargo.toml", "contracts/Cargo.lock", "contracts/rust-toolchain.toml"];
+        if (git("diff", "--quiet", onChain.rev, "--", ...source).code !== 0) problems.push(`${item.name}'s source changed since ${onChain.rev.slice(0, 12)}`);
+        file = reproducible(onChain.rev, item.crate);
+        if (!existsSync(file) && args.has("--rebuild")) run(["bash", "contracts/scripts/build.sh", "--reproducible", onChain.rev], ".");
+      }
+      if (!existsSync(file)) {
+        unbuilt.push(onChain.rev ? `${item.name} (build.sh --reproducible ${onChain.rev.slice(0, 12)})` : `${item.name} (pnpm build:contracts)`);
+        continue;
+      }
+      if (sha(file) === onChain.hash) matched++;
+      else problems.push(`${item.name} ${onChain.hash.slice(0, 10)}... differs from its ${onChain.rev ? "reproducible" : "local"} build ${sha(file).slice(0, 10)}...`);
+    }
+    if (problems.length) return fail(problems.join("; "));
+    const how = `${[...revs].map((r) => `reproducible builds of ${r.slice(0, 12)}`).join(", ")}${revs.size ? " and " : ""}local builds`;
+    if (unbuilt.length) return skip(`${matched} of ${items.length} match; not built: ${unbuilt.join(", ")}, or run with --rebuild`);
+    return ok(`${items.length} of ${items.length} hash like their ${how}, byte for byte`);
   });
 
   await check(S, "Accounts run published global code", async () => {
@@ -199,7 +252,7 @@ async function chain() {
 
   await check(S, "Hyperliquid order signed by Chain Signatures", async () => {
     const { tx, sender } = proofs.chainSignaturesOrder;
-    const o = await viewer.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: tx, sender_account_id: sender, wait_until: "NONE" });
+    const o = await archive.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: tx, sender_account_id: sender, wait_until: "NONE" });
     const signed = events(o).find((e) => e.event === "hyperliquid_signed");
     const mpc = o.receipts_outcome.some((r) => r.outcome.executor_id === D.external.chainSignatures);
     if (!signed || !mpc) return fail(`${tx}: ${signed ? "" : "no hyperliquid_signed event "}${mpc ? "" : `no receipt on ${D.external.chainSignatures}`}`);
@@ -238,7 +291,7 @@ async function chain() {
     const s = await viewer.view<{ trend: string; expiry: number; outcome: string } | null>(D.contracts.outcomes, "get_series", { series });
     if (!s || s.trend !== trend) return fail(`series ${series} is not ${trend}`);
     const settlement = await viewer.view<{ finalized: boolean; value: number }>(D.contracts.registry, "settlement_of", { id: trend, expiry: s.expiry });
-    const o = await viewer.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: settleTx, sender_account_id: keeper, wait_until: "NONE" });
+    const o = await archive.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: settleTx, sender_account_id: keeper, wait_until: "NONE" });
     if (s.outcome === "open" || !settlement.finalized || !("SuccessValue" in o.status)) return fail(`series ${series}: outcome ${s.outcome}, settlement finalized ${settlement.finalized}`);
     return ok(`series ${series} (${trend}) settled ${s.outcome} at ${(settlement.value / 1e6).toFixed(2)} by ${settleTx.slice(0, 10)}...`);
   });
@@ -251,7 +304,7 @@ async function chain() {
     const usdc = p.amounts[p.token_account_ids.indexOf(D.contracts.usdc)];
     if (!p.token_account_ids.includes(c.coin) || !usdc || BigInt(usdc) === 0n) return fail(`pool ${pool} on ${D.external.exchange} does not hold ${c.coin} and USDC`);
     for (const tx of steps) {
-      const o = await viewer.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: tx, sender_account_id: keeper, wait_until: "NONE" });
+      const o = await archive.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: tx, sender_account_id: keeper, wait_until: "NONE" });
       if (!("SuccessValue" in o.status)) return fail(`graduation step ${tx.slice(0, 10)}... failed`);
     }
     return ok(`${trend}: pool ${pool} on ${D.external.exchange} holds ${(Number(usdc) / 1e6).toFixed(2)} USDC and the coin, in ${steps.length} keeper steps`);
@@ -259,7 +312,7 @@ async function chain() {
 
   await check(S, "x402 payment settled in USDC on NEAR", async () => {
     const { tx, relayer, payer, amount } = proofs.x402Payment;
-    const o = await viewer.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: tx, sender_account_id: relayer, wait_until: "NONE" });
+    const o = await archive.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: tx, sender_account_id: relayer, wait_until: "NONE" });
     const transfer = events(o).find((e) => e.standard === "nep141" && e.event === "ft_transfer");
     const data = (Array.isArray(transfer?.data) ? transfer.data[0] : transfer?.data) as { old_owner_id?: string; new_owner_id?: string; amount?: string } | undefined;
     if (!data || data.old_owner_id !== payer || data.new_owner_id !== D.treasury || data.amount !== amount) return fail(`${tx}: no ft_transfer of ${amount} from ${payer} to ${D.treasury}`);

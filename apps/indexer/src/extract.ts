@@ -60,7 +60,7 @@ function receiptEvents(r: ReceiptMeta, tracker: Tracker): StoredEvent[] {
   const role = tracker.roleOf(r.executor);
   if (!role) return [];
   return parseEvents(r.logs)
-    .filter((e) => tracker.keeps(role, e.standard) && storable(e))
+    .filter((e) => tracker.keeps(role, e.standard, e.data) && storable(e))
     .map((e) => ({
       block_height: r.height,
       block_time: r.time,

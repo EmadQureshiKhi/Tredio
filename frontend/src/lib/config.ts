@@ -23,7 +23,8 @@ export const DEPLOYMENT: Deployment = deployment(NETWORK);
 const DEFAULT_RPC_URLS: Record<Network, string[]> = {
   // Intear's endpoint is slower but sends CORS headers and takes bursts the others refuse; dRPC replaces rpc.testnet.near.org, which is deprecated.
   testnet: [DEPLOYMENT.rpc, "https://testnet-rpc.intea.rs", "https://near-testnet.drpc.org"],
-  mainnet: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.near.org"],
+  // #mainnet: the same three providers (rpc.mainnet.near.org is deprecated and slow, Lava's endpoint is discontinued).
+  mainnet: [DEPLOYMENT.rpc, "https://rpc.intea.rs", "https://near.drpc.org"],
 };
 const listOf = (v: string | undefined) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 const configuredRpcs = listOf(process.env.NEXT_PUBLIC_NEAR_RPC_URLS);

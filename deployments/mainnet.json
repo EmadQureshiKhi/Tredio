@@ -1,0 +1,41 @@
+{
+  "network": "mainnet",
+  "status": "planned",
+  "rpc": "https://rpc.mainnet.fastnear.com",
+  "deployedAt": null,
+  "startBlock": null,
+  "root": "tredio.near",
+  "treasury": "tredio-treasury.near",
+  "contracts": {
+    "usdc": "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+    "registry": "registry.tredio.near",
+    "outcomes": "outcomes.tredio.near",
+    "book": "book.tredio.near",
+    "perps": "perps.tredio.near",
+    "curation": "curation.tredio.near",
+    "coins": "coins.tredio.near",
+    "accounts": "accounts.tredio.near"
+  },
+  "external": {
+    "exchange": "v2.ref-finance.near",
+    "chainSignatures": "v1.signer"
+  },
+  "globalCode": {
+    "coin": "",
+    "account": ""
+  },
+  "oracle": {
+    "mode": "tee_signer",
+    "publicKey": ""
+  },
+  "params": {
+    "usdcDecimals": 6,
+    "indexDecimals": 6,
+    "coinDecimals": 18,
+    "outcomeTestWindow": 0,
+    "bookTakerFeeBps": 20,
+    "maxOpenInterestPerSide": "250000000000",
+    "curveBaseVirtualQuote": "2000000000",
+    "curveGraduationReserve": "2000000000"
+  }
+}

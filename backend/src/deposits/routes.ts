@@ -1,4 +1,4 @@
-import { DRY_RUN_ACCOUNT, depositRequest, explorerUrl, hyperliquidFundingRequest, isFinal, type OneClick, OneClickError, type QuoteResponse, type StatusResponse, withdrawalRequest } from "@tredio/intents";
+import { DRY_RUN_ACCOUNT, depositRequest, explorerUrl, hyperliquidFundingRequest, hyperliquidReturnRequest, isFinal, type OneClick, OneClickError, type QuoteResponse, type StatusResponse, withdrawalRequest } from "@tredio/intents";
 import { Hono, type MiddlewareHandler } from "hono";
 import { z } from "zod";
 import type { Sql } from "../db";
@@ -6,10 +6,11 @@ import type { Log } from "../log";
 import { rateLimit } from "../api/rate-limit";
 
 /**
- * Any-chain deposits and withdrawals through NEAR Intents 1Click (packages/intents). On mainnet a
- * quote opens a deposit address that 1Click watches; the API keeps one row per address with the
- * swap's latest state, refreshed while someone looks. On testnet 1Click does not exist, so quotes
- * are dry (no deposit address) at mainnet prices, to show the route and its cost.
+ * Any-chain deposits and withdrawals through NEAR Intents 1Click (packages/intents), and USDC to and
+ * from the account's Hyperliquid perps balance. On mainnet a quote opens a deposit address that
+ * 1Click watches; the API keeps one row per address with the swap's latest state, refreshed while
+ * someone looks. On testnet 1Click does not exist, so quotes are dry (no deposit address) at
+ * mainnet prices, to show the route and its cost.
  */
 
 type Vars = { Variables: { user: string; token: string } };
@@ -34,13 +35,15 @@ interface DepositRow {
   updated_at: Date;
 }
 
-const DIRECTIONS = ["deposit", "withdraw", "hyperliquid"] as const;
+/** `hyperliquid` funds the account's Hyperliquid perps balance from NEAR; `from-hyperliquid` brings USDC back to NEAR. */
+const DIRECTIONS = ["deposit", "withdraw", "hyperliquid", "from-hyperliquid"] as const;
 type Direction = (typeof DIRECTIONS)[number];
 
 const quoteBody = z.discriminatedUnion("direction", [
   z.object({ direction: z.literal("deposit"), asset: z.string().min(3).max(200), amount: z.string().regex(/^\d{1,40}$/), refundTo: z.string().min(2).max(200) }),
   z.object({ direction: z.literal("withdraw"), asset: z.string().min(3).max(200), amount: z.string().regex(/^\d{1,40}$/), recipient: z.string().min(2).max(200) }),
   z.object({ direction: z.literal("hyperliquid"), amount: z.string().regex(/^\d{1,40}$/), hyperliquidAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/) }),
+  z.object({ direction: z.literal("from-hyperliquid"), amount: z.string().regex(/^\d{1,30}$/), hyperliquidAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/) }),
 ]);
 
 /** A row's status is read from 1Click again at most this often. */
@@ -105,7 +108,9 @@ export function depositRoutes(d: DepositDeps) {
         ? depositRequest({ originAsset: q.asset, amount: q.amount, account, refundTo: q.refundTo, dry: !live, now: now() })
         : q.direction === "withdraw"
           ? withdrawalRequest({ destinationAsset: q.asset, amount: q.amount, account, recipient: q.recipient, dry: !live, now: now() })
-          : hyperliquidFundingRequest({ amount: q.amount, account, hyperliquidAddress: q.hyperliquidAddress, dry: !live, now: now() });
+          : q.direction === "hyperliquid"
+            ? hyperliquidFundingRequest({ amount: q.amount, account, hyperliquidAddress: q.hyperliquidAddress, dry: !live, now: now() })
+            : hyperliquidReturnRequest({ amount: q.amount, account, hyperliquidAddress: q.hyperliquidAddress, dry: !live, now: now() });
     let quote: QuoteResponse;
     try {
       quote = await d.oneClick.quote(req);

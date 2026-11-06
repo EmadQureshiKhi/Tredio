@@ -21,6 +21,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 authors = ["Emad Qureshi"]
+repository = "https://github.com/EmadQureshiKhi/Tredio"
 
 [workspace.dependencies]
 near-sdk = { version = "5.30.1", default-features = false, features = ["wee_alloc"] }

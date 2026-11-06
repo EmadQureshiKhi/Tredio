@@ -548,7 +548,7 @@ export interface OneClickQuote {
 
 export interface DepositRow {
   id: number;
-  direction: "deposit" | "withdraw" | "hyperliquid";
+  direction: "deposit" | "withdraw" | "hyperliquid" | "from-hyperliquid";
   depositAddress: string;
   depositMemo: string | null;
   amountIn: string;
@@ -566,7 +566,9 @@ export interface DepositRow {
 export type QuoteRequest =
   | { direction: "deposit"; asset: string; amount: string; refundTo: string }
   | { direction: "withdraw"; asset: string; amount: string; recipient: string }
-  | { direction: "hyperliquid"; amount: string; hyperliquidAddress: string };
+  | { direction: "hyperliquid"; amount: string; hyperliquidAddress: string }
+  /** USDC back from the account's Hyperliquid balance to NEAR: `amount` micro-USDC; the account then sends the quote's `amountIn` (8 decimals) to its deposit address on Hyperliquid. */
+  | { direction: "from-hyperliquid"; amount: string; hyperliquidAddress: string };
 
 export interface QuoteAnswer {
   dry: boolean;

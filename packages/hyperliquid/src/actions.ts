@@ -1,5 +1,6 @@
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
+import { concat, domainSeparator, keccakText, typedDataDigest } from "./eip712";
 
 /**
  * Hyperliquid L1 actions exactly as the Tredio account contract builds and hashes them
@@ -97,29 +98,10 @@ export function actionHash(action: L1Action, nonce: number): Uint8Array {
   return keccak_256(data);
 }
 
-const enc = (s: string) => new TextEncoder().encode(s);
-const concat = (...parts: Uint8Array[]) => {
-  const all = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
-  let o = 0;
-  for (const p of parts) {
-    all.set(p, o);
-    o += p.length;
-  }
-  return all;
-};
-const word = (n: number) => {
-  const w = new Uint8Array(32);
-  new DataView(w.buffer).setBigUint64(24, BigInt(n));
-  return w;
-};
-
 /** The EIP-712 digest of the phantom agent `Agent(string source, bytes32 connectionId)` in the Exchange domain. */
 export function agentDigest(connectionId: Uint8Array, mainnet: boolean): Uint8Array {
-  const domainType = keccak_256(enc("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"));
-  const separator = keccak_256(concat(domainType, keccak_256(enc("Exchange")), keccak_256(enc("1")), word(1337), new Uint8Array(32)));
-  const agentType = keccak_256(enc("Agent(string source,bytes32 connectionId)"));
-  const hash = keccak_256(concat(agentType, keccak_256(enc(mainnet ? "a" : "b")), connectionId));
-  return keccak_256(concat(new Uint8Array([0x19, 0x01]), separator, hash));
+  const hash = keccak_256(concat(keccakText("Agent(string source,bytes32 connectionId)"), keccakText(mainnet ? "a" : "b"), connectionId));
+  return typedDataDigest(domainSeparator("Exchange", "1", 1337), hash);
 }
 
 /** The digest the contract emits in its `hyperliquid_signed` event for this action. */

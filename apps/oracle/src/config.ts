@@ -24,7 +24,8 @@ const schema = z.object({
   ORACLE_MODE: z.enum(["local", "outlayer"]).default("local"),
   /** The report signing key the registry trusts in local mode. */
   REPORT_SIGNING_KEY: optional(z.string().regex(/^ed25519:/)),
-  OUTLAYER_CONTRACT: z.string().default("outlayer.testnet"),
+  /** OutLayer's contract; defaults to the network's (OUTLAYER_CONTRACTS). */
+  OUTLAYER_CONTRACT: optional(z.string().min(2)),
   OUTLAYER_WASM_URL: optional(z.string().url()),
   OUTLAYER_WASM_HASH: optional(z.string().regex(/^[0-9a-f]{64}$/)),
   OUTLAYER_MAX_SECONDS: z.coerce.number().int().min(10).max(180).default(60),
@@ -54,7 +55,10 @@ const schema = z.object({
   MIN_BALANCE_NEAR: z.coerce.number().nonnegative().default(2),
 });
 
-export type Config = z.infer<typeof schema> & { deployment: Deployment; rpc: RpcEndpoint[] };
+/** OutLayer's contract on each network (both expose `request_execution`, checked 2026-11-07). #mainnet */
+export const OUTLAYER_CONTRACTS = { testnet: "outlayer.testnet", mainnet: "outlayer.near" } as const;
+
+export type Config = Omit<z.infer<typeof schema>, "OUTLAYER_CONTRACT"> & { OUTLAYER_CONTRACT: string; deployment: Deployment; rpc: RpcEndpoint[] };
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const c = schema.parse(env);
@@ -62,5 +66,5 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
   const rpc = rpcEndpoints(c.NEAR_NETWORK, list(c.NEAR_RPC_URLS), list(c.FASTNEAR_API_KEYS));
   if (c.ORACLE_MODE === "local" && !c.REPORT_SIGNING_KEY) throw new Error("local mode needs REPORT_SIGNING_KEY");
   if (c.ORACLE_MODE === "outlayer" && !(c.OUTLAYER_WASM_URL && c.OUTLAYER_WASM_HASH)) throw new Error("outlayer mode needs OUTLAYER_WASM_URL and OUTLAYER_WASM_HASH");
-  return { ...c, deployment, rpc };
+  return { ...c, OUTLAYER_CONTRACT: c.OUTLAYER_CONTRACT ?? OUTLAYER_CONTRACTS[c.NEAR_NETWORK], deployment, rpc };
 }

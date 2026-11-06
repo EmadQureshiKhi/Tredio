@@ -5,10 +5,17 @@
 # So is every source line, even reformatting: panic locations carry line numbers into the wasm.
 set -euo pipefail
 cd "$(dirname "$0")"
+# NEAR_NETWORK picks the defaults (testnet unless set): a mainnet build is a different program with its own hash.
+case "${NEAR_NETWORK:-testnet}" in
+  testnet) rpc=https://test.rpc.fastnear.com hyperliquid=https://api.hyperliquid-testnet.xyz ;;
+  mainnet) rpc=https://rpc.mainnet.fastnear.com hyperliquid=https://api.hyperliquid.xyz ;; # #mainnet
+  *) echo "NEAR_NETWORK must be testnet or mainnet" >&2; exit 1 ;;
+esac
+registry="$(sed -n 's/^ *"registry": "\(.*\)",*$/\1/p' "../../../deployments/${NEAR_NETWORK:-testnet}.json")"
 export TREDIO_BACKEND_URL="${TREDIO_BACKEND_URL:-https://api.tredio.bid}"
-export TREDIO_RPC_URL="${TREDIO_RPC_URL:-https://test.rpc.fastnear.com}"
-export TREDIO_REGISTRY="${TREDIO_REGISTRY:-registry.tredio.testnet}"
-export TREDIO_HYPERLIQUID_URL="${TREDIO_HYPERLIQUID_URL:-https://api.hyperliquid-testnet.xyz}"
+export TREDIO_RPC_URL="${TREDIO_RPC_URL:-$rpc}"
+export TREDIO_REGISTRY="${TREDIO_REGISTRY:-$registry}"
+export TREDIO_HYPERLIQUID_URL="${TREDIO_HYPERLIQUID_URL:-$hyperliquid}"
 # Nothing from the caller's environment may pick another toolchain, flags or output directory.
 unset RUSTUP_TOOLCHAIN CARGO_TARGET_DIR CARGO_ENCODED_RUSTFLAGS CARGO_BUILD_RUSTFLAGS
 pinned="$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)"

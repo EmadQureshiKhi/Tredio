@@ -1,5 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { activationTicketMessage, canonicalJson, deployment, ownerApprovalDigest, ownerRequests, requestChallenge, requestJson } from "../src/index";
+import {
+  activationTicketMessage,
+  canonicalJson,
+  deployment,
+  deploymentPlan,
+  isDeployed,
+  MAINNET_USDC,
+  ownerApprovalDigest,
+  ownerRequests,
+  requestChallenge,
+  requestJson,
+} from "../src/index";
 
 const hex = (b: Uint8Array) => Buffer.from(b).toString("hex");
 
@@ -50,6 +61,18 @@ describe("deployments", () => {
     const d = deployment("testnet");
     for (const account of Object.values(d.contracts)) expect(account.endsWith(`.${d.root}`)).toBe(true);
     expect(d.globalCode.account).toMatch(/^[1-9A-HJ-NP-Za-km-z]{43,44}$/);
+  });
+
+  test("mainnet is the plan until it is deployed: native USDC, Rhea, the MPC signer, no test window", () => {
+    expect(isDeployed("testnet")).toBe(true);
+    const plan = deploymentPlan("mainnet");
+    if (isDeployed("mainnet")) return;
+    expect(() => deployment("mainnet")).toThrow(/not deployed on mainnet yet/);
+    expect(plan.contracts.usdc).toBe(MAINNET_USDC);
+    for (const [role, account] of Object.entries(plan.contracts)) if (role !== "usdc") expect(account).toBe(`${role}.${plan.root}`);
+    expect(plan.external).toEqual({ exchange: "v2.ref-finance.near", chainSignatures: "v1.signer" });
+    expect(plan.params.outcomeTestWindow).toBe(0);
+    expect(Object.keys(plan.params).sort()).toEqual(Object.keys(deployment("testnet").params).sort());
   });
 });
 

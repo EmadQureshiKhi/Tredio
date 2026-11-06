@@ -1,6 +1,6 @@
 /**
  * NEAR Intents through the 1Click API: any-chain deposits into a Tredio account, withdrawals out
- * of it, and funding a Hyperliquid perps balance, each one quote with its own deposit address.
+ * of it, and funding a Hyperliquid perps balance and back, each one quote with its own deposit address.
  * With a partner JWT every quote asks for Confidential Intents (`confidentiality: "basic"`), so
  * the origin and route of a deposit cannot be linked to the account it lands in; the destination
  * transfer itself stays public. 1Click requires partner authentication for that flag, so without a
@@ -245,6 +245,27 @@ export function withdrawalRequest(a: { destinationAsset: string; amount: string;
 /** Funding a Hyperliquid perps balance from the account's USDC on NEAR (minimum 0.5 USDC on 1Click's side). */
 export function hyperliquidFundingRequest(a: { amount: string; account: string; hyperliquidAddress: string; dry: boolean; now?: number }): QuoteRequest {
   return withdrawalRequest({ destinationAsset: HYPERLIQUID_USDC_ASSET, amount: a.amount, account: a.account, recipient: a.hyperliquidAddress, dry: a.dry, now: a.now });
+}
+
+/**
+ * What 1Click takes from a transfer out of Hyperliquid (docs.near-intents.org, 1Click API,
+ * Hyperliquid, "Deposit USDC from Hyperliquid"): a flat 0.2 USDC from every transfer to the deposit
+ * address (already in the quote), at least 0.5 USDC per deposit, and, for a perps `usdSend`, 1 USDC
+ * more that the quote does not include, so the account sends `amountIn` plus that. Micro-USDC.
+ */
+export const HYPERLIQUID_DEPOSIT_FEE = 200_000n;
+export const HYPERLIQUID_MIN_DEPOSIT = 500_000n;
+export const HYPERLIQUID_USD_SEND_SURCHARGE = 1_000_000n;
+
+/**
+ * USDC back from a Hyperliquid perps balance to the account on NEAR: the funding route in reverse.
+ * `amount` is micro-USDC (6 decimals) as everywhere in Tredio; 1Click counts Hyperliquid USDC in 8.
+ * The account then sends the quote's `amountIn` (plus HYPERLIQUID_USD_SEND_SURCHARGE by `usdSend`)
+ * from its Hyperliquid address to the quote's deposit address there; a failed swap refunds that
+ * Hyperliquid address.
+ */
+export function hyperliquidReturnRequest(a: { amount: string; account: string; hyperliquidAddress: string; dry: boolean; now?: number }): QuoteRequest {
+  return depositRequest({ originAsset: HYPERLIQUID_USDC_ASSET, amount: (BigInt(a.amount) * 100n).toString(), account: a.account, refundTo: a.hyperliquidAddress, dry: a.dry, now: a.now });
 }
 
 /** Where to follow a swap on the NEAR Intents explorer. */

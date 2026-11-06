@@ -57,7 +57,7 @@ if (import.meta.main) {
     const rt = await setup();
     try {
       const t0 = Date.now();
-      const r = await resync(rt.sql, rt.cfg.NETWORK, rt.startBlock, rt.tracker, rt.log, { refetch: values.refetch!, from });
+      const r = await resync(rt.sql, rt.cfg.NEAR_NETWORK, rt.startBlock, rt.tracker, rt.log, { refetch: values.refetch!, from });
       rt.log.info("resync done", { ...r, ms: Date.now() - t0 });
     } finally {
       await rt.release();

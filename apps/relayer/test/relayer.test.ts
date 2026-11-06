@@ -4,7 +4,8 @@ import { p256 } from "@noble/curves/nist.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { base58Encode, type Sender, type Viewer } from "@tredio/chain";
 import { activationTicketMessage, deployment, ownerRequest, requestChallenge, requestJson } from "@tredio/contracts";
-import { RelayError, Relayer, Window } from "../src/relayer";
+import { encodeSignedDelegateAction } from "near-kit";
+import { metaAllowlist, RelayError, Relayer, Window } from "../src/relayer";
 import { TxError } from "@tredio/chain";
 
 const D = deployment("testnet");
@@ -66,7 +67,10 @@ function fakes(opts: { existing?: Set<string>; owners?: Map<string, string>; ses
     fundGasKey: async (account: string, pk: string, amount: bigint) => (sent.push({ kind: "fund", detail: { account, pk, amount } }), { transaction: { hash: "tx2" } }),
     sendTx: async (build: (tx: unknown) => unknown) => {
       const actions: unknown[] = [];
-      const tx = { transfer: (to: string, amount: string) => (actions.push({ transfer: { to, amount } }), tx) };
+      const tx = {
+        transfer: (to: string, amount: string) => (actions.push({ transfer: { to, amount } }), tx),
+        signedDelegateAction: (sd: unknown) => (actions.push({ delegate: sd }), tx),
+      };
       build(tx);
       sent.push({ kind: "tx", detail: actions });
       return { transaction: { hash: "tx3" } };
@@ -217,4 +221,39 @@ test("a sliding window forgets old events", () => {
   expect(w.count("a")).toBe(2);
   t = 1500;
   expect(w.count("a")).toBe(0);
+});
+
+describe("wallet meta-transactions", () => {
+  const delegate = (receiverId: string, methodName: string, args: unknown) =>
+    encodeSignedDelegateAction({
+      signedDelegate: {
+        delegateAction: {
+          senderId: "alice.testnet",
+          receiverId,
+          actions: [{ functionCall: { methodName, args: new TextEncoder().encode(JSON.stringify(args)), gas: 100n * 10n ** 12n, deposit: 1n } }],
+          nonce: 1n,
+          maxBlockHeight: 1n,
+          publicKey: { ed25519Key: { data: Array.from({ length: 32 }, () => 0) } },
+        },
+        signature: { ed25519Signature: { data: Array.from({ length: 64 }, () => 0) } },
+      },
+    } as never);
+
+  test("token transfers are paid only when they go to a Tredio contract", async () => {
+    const f = fakes({});
+    const r = relayer(f);
+    const to = (receiver_id: string) => ({ receiver_id, amount: "1000000", msg: "" });
+    await expect(r.relayMeta(delegate(D.contracts.usdc, "ft_transfer_call", to("bob.testnet")))).rejects.toThrow(/transfers to Tredio contracts/);
+    await expect(r.relayMeta(delegate(D.contracts.usdc, "ft_transfer_call", { amount: "1" }))).rejects.toThrow(/transfers to Tredio contracts/);
+    await expect(r.relayMeta(delegate(D.contracts.outcomes, "mt_transfer_call", to("bob.testnet")))).rejects.toThrow(/transfers to Tredio contracts/);
+    await expect(r.relayMeta(delegate("evil.testnet", "ft_transfer_call", to(D.contracts.book)))).rejects.toThrow(/only for calls to Tredio contracts/);
+    expect(await r.relayMeta(delegate(D.contracts.usdc, "ft_transfer_call", to(D.contracts.outcomes)))).toMatchObject({ sender: "alice.testnet" });
+    expect(await r.relayMeta(delegate(D.contracts.outcomes, "mt_transfer_call", to(D.contracts.book)))).toMatchObject({ sender: "alice.testnet" });
+  });
+
+  test("#mainnet: Circle's USDC has no faucet to relay", () => {
+    expect(metaAllowlist(D).get(D.contracts.usdc)?.has("faucet")).toBe(true);
+    const mainnet = { ...D, root: "tredio.near", contracts: { ...D.contracts, usdc: "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1" } };
+    expect(metaAllowlist(mainnet).get(mainnet.contracts.usdc)).toEqual(new Set(["ft_transfer_call", "storage_deposit"]));
+  });
 });

@@ -280,10 +280,19 @@ function HyperliquidAccount({ market, position }: { market: HlMarket; position: 
         <span className="text-text-2">
           Balance <span className="num font-strong text-text">{state ? `${usdc(state.accountValue)} USDC` : hl.isLoading ? "..." : "-"}</span>
         </span>
-        {state && state.accountValue < 1 ? (
-          <Button tone="secondary" size="sm" onClick={() => open("deposit")}>
-            Fund it
-          </Button>
+        {state && (state.accountValue < 1 || state.withdrawable >= 0.01) ? (
+          <span className="flex shrink-0 items-center gap-2">
+            {state.accountValue < 1 ? (
+              <Button tone="secondary" size="sm" onClick={() => open("deposit")}>
+                Fund it
+              </Button>
+            ) : null}
+            {state.withdrawable >= 0.01 ? (
+              <Button tone="secondary" size="sm" onClick={() => open("hl-withdraw")} data-testid="asset-perp-withdraw">
+                Withdraw
+              </Button>
+            ) : null}
+          </span>
         ) : null}
       </div>
       {state && state.accountValue < 1 ? (

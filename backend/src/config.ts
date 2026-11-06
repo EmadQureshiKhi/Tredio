@@ -185,6 +185,8 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     throw new Error("ELFA_PROXIES carry requests to api.elfa.ai only; ELFA_API_BASE must point there");
   }
   const deployment = parsed.DEPLOYMENT_JSON ? (JSON.parse(parsed.DEPLOYMENT_JSON) as Deployment) : deploymentOf(parsed.NEAR_NETWORK);
+  // #mainnet: the relayer creates accounts only with a ticket from this API, so without the key nobody could sign up.
+  if (parsed.NEAR_NETWORK === "mainnet" && !parsed.ACTIVATION_TICKET_KEY) throw new Error("mainnet needs ACTIVATION_TICKET_KEY: the relayer creates accounts only with an activation ticket");
   const rpc = rpcEndpoints(parsed.NEAR_NETWORK, list(parsed.NEAR_RPC_URLS), list(parsed.FASTNEAR_API_KEYS));
   for (const a of parsed.ADMIN_ACCOUNTS) accountId.parse(a);
   const systemServices = [...parseServices(parsed.STATUS_SERVICES), ...parseServices(parsed.ADMIN_SERVICES)].filter((s, i, all) => all.findIndex((x) => x.name === s.name) === i);

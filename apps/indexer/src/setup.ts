@@ -21,10 +21,10 @@ export interface Runtime {
 export async function setup(env: Record<string, string | undefined> = process.env): Promise<Runtime> {
   const cfg = loadConfig(env);
   const log = createLog(cfg.LOG_LEVEL);
-  const deployment = loadDeployment(cfg.DEPLOYMENTS_FILE ?? deploymentsPath(cfg.NETWORK));
-  if (deployment.network !== cfg.NETWORK) throw new Error(`the deployments file is for ${deployment.network}, NETWORK is ${cfg.NETWORK}`);
-  const startBlock = cfg.START_BLOCK ?? deployment.startBlock ?? DEFAULT_START_BLOCK[cfg.NETWORK];
-  if (!startBlock) throw new Error(`set START_BLOCK: there is no default start block for ${cfg.NETWORK}`);
+  const deployment = loadDeployment(cfg.DEPLOYMENTS_FILE ?? deploymentsPath(cfg.NEAR_NETWORK));
+  if (deployment.network !== cfg.NEAR_NETWORK) throw new Error(`the deployments file is for ${deployment.network}, NEAR_NETWORK is ${cfg.NEAR_NETWORK}`);
+  const startBlock = cfg.START_BLOCK ?? deployment.startBlock ?? DEFAULT_START_BLOCK[cfg.NEAR_NETWORK];
+  if (!startBlock) throw new Error(`set START_BLOCK: there is no default start block for ${cfg.NEAR_NETWORK}`);
   const sql = connect(cfg.DATABASE_URL, cfg.INDEXER_SCHEMA);
   try {
     // The lock comes first, so two processes never run the migrations at once.
@@ -32,7 +32,7 @@ export async function setup(env: Record<string, string | undefined> = process.en
     if (!release) throw new Error(`another indexer process holds schema "${cfg.INDEXER_SCHEMA}"; stop it first`);
     try {
       await migrate(sql, cfg.INDEXER_SCHEMA);
-      const others = await otherNetworks(sql, cfg.NETWORK);
+      const others = await otherNetworks(sql, cfg.NEAR_NETWORK);
       if (others.length) throw new Error(`schema "${cfg.INDEXER_SCHEMA}" already holds ${others.join(", ")} data; use another INDEXER_SCHEMA`);
     } catch (e) {
       await release();

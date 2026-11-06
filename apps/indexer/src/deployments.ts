@@ -54,11 +54,24 @@ export class Tracker {
   private readonly coinSuffix: string;
   /** USDC (6 decimals) a curve's reserve must reach to stop selling; a sale below it reopens the curve. */
   readonly graduationReserve: bigint;
+  /**
+   * #mainnet: USDC is a token Tredio did not deploy (Circle's native USDC on mainnet, not
+   * `usdc.<root>`), so its events are everyone's and only the ones that touch Tredio are kept.
+   */
+  readonly externalUsdc: boolean;
 
   constructor(readonly deployment: Deployment) {
     for (const [role, id] of Object.entries(deployment.contracts)) this.roles.set(id, role as ContractRole);
     this.coinSuffix = `.${deployment.contracts.coins}`;
     this.graduationReserve = BigInt(deployment.params?.curveGraduationReserve ?? "0");
+    this.externalUsdc = !deployment.contracts.usdc.endsWith(`.${deployment.root}`);
+  }
+
+  /** The accounts the transactions feed polls every cycle: Tredio's own contracts, never an external USDC. */
+  coreAccounts(): string[] {
+    return Object.entries(this.deployment.contracts)
+      .filter(([role]) => role !== "usdc" || !this.externalUsdc)
+      .map(([, id]) => id);
   }
 
   roleOf(executor: string): Role | null {
@@ -72,9 +85,21 @@ export class Tracker {
   /**
    * Whether an event of `standard` logged by an executor of `role` is kept. Contracts keep every
    * event they log; a user account only its `tredio-account` events, so a universal account of
-   * another app never enters the tables.
+   * another app never enters the tables; an external USDC only the events with a Tredio account
+   * on either side.
    */
-  keeps(role: Role, standard: string): boolean {
-    return role !== "account" || standard === "tredio-account";
+  keeps(role: Role, standard: string, data?: unknown): boolean {
+    if (role === "account") return standard === "tredio-account";
+    if (role === "usdc" && this.externalUsdc) return standard === "nep141" && this.touchesTredio(data);
+    return true;
+  }
+
+  /** True when an item of a NEP-141 event's data names a Tredio contract, coin or account. */
+  private touchesTredio(data: unknown): boolean {
+    if (!Array.isArray(data)) return false;
+    return data.some((item) => {
+      const i = (item ?? {}) as Record<string, unknown>;
+      return [i.old_owner_id, i.new_owner_id, i.owner_id].some((a) => typeof a === "string" && this.roleOf(a) !== null);
+    });
   }
 }

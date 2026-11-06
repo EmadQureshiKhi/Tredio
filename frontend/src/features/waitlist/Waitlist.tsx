@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { AnimateHeight, Button, cn, DrawnCheck, ErrorNote, Field, Sheet, Switch } from "@/components/ui";
 import { useAccount } from "@/lib/account/AccountProvider";
 import { ApiError, waitlist } from "@/lib/api";
+import { IS_MAINNET } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
 import { useSheets } from "@/lib/sheets";
 import { emailError } from "./email";
@@ -25,9 +26,14 @@ const EASE_OUT = [0.25, 1, 0.5, 1] as const;
 
 /**
  * Desktop sidebar: the offer, which its X folds down to a "Join the waitlist" button, and a compact
- * "On the waitlist" once this browser joined (a join wins over a folded card).
+ * "On the waitlist" once this browser joined (a join wins over a folded card). #mainnet: the list
+ * is for Mainnet's launch, so an app built for Mainnet shows none of it.
  */
 export function WaitlistCard() {
+  return IS_MAINNET ? null : <SidebarCard />;
+}
+
+function SidebarCard() {
   const open = useSheets((s) => s.open);
   const account = useAccount();
   const memory = useWaitlistMemory();
@@ -119,9 +125,13 @@ export function WaitlistCard() {
 
 /**
  * Phones and tablets (no sidebar): a slim row under the Home hero, until this browser joins or
- * dismisses it.
+ * dismisses it. None on Mainnet.
  */
 export function WaitlistRow() {
+  return IS_MAINNET ? null : <HomeRow />;
+}
+
+function HomeRow() {
   const open = useSheets((s) => s.open);
   const memory = useWaitlistMemory();
   const reduced = useReducedMotion();

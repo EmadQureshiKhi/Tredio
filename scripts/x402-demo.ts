@@ -15,7 +15,9 @@
 import { calls, explorerTx, fromRaw, parseEvents } from "@tredio/contracts";
 import { createPaymentPayload, decodeHeader, encodeHeader, type PaymentRequired, type SettlementResponse, X402_HEADERS, x402Fetch } from "@tredio/chain";
 import type { FinalExecutionOutcome } from "near-kit";
-import { D, keyOf, senderFor, viewer } from "./lib/testnet";
+import { D, keyOf, senderFor, testnetOnly, viewer } from "./lib/network";
+
+testnetOnly("x402-demo");
 
 const API = (process.env.X402_API ?? "http://localhost:4000").replace(/\/+$/, "");
 const PAYER = process.env.X402_PAYER ?? "tredio.testnet";

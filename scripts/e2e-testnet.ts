@@ -12,7 +12,9 @@
 import { readFileSync } from "node:fs";
 import { AccountVersions, calls, type OwnerAction, ownerRequest, requestJson, type Report, type Series, sessionCallTgas, upgradeToV2 } from "@tredio/contracts";
 import { Sender } from "@tredio/chain";
-import { D, RPC, SoftPasskey, newEd25519, nowSecs, senderFor, signReport, viewer } from "./lib/testnet";
+import { D, RPC, SoftPasskey, newEd25519, nowSecs, senderFor, signReport, testnetOnly, viewer } from "./lib/network";
+
+testnetOnly("e2e-testnet");
 
 const C = calls(D);
 const USDC = 1_000_000n;

@@ -17,13 +17,15 @@ import { WaitlistSheet } from "@/features/waitlist/Waitlist";
 import { session } from "@/lib/trade/calls";
 import { useTx } from "@/lib/trade/useTx";
 import { faucetButton, faucetState, isCooldown, untilText } from "./faucet-claims";
+import { HlWithdrawSheet } from "./HlWithdrawSheet";
 
-/** The panels any screen can open: add funds, propose a trend from a link, and the Mainnet waitlist. */
+/** The panels any screen can open: add funds, withdraw from Hyperliquid, propose a trend from a link, and the Mainnet waitlist. */
 export default function GlobalSheets() {
   const { current, close } = useSheets();
   return (
     <>
       <DepositSheet open={current === "deposit"} onOpenChange={(o) => !o && close()} />
+      <HlWithdrawSheet open={current === "hl-withdraw"} onOpenChange={(o) => !o && close()} />
       <ProposeSheet open={current === "propose"} onOpenChange={(o) => !o && close()} />
       <WaitlistSheet open={current === "waitlist"} onOpenChange={(o) => !o && close()} />
     </>

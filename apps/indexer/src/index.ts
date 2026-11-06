@@ -20,13 +20,13 @@ try {
 const { cfg, log, sql, tracker } = rt;
 const stop = new AbortController();
 let beat = () => {};
-const common = { sql, tracker, network: cfg.NETWORK, startBlock: rt.startBlock, log, signal: stop.signal };
+const common = { sql, tracker, network: cfg.NEAR_NETWORK, startBlock: rt.startBlock, log, signal: stop.signal };
 
 let feed: { status: IngestStatus; beat(): void; run(): Promise<void> };
 let source: Record<string, unknown>;
 if (cfg.INDEXER_SOURCE === "txs") {
   const api = new TxApi({ baseUrl: cfg.txApiUrl, apiKeys: cfg.txApiKeys, rpm: cfg.TX_API_RPM, log, signal: stop.signal, onAttempt: () => beat() });
-  const core = [...new Set([...Object.values(tracker.deployment.contracts), ...cfg.relayers])];
+  const core = [...new Set([...tracker.coreAccounts(), ...cfg.relayers])];
   feed = new TxIngestor({
     ...common,
     api,
@@ -56,7 +56,7 @@ const server = Bun.serve({
     liveTimeoutSec: cfg.LIVE_TIMEOUT_SEC,
   }).fetch,
 });
-log.info("indexer up", { network: cfg.NETWORK, schema: cfg.INDEXER_SCHEMA, ...source, startBlock: rt.startBlock, port: server.port });
+log.info("indexer up", { network: cfg.NEAR_NETWORK, schema: cfg.INDEXER_SCHEMA, ...source, startBlock: rt.startBlock, port: server.port });
 
 let exitCode = 0;
 const shutdown = (signal: string) => {

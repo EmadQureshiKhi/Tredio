@@ -94,6 +94,8 @@ export const ownerActions = {
   revokeSession: (publicKey: string, deleteKey = false): OwnerAction => ({ revoke_session: deleteKey ? { public_key: publicKey, delete_key: true } : { public_key: publicKey } }),
   freeze: (frozen: boolean): OwnerAction => ({ freeze: { frozen } }),
   transferNear: (receiver: string, yocto: bigint): OwnerAction => ({ transfer: { receiver_id: receiver, amount: s(yocto) } }),
+  /** Asks Chain Signatures to sign a 32-byte digest (hex, no 0x) under the account's key at `path`; secp256k1 (domain 0). Must be the request's only action. */
+  mpcSign: (path: string, digestHex: string): OwnerAction => ({ mpc_sign: { path, payload: digestHex, domain_id: 0 } }),
 };
 
 /** What a NEAR wallet sends to do what a session action does (wallets have no session). */

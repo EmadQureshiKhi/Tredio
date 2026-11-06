@@ -93,8 +93,10 @@ export interface Limits {
 /** Contract methods a wallet's meta-transaction may call, by contract. */
 export function metaAllowlist(d: Deployment): Map<string, Set<string>> {
   const c = d.contracts;
+  // #mainnet: USDC is Circle's, which has no faucet; the test token under the root account has one.
+  const ownUsdc = c.usdc.endsWith(`.${d.root}`);
   return new Map([
-    [c.usdc, new Set(["ft_transfer_call", "faucet", "storage_deposit"])],
+    [c.usdc, new Set(["ft_transfer_call", "storage_deposit", ...(ownUsdc ? ["faucet"] : [])])],
     [c.outcomes, new Set(["redeem_sets", "redeem_winnings", "mt_transfer_call", "storage_deposit"])],
     [c.book, new Set(["place_order", "cancel_order", "batch_update", "withdraw", "storage_deposit"])],
     [c.perps, new Set(["close", "storage_deposit"])],
@@ -110,6 +112,24 @@ const STORAGE_PRICE = 10n ** 19n;
 const CONTRACT_STORAGE_MIN = 5n * 10n ** 21n;
 const CONTRACT_STORAGE_DEPOSIT = 2n * 10n ** 22n;
 const ONE_YOCTO = 1n;
+/** Token transfers the relayer pays for, whose receiver must be one of Tredio's contracts. */
+const TRANSFER_CALLS = new Set(["ft_transfer_call", "mt_transfer_call"]);
+
+/** The receivers a relayed token transfer may name: the contracts that take tokens. */
+export function tokenReceivers(d: Deployment): Set<string> {
+  const c = d.contracts;
+  return new Set([c.outcomes, c.book, c.perps, c.coins, c.curation]);
+}
+
+/** `receiver_id` of a function call's JSON arguments, or null. */
+function receiverOf(args: unknown): string | null {
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(args as Uint8Array)) as { receiver_id?: unknown };
+    return typeof parsed.receiver_id === "string" ? parsed.receiver_id : null;
+  } catch {
+    return null;
+  }
+}
 
 export interface RelayerDeps {
   sender: Sender;
@@ -134,6 +154,7 @@ export class Relayer {
   private readonly day: Window;
   private readonly C;
   private readonly allow;
+  private readonly receivers;
   readonly stats = { accounts: 0, ownerCalls: 0, topups: 0, meta: 0, refused: 0, failed: 0, lastError: null as string | null };
 
   constructor(private readonly d: RelayerDeps) {
@@ -141,6 +162,7 @@ export class Relayer {
     this.day = new Window(86_400_000, d.now);
     this.C = calls(d.deployment);
     this.allow = metaAllowlist(d.deployment);
+    this.receivers = tokenReceivers(d.deployment);
   }
 
   private nowSec() {
@@ -358,10 +380,14 @@ export class Relayer {
     const methods = this.allow.get(da.receiverId);
     if (!methods) throw new RelayError(`the relayer pays only for calls to Tredio contracts, not ${da.receiverId}`, 403);
     for (const action of da.actions as Array<Record<string, unknown>>) {
-      const fc = action.functionCall as { methodName: string; deposit: bigint | string } | undefined;
-      // Borsh-decoded: the method name is a string, the deposit a bigint.
+      const fc = action.functionCall as { methodName: string; args: Uint8Array; deposit: bigint | string } | undefined;
+      // Borsh-decoded: the method name is a string, the arguments bytes, the deposit a bigint.
       if (!fc) throw new RelayError("only function calls are relayed", 403);
       if (!methods.has(fc.methodName)) throw new RelayError(`the relayer does not pay for ${fc.methodName}`, 403);
+      // Otherwise any wallet could have the relayer pay to move its tokens anywhere (real USDC on mainnet).
+      if (TRANSFER_CALLS.has(fc.methodName) && !this.receivers.has(receiverOf(fc.args) ?? "")) {
+        throw new RelayError("the relayer pays only for transfers to Tredio contracts", 403);
+      }
       const deposit = BigInt(fc.deposit);
       if (deposit > ONE_YOCTO && fc.methodName !== "storage_deposit") throw new RelayError("relayed calls attach at most one yoctoNEAR", 403);
       if (fc.methodName === "storage_deposit" && deposit > 0n) throw new RelayError("pay storage from the wallet", 403);

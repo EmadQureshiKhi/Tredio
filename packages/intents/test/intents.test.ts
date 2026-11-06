@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { depositRequest, hyperliquidFundingRequest, HYPERLIQUID_USDC_ASSET, isFinal, NEAR_USDC_ASSET, OneClick, OneClickError, withdrawalRequest } from "../src";
+import { depositRequest, hyperliquidFundingRequest, hyperliquidReturnRequest, HYPERLIQUID_USDC_ASSET, isFinal, NEAR_USDC_ASSET, OneClick, OneClickError, withdrawalRequest } from "../src";
+import mainnet from "../../../deployments/mainnet.json" with { type: "json" };
 
 describe("1Click requests", () => {
   test("deposits land as USDC on NEAR, refunded on the origin chain", () => {
@@ -20,6 +21,17 @@ describe("1Click requests", () => {
 
   test("Hyperliquid funding goes to the perps balance asset", () => {
     expect(hyperliquidFundingRequest({ amount: "1000000", account: "a.near", hyperliquidAddress: "0x1", dry: true }).destinationAsset).toBe(HYPERLIQUID_USDC_ASSET);
+  });
+
+  test("USDC back from Hyperliquid starts from the perps asset (8 decimals), lands on NEAR and refunds the Hyperliquid address", () => {
+    const r = hyperliquidReturnRequest({ amount: "2500000", account: "alice.near", hyperliquidAddress: "0xabc", dry: false, now: 0 });
+    expect(r.originAsset).toBe(HYPERLIQUID_USDC_ASSET);
+    expect(r.amount).toBe("250000000");
+    expect(r.destinationAsset).toBe(NEAR_USDC_ASSET);
+    expect(r.recipient).toBe("alice.near");
+    expect(r.refundTo).toBe("0xabc");
+    expect(r.refundType).toBe("ORIGIN_CHAIN");
+    expect(r.depositType).toBe("ORIGIN_CHAIN");
   });
 
   test("final states", () => {
@@ -63,4 +75,8 @@ describe("OneClick client", () => {
     await client.tokens();
     expect(calls).toBe(1);
   });
+});
+
+test("#mainnet: 1Click's NEAR USDC is the USDC the mainnet contracts settle in", () => {
+  expect(NEAR_USDC_ASSET).toBe(`nep141:${mainnet.contracts.usdc}`);
 });

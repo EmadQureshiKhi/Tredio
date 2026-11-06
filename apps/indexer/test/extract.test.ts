@@ -26,6 +26,23 @@ describe("Tracker", () => {
     expect(tracker.keeps("account", "nep141")).toBe(false);
     expect(tracker.keeps("usdc", "nep141")).toBe(true);
   });
+
+  test("mainnet: Circle's USDC keeps only transfers that touch Tredio, and is not polled", () => {
+    const usdc = "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
+    const contracts = Object.fromEntries(Object.entries(DEPLOYMENT.contracts).map(([role, id]) => [role, id.replace(/tredio\.testnet$/, "tredio.near")]));
+    const mainnet = new Tracker({ ...DEPLOYMENT, network: "mainnet", root: "tredio.near", contracts: { ...(contracts as typeof DEPLOYMENT.contracts), usdc } });
+    expect(tracker.externalUsdc).toBe(false);
+    expect(mainnet.externalUsdc).toBe(true);
+    expect(mainnet.coreAccounts()).not.toContain(usdc);
+    expect(tracker.coreAccounts()).toContain("usdc.tredio.testnet");
+    const transfer = (from: string, to: string) => [{ old_owner_id: from, new_owner_id: to, amount: "1" }];
+    expect(mainnet.keeps("usdc", "nep141", transfer("alice.near", "outcomes.tredio.near"))).toBe(true);
+    expect(mainnet.keeps("usdc", "nep141", transfer("perps.tredio.near", "bob.near"))).toBe(true);
+    expect(mainnet.keeps("usdc", "nep141", transfer(ALICE, "bob.near"))).toBe(true);
+    expect(mainnet.keeps("usdc", "nep141", transfer("alice.near", "bob.near"))).toBe(false);
+    expect(mainnet.keeps("usdc", "nep141", [{ owner_id: "alice.near", amount: "1" }])).toBe(false);
+    expect(mainnet.keeps("usdc", "fiat-token", transfer("alice.near", "outcomes.tredio.near"))).toBe(false);
+  });
 });
 
 describe("extractEvents", () => {

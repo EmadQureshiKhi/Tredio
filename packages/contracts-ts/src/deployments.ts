@@ -1,15 +1,22 @@
 /**
- * Where the Tredio contracts live on each network. Testnet comes from deployments/testnet.json,
- * written by contracts/scripts/deploy-testnet.sh.
+ * Where the Tredio contracts live on each network: deployments/<network>.json, written by
+ * contracts/scripts/deploy.sh. Mainnet's file is the plan until that script deploys it
+ * (`status: "planned"`): the same ids and parameters the deploy will use, so every service and
+ * the app switch networks with NEAR_NETWORK alone.
  */
+import mainnet from "../../../deployments/mainnet.json" with { type: "json" };
 import testnet from "../../../deployments/testnet.json" with { type: "json" };
 
 export type Network = "testnet" | "mainnet";
 
 export interface Deployment {
   network: Network;
+  /** `planned` until the deploy script has run on this network; a missing status means live. */
+  status?: "planned" | "live";
   rpc: string;
-  deployedAt: string;
+  deployedAt: string | null;
+  /** The block before the first contract account was created, where the indexer starts. */
+  startBlock?: number | null;
   root: string;
   treasury: string;
   contracts: {
@@ -41,14 +48,24 @@ export interface Deployment {
   };
 }
 
-const DEPLOYMENTS: Partial<Record<Network, Deployment>> = { testnet: testnet as Deployment };
+const DEPLOYMENTS: Record<Network, Deployment> = { testnet: testnet as Deployment, mainnet: mainnet as Deployment };
 
 /** Native USDC on NEAR mainnet (Circle), used instead of the testnet token. */
 export const MAINNET_USDC = "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";
 
+/** True once the contracts are deployed on `network`. */
+export const isDeployed = (network: Network): boolean => DEPLOYMENTS[network].status !== "planned";
+
+/** The planned or live deployment, for tools that prepare a deploy (never for trading). */
+export const deploymentPlan = (network: Network): Deployment => DEPLOYMENTS[network];
+
 export function deployment(network: Network = "testnet"): Deployment {
   const d = DEPLOYMENTS[network];
-  if (!d) throw new Error(`no Tredio deployment on ${network} yet`);
+  if (!isDeployed(network)) {
+    throw new Error(`Tredio is not deployed on ${network} yet: deployments/${network}.json is the plan, and contracts/scripts/deploy.sh ${network} writes the live deployment`);
+  }
+  // #mainnet: Tredio settles in Circle's native USDC, never a token of its own.
+  if (network === "mainnet" && d.contracts.usdc !== MAINNET_USDC) throw new Error(`deployments/mainnet.json names ${d.contracts.usdc} as USDC, not native USDC`);
   return d;
 }
 

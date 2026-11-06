@@ -5,7 +5,7 @@ const opt = <T extends z.ZodType>(t: T) => z.preprocess((v) => (v === "" ? undef
 const int = (def: number, min = 0) => z.preprocess((v) => (v === "" ? undefined : v), z.coerce.number().int().min(min).default(def));
 
 const Env = z.object({
-  NETWORK: z.enum(["testnet", "mainnet"]).default("testnet"),
+  NEAR_NETWORK: z.enum(["testnet", "mainnet"]).default("testnet"),
   /** `txs`: FastNEAR's transactions API (no key needed); `blocks`: neardata, every block. */
   INDEXER_SOURCE: z.enum(["txs", "blocks"]).default("txs"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
@@ -77,8 +77,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     TX_API_RPM: c.TX_API_RPM ?? (txApiKeys.length > 0 ? KEY_RPM * txApiKeys.length : TX_FREE_RPM),
     neardataKeys,
     txApiKeys,
-    neardataUrl: (c.NEARDATA_URL ?? `https://${c.NETWORK}.neardata.xyz`).replace(/\/+$/, ""),
-    txApiUrl: (c.TX_API_URL ?? `https://tx.${c.NETWORK === "mainnet" ? "main" : "test"}.fastnear.com`).replace(/\/+$/, ""),
-    relayers: (RELAYER_ACCOUNT_ID ?? DEFAULT_RELAYERS[c.NETWORK] ?? "").split(",").map((a) => a.trim()).filter(Boolean),
+    neardataUrl: (c.NEARDATA_URL ?? `https://${c.NEAR_NETWORK}.neardata.xyz`).replace(/\/+$/, ""),
+    txApiUrl: (c.TX_API_URL ?? `https://tx.${c.NEAR_NETWORK === "mainnet" ? "main" : "test"}.fastnear.com`).replace(/\/+$/, ""),
+    relayers: (RELAYER_ACCOUNT_ID ?? DEFAULT_RELAYERS[c.NEAR_NETWORK] ?? "").split(",").map((a) => a.trim()).filter(Boolean),
   };
 }

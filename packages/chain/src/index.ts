@@ -23,7 +23,8 @@ export const DEFAULT_RPCS: Record<"testnet" | "mainnet", string[]> = {
   // Intear's endpoint is slower but takes bursts the others refuse when several services share an address;
   // dRPC replaces rpc.testnet.near.org, which now answers every call with a deprecation error.
   testnet: ["https://test.rpc.fastnear.com", "https://testnet-rpc.intea.rs", "https://near-testnet.drpc.org"],
-  mainnet: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.near.org"],
+  // #mainnet: the same three providers (rpc.mainnet.near.org is deprecated and slow, Lava's endpoint is discontinued).
+  mainnet: ["https://rpc.mainnet.fastnear.com", "https://rpc.intea.rs", "https://near.drpc.org"],
 };
 
 export type Network = "testnet" | "mainnet";

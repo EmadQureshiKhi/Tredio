@@ -25,7 +25,8 @@ import { useTx } from "@/lib/trade/useTx";
  * testnet USDC comes from the faucet.
  */
 
-type Direction = QuoteRequest["direction"];
+/** USDC back from Hyperliquid starts from the Hyperliquid balance instead (the withdraw sheet), which signs its own send. */
+type Direction = Exclude<QuoteRequest["direction"], "from-hyperliquid">;
 
 const CHAIN_NAMES: Record<string, string> = {
   near: "NEAR",
@@ -302,7 +303,7 @@ function History() {
         {rows.map((r) => (
           <li key={r.id} className="flex items-center justify-between gap-3 py-3 text-[13px]">
             <span className="min-w-0 truncate text-text">
-              {r.direction === "deposit" ? "In" : r.direction === "withdraw" ? "Out" : "To Hyperliquid"}: {r.amountIn} <span className="text-text-3">to {shortAddress(r.depositAddress)}</span>
+              {r.direction === "deposit" ? "In" : r.direction === "withdraw" ? "Out" : r.direction === "hyperliquid" ? "To Hyperliquid" : "From Hyperliquid"}: {r.amountIn} <span className="text-text-3">to {shortAddress(r.depositAddress)}</span>
             </span>
             <span className="flex shrink-0 items-center gap-2">
               <Badge tone={r.phase === "SUCCESS" ? "up" : r.phase === "REFUNDED" || r.phase === "FAILED" ? "down" : "neutral"}>{r.phase.replace(/_/g, " ").toLowerCase()}</Badge>
