@@ -35,6 +35,7 @@ Everything runs on NEAR testnet.
 
 - Contracts: [`registry`](https://testnet.nearblocks.io/address/registry.tredio.testnet), [`outcomes`](https://testnet.nearblocks.io/address/outcomes.tredio.testnet), [`book`](https://testnet.nearblocks.io/address/book.tredio.testnet), [`perps`](https://testnet.nearblocks.io/address/perps.tredio.testnet), [`coins`](https://testnet.nearblocks.io/address/coins.tredio.testnet), [`curation`](https://testnet.nearblocks.io/address/curation.tredio.testnet), [`accounts`](https://testnet.nearblocks.io/address/accounts.tredio.testnet), [`usdc`](https://testnet.nearblocks.io/address/usdc.tredio.testnet).
 - Passkey accounts from the end-to-end runs: [`0ugt5v5y...`](https://testnet.nearblocks.io/address/0ugt5v5y5rdhyhndtyhrwrkp5rxrmxhpfbrcx9ets3g94pjsdjt330) (script) and [`0u5rr3y2...`](https://testnet.nearblocks.io/address/0u5rr3y2bqwn16dvh33rwry06bpnyj97j5j9rk2gd0vyj0ncyy5nf0) (browser).
+- An x402 payment: [`8o1HFa5i...`](https://testnet.nearblocks.io/txns/8o1HFa5i3AfemE8FYm6HDFNAGGxZtQnxh622u22jaoZ1), 0.01 USDC for a trend's full history, signed by the agent as a delegate action and submitted by Tredio's relayer.
 - The records `pnpm verify` checks are listed in [`deployments/testnet-proofs.json`](deployments/testnet-proofs.json).
 
 ## Tracks

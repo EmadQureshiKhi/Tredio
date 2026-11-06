@@ -22,6 +22,7 @@ const proofs = JSON.parse(readFileSync(join(ROOT, `deployments/${NETWORK}-proofs
   passkeyAccounts: string[];
   chainSignaturesOrder: { tx: string; sender: string };
   outlayerRun: { tx: string; project: string; attestations: string };
+  x402Payment: { tx: string; relayer: string; payer: string; amount: string };
 };
 const args = new Set(process.argv.slice(2));
 const viewer = new Viewer(NETWORK, DEFAULT_RPCS[NETWORK]);
@@ -158,6 +159,15 @@ async function chain() {
     if (a.project_id !== proofs.outlayerRun.project) return fail(`attested project is ${a.project_id}`);
     if (!a.tdx_quote || a.wasm_hash !== a.executed_wasm_sha256) return fail("attestation without a TDX quote or with a different executed hash");
     return ok(`${a.project_id}, TDX quote over wasm ${a.wasm_hash?.slice(0, 12)}...`);
+  });
+
+  await check(S, "x402 payment settled in USDC on NEAR", async () => {
+    const { tx, relayer, payer, amount } = proofs.x402Payment;
+    const o = await viewer.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: tx, sender_account_id: relayer, wait_until: "NONE" });
+    const transfer = events(o).find((e) => e.standard === "nep141" && e.event === "ft_transfer");
+    const data = (Array.isArray(transfer?.data) ? transfer.data[0] : transfer?.data) as { old_owner_id?: string; new_owner_id?: string; amount?: string } | undefined;
+    if (!data || data.old_owner_id !== payer || data.new_owner_id !== D.treasury || data.amount !== amount) return fail(`${tx}: no ft_transfer of ${amount} from ${payer} to ${D.treasury}`);
+    return ok(`${tx.slice(0, 10)}...: ${Number(amount) / 1e6} USDC from ${payer} to ${D.treasury}, a delegate action ${relayer} submitted`);
   });
 
   if (args.has("--build")) {

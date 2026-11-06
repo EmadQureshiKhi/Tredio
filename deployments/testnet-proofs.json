@@ -13,5 +13,11 @@
     "tx": "73UDs4Yi8hNDu8xieSBJwmvrwFzPMcHium7xvkw3pcbm",
     "project": "tredio.testnet/attention-oracle",
     "attestations": "https://testnet-api.outlayer.ai/attestations/by-tx/"
+  },
+  "x402Payment": {
+    "tx": "8o1HFa5i3AfemE8FYm6HDFNAGGxZtQnxh622u22jaoZ1",
+    "relayer": "tredio-relayer.testnet",
+    "payer": "tredio.testnet",
+    "amount": "10000"
   }
 }
