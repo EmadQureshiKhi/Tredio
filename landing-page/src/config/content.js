@@ -8,7 +8,7 @@ export const HOW_IT_WORKS = [
     heading: "A topic starts trending. Tredio's radar spots it and proposes a market.",
     label: "Radar",
     detail: "Signals",
-    description: "Six data sources feed it, around the clock.",
+    description: "Eight data sources feed it, around the clock.",
   },
   {
     image: "/assets/img/about-review.webp",
@@ -19,10 +19,10 @@ export const HOW_IT_WORKS = [
   },
   {
     image: "/assets/img/crypto-chart.jpg",
-    heading: "Inside an OutLayer TEE, an oracle scores its attention from 0 to 100 and writes it on NEAR.",
+    heading: "An oracle built for an OutLayer TEE scores its attention from 0 to 100 and writes it on NEAR.",
     label: "Oracle",
     detail: "OutLayer TEE",
-    description: "The registry accepts attested reports only.",
+    description: "The registry accepts reports signed by its one oracle key only.",
   },
   {
     image: "/assets/img/about-markets.webp",
@@ -78,7 +78,7 @@ export const TRACKS = [
     background: "bg-[#110F28]",
     title: "Agents read the index and trade by the rules you set.",
     description:
-      "An MCP server and a pay-per-call x402 API give agents the index and the markets. Autopilot trades your rules through a revocable session on your own account, inside limits your passkey signed.",
+      "An MCP server and a pay-per-call x402 API give agents the index and the markets. Autopilot trades your rules through a revocable session on your own account, under an on-chain price and leverage guard.",
     image: "/assets/img/track-agents.webp",
     alt: "An agent's tool call reading a trend's index, and an Autopilot rule with its limits",
   },

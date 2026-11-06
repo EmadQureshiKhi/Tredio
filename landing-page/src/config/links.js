@@ -13,7 +13,7 @@ export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://tredio.bid"
 export const SITE_NAME = "Tredio";
 export const SITE_TITLE = "Tredio | Trade the World's Attention";
 export const SITE_DESCRIPTION =
-  "Attention markets on NEAR. An AI radar finds trends, a TEE oracle scores each one from 0 to 100 on chain, and you trade the index from a passkey account: Up/Down outcomes, attention perps, trend coins and Hyperliquid perps.";
+  "Attention markets on NEAR. An AI radar finds trends, an oracle built for a TEE scores each one from 0 to 100 on chain, and you trade the index from a passkey account: Up/Down outcomes, attention perps, trend coins and Hyperliquid perps.";
 
 // The one address for every question (support, partners, press, security).
 export const CONTACT_EMAIL = "contact@tredio.bid";

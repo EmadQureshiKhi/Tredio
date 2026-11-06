@@ -147,6 +147,9 @@ What the team can still do on testnet, stated plainly:
 
 ## Accepted risks and observations
 
+- The account checks that the passkey's assertion carries user presence, not user verification (the UV flag).
+  The app requires user verification from the authenticator (Face ID, a fingerprint or a PIN), so a person's own device always asks, but the contract itself would accept a presence-only assertion from the same key.
+  Requiring the UV flag on chain is a one-line change for the next account code.
 - Plain (non-gas) session keys have an unlimited allowance, so a leaked one sent directly could burn the account's liquid NEAR on failing calls.
   A cap was tried and reverted: an allowance is charged the attached gas at 1e9 yocto per gas (the sandbox charged 0.3009 NEAR of allowance for one 300 Tgas call), so any cap small enough to matter stops the key.
   The app uses gas keys only; plain keys are the fallback for meta transactions, where the relayer pays.

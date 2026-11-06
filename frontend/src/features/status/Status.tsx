@@ -136,7 +136,7 @@ function OracleCard({ s, since }: { s: SystemStatus; since: number }) {
         <Fact label="Live trends" value={live === undefined ? "..." : integer(live)} testId="live-trends" />
         <Fact label="Trends behind on measurements" value={integer(s.oracle.staleTrends)} tone={s.oracle.staleTrends > 0 ? "warn" : undefined} testId="stale-trends" />
       </div>
-      <p className="text-[13px] leading-5 text-text-2">The Tredio oracle measures attention on X, Telegram, Bluesky, news, Wikipedia, Hacker News and smart-money flows every minute and records each trend&rsquo;s index. Perps trade at it, and every Up or down series settles on it.</p>
+      <p className="text-[13px] leading-5 text-text-2">The Tredio oracle measures attention on X, Telegram, Bluesky, news, Wikipedia, Hacker News and smart-money flows every minute and records each trend&rsquo;s index. Perps trade at it, and every Up/Down series settles on it.</p>
     </Card>
   );
 }

@@ -627,12 +627,12 @@ TAGLINE = "Trade the world's attention on NEAR."
 def pipeline() -> Columns:
     return Columns(
         "How a trend becomes a market",
-        "The radar proposes, NEAR AI Cloud reviews, an OutLayer enclave scores, and the registry accepts only what the enclave signed. Every market and every account guard reads the registry.",
+        "The radar proposes, NEAR AI Cloud reviews, the oracle scores, and the registry accepts only reports signed by the one key it trusts (the enclave's, once hosting is live). Every market and every account guard reads the registry.",
         [
             [
                 Panel(
-                    "Oracle in a TEE",
-                    "apps/oracle, every 5 minutes",
+                    "Oracle built for a TEE",
+                    "apps/oracle, every minute",
                     [
                         Item("request_execution", "OutLayer runs the index build, pinned by its sha256", mono=True),
                         Item("Key bound to the build", "An ed25519 key with bind: wasm, so only that exact build can sign a report"),
@@ -692,7 +692,7 @@ def pipeline() -> Columns:
                     "Service fleet",
                     "Bun services on gas-key nonce lanes",
                     [
-                        Item("relayer, keeper, market maker, top-up", "Parallel lanes on one gas key each, refilled from the treasury"),
+                        Item("relayer, keeper, market maker", "Parallel lanes on one gas key each; the top-up service refills them from the treasury"),
                         Item("Autopilot and copy", "Rules and mainnet leaders mirrored through the person's autopilot session"),
                         Item("indexer", "Events from the FastNEAR transaction API into Postgres for history and PnL"),
                     ],
@@ -700,7 +700,7 @@ def pipeline() -> Columns:
             ],
         ],
         [
-            ("Oracle in a TEE", "registry", "signed report"),
+            ("Oracle built for a TEE", "registry", "signed report"),
             ("registry", "Passkey account", "marks, fair value"),
             ("Markets", "Service fleet", "quotes, settles"),
         ],

@@ -12,7 +12,7 @@ The product overview is in [README.md](README.md); the judges' checklist is in [
 - `frontend/` (the app, 3000), `admin/` (operator console), `landing-page/` (tredio.bid): Next.js.
 - `packages/`: `chain` (sender, viewer, proofs, the x402 paying client), `contracts-ts` (`@tredio/contracts`: typed calls and deployments), `hyperliquid`, `intents` (1Click), `autopilot` (rule engine), `mcp` (MCP server).
 - `skills/tredio/SKILL.md`: the agent skill for using Tredio.
-- `scripts/`: `dev.ts` (run everything), `verify.ts` (check the claims against testnet), `e2e-testnet.ts` (one full flow on testnet), `gas-keys.ts`.
+- `scripts/`: `dev.ts` (run everything), `verify.ts` (check the claims against testnet), `e2e-testnet.ts` (one full flow on testnet), `x402-demo.ts` (pay for an x402 route on testnet), `gas-keys.ts`.
 - `tools/make_readme_art.py`: the README figures (Pillow, colours from `frontend/app/globals.css`).
 
 ## Commands
