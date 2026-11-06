@@ -2,11 +2,26 @@
 //! the paired coins, deposit both sides, add the liquidity. A failed step leaves the curve where
 //! it was so the next call retries it. LP shares stay with the factory, which cannot withdraw
 //! them: graduated liquidity is locked.
+//!
+//! One step runs at a time per curve: `graduate` refuses while the previous step's callback is
+//! pending, so two calls in the same block cannot create two pools or deposit the graduation
+//! USDC twice (the second deposit would take another curve's reserve). A step whose callback
+//! never ran is retried after [`STEP_TIMEOUT`].
 
 use near_sdk::json_types::U128;
-use near_sdk::{env, near, require, serde_json, AccountId, NearToken, Promise, PromiseError};
+use near_sdk::{env, near, require, serde_json, AccountId, IntoStorageKey, NearToken, Promise, PromiseError};
+use tredio_common::now_secs;
 
-use crate::{Coins, CoinsExt, Event, Stage, GAS_CALLBACK, GAS_TRANSFER_CALL, HOLDER_STORAGE};
+use crate::{Coins, CoinsExt, Event, Key, Stage, GAS_CALLBACK, GAS_TRANSFER_CALL, HOLDER_STORAGE};
+
+/// Seconds after which a graduation step still waiting on its callback counts as lost.
+pub const STEP_TIMEOUT: u64 = 600;
+
+fn step_key(trend: &str) -> Vec<u8> {
+    let mut key = Key::StepInFlight.into_storage_key();
+    key.extend_from_slice(trend.as_bytes());
+    key
+}
 
 const POOL_DEPOSIT: NearToken = NearToken::from_millinear(100);
 const LIQUIDITY_DEPOSIT: NearToken = NearToken::from_millinear(10);
@@ -19,6 +34,22 @@ fn all_succeeded() -> bool {
 }
 
 impl Coins {
+    /// When the graduation step in flight for `trend` started, unless there is none or it timed out.
+    pub(crate) fn step_in_flight(trend: &str) -> Option<u64> {
+        let at = env::storage_read(&step_key(trend))?;
+        let at = u64::from_le_bytes(at.try_into().ok()?);
+        (now_secs() < at + STEP_TIMEOUT).then_some(at)
+    }
+
+    fn begin_step(trend: &str) {
+        require!(Self::step_in_flight(trend).is_none(), "a graduation step is in flight");
+        env::storage_write(&step_key(trend), &now_secs().to_le_bytes());
+    }
+
+    fn end_step(trend: &str) {
+        env::storage_remove(&step_key(trend));
+    }
+
     fn call(
         &self,
         receiver: &AccountId,
@@ -43,14 +74,22 @@ impl Coins {
     pub fn prepare_exchange(&mut self) {
         require!(env::predecessor_account_id() == self.owner, "owner only");
         self.call(&self.exchange, "storage_deposit", serde_json::json!({}), EXCHANGE_STORAGE).detach();
-        self.call(&self.usdc, "storage_deposit", serde_json::json!({ "account_id": self.exchange }), FT_STORAGE)
-            .detach();
+        self.call(
+            &self.usdc,
+            "storage_deposit",
+            serde_json::json!({ "account_id": self.exchange }),
+            FT_STORAGE,
+        )
+        .detach();
     }
 
     /// Advances a filled curve's graduation by one step. Permissionless; the keeper calls it
     /// until the curve reports `graduated`. Returns the stage reached.
     pub fn graduate(&mut self, trend: String) -> Promise {
         let c = self.get(&trend);
+        if matches!(c.stage, Stage::Ready | Stage::Pooled) {
+            Self::begin_step(&trend);
+        }
         let me = env::current_account_id();
         let cb = Self::ext(me.clone()).with_static_gas(GAS_CALLBACK);
         match c.stage {
@@ -119,6 +158,7 @@ impl Coins {
         trend: String,
         #[callback_result] pool_id: Result<u64, PromiseError>,
     ) -> Stage {
+        Self::end_step(&trend);
         let mut c = self.get(&trend);
         let Ok(pool_id) = pool_id else {
             Event::GraduationStep { trend: &trend, step: "pool", ok: false }.emit();
@@ -142,6 +182,7 @@ impl Coins {
 
     #[private]
     pub fn on_grad_minted(&mut self, trend: String) -> bool {
+        Self::end_step(&trend);
         let ok = all_succeeded();
         let mut c = self.get(&trend);
         // A mint that succeeded while registering the exchange failed is kept, and only the
@@ -155,6 +196,7 @@ impl Coins {
 
     #[private]
     pub fn on_deposited(&mut self, trend: String, coins: bool) -> bool {
+        Self::end_step(&trend);
         let mut c = self.get(&trend);
         let want = if coins { c.grad_coins.0 } else { c.grad_quote.0 };
         let used = env::promise_result_checked(0, 64)
@@ -179,6 +221,7 @@ impl Coins {
 
     #[private]
     pub fn on_liquidity_added(&mut self, trend: String) -> Stage {
+        Self::end_step(&trend);
         let mut c = self.get(&trend);
         if !tredio_common::promise_succeeded() {
             Event::GraduationStep { trend: &trend, step: "liquidity", ok: false }.emit();

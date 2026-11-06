@@ -358,3 +358,48 @@ fn resolve_keeps_what_the_receiver_used() {
     assert_eq!(bal(&c, "alice.testnet", "1:up"), 6_000_000);
     assert_eq!(bal(&c, "bob.testnet", "1:up"), 4_000_000);
 }
+
+#[test]
+fn a_failed_payout_is_restored_even_when_storage_filled_up_meanwhile() {
+    let mut c = setup();
+    let _ = c.open_series("topic:a".into(), WINDOW_7D);
+    ctx("outcomes.testnet", T0, 0);
+    let week = c
+        .on_series_registered(
+            "topic:a".into(),
+            WINDOW_7D,
+            T0,
+            T0 + WINDOW_7D,
+            Ok(snapshot(50_000_000, Status::Active)),
+        )
+        .unwrap();
+    // Carol's storage holds exactly two balances.
+    let two =
+        (REGISTRATION_BYTES + 2 * BALANCE_ENTRY_BYTES) as u128 * env::storage_byte_cost().as_yoctonear();
+    ctx("carol.testnet", T0, two);
+    c.storage_deposit(None, None);
+    mint(&mut c, "carol.testnet", 5_000_000);
+    ctx("carol.testnet", T0 + 20, 0);
+    let _ = c.redeem_sets(1, U128(5_000_000));
+    // Before the payout settles, someone mints dust sets of another series to carol.
+    ctx("usdc.testnet", T0 + 20, 0);
+    let msg = format!(r#"{{"mint":{{"series":{week},"receiver":"carol.testnet"}}}}"#);
+    let _ = c.ft_on_transfer(acc("bob.testnet"), U128(1), msg);
+    ctx("outcomes.testnet", T0 + 20, 0);
+    let _ = c.on_mint_checked(
+        week,
+        acc("bob.testnet"),
+        acc("carol.testnet"),
+        U128(1),
+        Ok(Some(snapshot(50_000_000, Status::Active))),
+    );
+    // The USDC transfer to carol failed: her tokens must come back, storage or not.
+    ctx_with("outcomes.testnet", T0 + 20, 0, vec![near_sdk::PromiseResult::Failed]);
+    assert_eq!(
+        c.after_payout(1, acc("carol.testnet"), U128(5_000_000), U128(5_000_000), U128(5_000_000)).0,
+        0
+    );
+    assert_eq!(bal(&c, "carol.testnet", "1:up"), 5_000_000);
+    assert_eq!(bal(&c, "carol.testnet", "1:down"), 5_000_000);
+    assert_eq!(c.get_series(1).unwrap().backing, 5_000_000);
+}

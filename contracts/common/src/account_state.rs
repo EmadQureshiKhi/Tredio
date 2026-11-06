@@ -6,11 +6,15 @@ use near_sdk::json_types::U128;
 use near_sdk::store::IterableMap;
 use near_sdk::{near, AccountId, BorshStorageKey, PublicKey};
 
-/// Storage key prefix of the session map inside a user account.
+/// Storage keys inside a user account. Append only: the order is the on-chain prefix.
 #[derive(BorshStorageKey)]
 #[near]
 pub enum AccountKey {
+    /// The session map.
     Sessions,
+    /// What account code v2 keeps besides `AccountCore` (dormant gas keys, gas top-ups), under
+    /// its own key so `STATE` keeps the v1 layout the factory writes.
+    Extension,
 }
 
 /// The contracts a user account trades with, fixed when it is created (an owner upgrade can

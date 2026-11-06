@@ -133,6 +133,19 @@ pub struct IndexUpdate {
 pub struct MarkUpdate {
     pub asset: String,
     pub price: U128,
+    /// The asset's index on this network's Hyperliquid (the `a` an order signs). Account
+    /// guards check an order's index against it, so a mark cannot vouch for another asset.
+    #[serde(default)]
+    pub asset_index: Option<u32>,
+}
+
+/// A mark as `mark_of` returns it: the stored mark and the asset's Hyperliquid index.
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MarkView {
+    pub price: U128,
+    pub at: u64,
+    pub asset_index: Option<u32>,
 }
 
 /// One oracle run.
@@ -205,6 +218,8 @@ pub enum Event<'a> {
     MarkUpdated { asset: &'a str, price: U128, at: u64 },
     #[event_version("1.0.0")]
     OracleChanged { config: &'a OracleConfig },
+    #[event_version("1.0.0")]
+    AssetIndexSet { asset: &'a str, asset_index: u32 },
 }
 
 #[derive(BorshStorageKey)]
@@ -217,6 +232,13 @@ enum Key {
     Pending,
     Consumers,
     Marks,
+    /// Hyperliquid asset index per ticker. Read and written through `asset_indexes()`, outside
+    /// the root state, so a registry deployed before it reads its state unchanged.
+    AssetIndexes,
+}
+
+fn asset_indexes() -> LookupMap<String, u32> {
+    LookupMap::new(Key::AssetIndexes)
 }
 
 #[near(contract_state)]
@@ -402,8 +424,9 @@ impl Registry {
         U128(fair_up_usdc(t.index, opening, expiry.saturating_sub(now_secs())))
     }
 
-    pub fn mark_of(&self, asset: String) -> Option<Mark> {
-        self.marks.get(&asset).cloned()
+    pub fn mark_of(&self, asset: String) -> Option<MarkView> {
+        let m = self.marks.get(&asset)?;
+        Some(MarkView { price: m.price, at: m.at, asset_index: asset_indexes().get(&asset).copied() })
     }
 
     pub fn is_consumer(&self, account_id: AccountId) -> bool {
@@ -440,6 +463,7 @@ impl Registry {
                 rejected += 1;
             }
         }
+        let mut indexes = asset_indexes();
         for m in r.marks {
             if m.asset.is_empty() || m.asset.len() > 16 || m.price.0 == 0 {
                 Event::ItemRejected { id: &m.asset, kind: "mark", reason: Rejection::BadMark }.emit();
@@ -447,9 +471,16 @@ impl Registry {
                 continue;
             }
             Event::MarkUpdated { asset: &m.asset, price: m.price, at: r.observed_at }.emit();
+            if let Some(i) = m.asset_index {
+                if indexes.get(&m.asset) != Some(&i) {
+                    Event::AssetIndexSet { asset: &m.asset, asset_index: i }.emit();
+                    indexes.insert(m.asset.clone(), i);
+                }
+            }
             self.marks.insert(m.asset, Mark { price: m.price, at: r.observed_at });
             marks += 1;
         }
+        indexes.flush();
         Event::ReportProcessed {
             run_id: r.run_id,
             observed_at: r.observed_at,

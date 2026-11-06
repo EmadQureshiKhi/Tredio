@@ -126,18 +126,23 @@ impl FungibleTokenReceiver for Perps {
                 require!(leverage_bps > 0 && leverage_bps <= MAX_LEVERAGE_BPS, "invalid leverage");
                 let owner = owner.unwrap_or_else(|| sender_id.clone());
                 require!(self.storage.is_registered(&owner), "owner is not registered for storage");
-                PromiseOrValue::Promise(self.read_index(&trend).then(
-                    Self::ext(env::current_account_id()).with_static_gas(GAS_AFTER_REGISTRY).with_unused_gas_weight(1).on_open(
-                        sender_id,
-                        owner,
-                        trend,
-                        is_long,
-                        amount,
-                        leverage_bps,
-                        acceptable_index,
-                        deadline,
+                PromiseOrValue::Promise(
+                    self.read_index(&trend).then(
+                        Self::ext(env::current_account_id())
+                            .with_static_gas(GAS_AFTER_REGISTRY)
+                            .with_unused_gas_weight(1)
+                            .on_open(
+                                sender_id,
+                                owner,
+                                trend,
+                                is_long,
+                                amount,
+                                leverage_bps,
+                                acceptable_index,
+                                deadline,
+                            ),
                     ),
-                ))
+                )
             }
             FtMsg::AddMargin { id } => {
                 let mut p = self.get(id);
@@ -294,7 +299,10 @@ impl Perps {
     pub fn settle_retired(&mut self, id: u64) -> Promise {
         let p = self.get(id);
         self.read_index(&p.trend).then(
-            Self::ext(env::current_account_id()).with_static_gas(GAS_AFTER_REGISTRY).with_unused_gas_weight(1).on_settle_retired(id),
+            Self::ext(env::current_account_id())
+                .with_static_gas(GAS_AFTER_REGISTRY)
+                .with_unused_gas_weight(1)
+                .on_settle_retired(id),
         )
     }
 
@@ -363,8 +371,12 @@ impl Perps {
 
     /// Accrues funding to now and refreshes the mark. Permissionless (the keeper pokes).
     pub fn poke(&mut self, trend: String) -> Promise {
-        self.read_index(&trend)
-            .then(Self::ext(env::current_account_id()).with_static_gas(GAS_AFTER_REGISTRY).with_unused_gas_weight(1).on_poke(trend))
+        self.read_index(&trend).then(
+            Self::ext(env::current_account_id())
+                .with_static_gas(GAS_AFTER_REGISTRY)
+                .with_unused_gas_weight(1)
+                .on_poke(trend),
+        )
     }
 
     #[private]

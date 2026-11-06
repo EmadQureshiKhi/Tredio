@@ -72,7 +72,7 @@ impl StorageLedger {
             self.required(e.entries)
         };
         let e = self.accounts.get_mut(account).unwrap();
-        let available = e.deposit - required;
+        let available = e.deposit.saturating_sub(required);
         let take = amount.unwrap_or(available);
         require!(take <= available, "amount exceeds the available storage balance");
         e.deposit -= take;
@@ -99,6 +99,16 @@ impl StorageLedger {
         let e = self.accounts.get_mut(account).unwrap();
         require!(e.deposit >= need, format!("{account} needs a larger storage deposit"));
         e.entries += 1;
+    }
+
+    /// Records one more entry for `account` without requiring its deposit to cover it, when it is
+    /// registered (unregistered accounts' entries are the contract's). For value that must land
+    /// even when the owner's storage is full, such as a failed payout coming back: the owner then
+    /// cannot withdraw storage or unregister until the entry is gone.
+    pub fn force_add_entry(&mut self, account: &AccountId) {
+        if let Some(e) = self.accounts.get_mut(account) {
+            e.entries += 1;
+        }
     }
 
     /// Releases one entry owned by `account`.

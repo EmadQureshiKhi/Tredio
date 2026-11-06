@@ -9,12 +9,21 @@
 //! `create_account` sends one batch to that address: the state init, the attached NEAR (storage,
 //! registrations and the first session's gas), `bootstrap`, and optionally the passkey-signed
 //! request that adds the first session, so one Face ID prompt yields a funded, trading account.
-//! The relayer pays it; anyone may call it with their own deposit.
+//! The relayer pays it; anyone may call it with their own deposit. If the batch fails (a bad
+//! first request, an account that exists and cannot be topped up), the runtime refunds the
+//! deposit to this factory, and `on_created` sends it back to the caller.
+//!
+//! The code hash every account is born with is part of its address, so it is fixed once the
+//! first account exists: accounts move to newer code with their passkey's `upgrade` action
+//! (new accounts can include it in their first request), and every passkey keeps its address.
 
-use near_sdk::json_types::{Base58CryptoHash, Base64VecU8};
+use near_sdk::json_types::{Base58CryptoHash, Base64VecU8, U128};
 use near_sdk::serde_json::{self, json};
 use near_sdk::universal_state_init::{UniversalStateInit, UniversalStateInitV1};
-use near_sdk::{env, near, require, AccountId, Gas, GlobalContractId, NearToken, PanicOnDefault, Promise};
+use near_sdk::{
+    env, near, require, AccountId, BorshStorageKey, Gas, GlobalContractId, IntoStorageKey, NearToken,
+    PanicOnDefault, Promise,
+};
 use tredio_common::account_state::{AccountCore, Protocol};
 
 /// Below this the new account could not cover registrations and a session.
@@ -22,6 +31,7 @@ pub const MIN_DEPOSIT: NearToken = NearToken::from_millinear(50);
 const GAS_BOOTSTRAP: Gas = Gas::from_tgas(60);
 const GAS_FIRST_REQUEST: Gas = Gas::from_tgas(60);
 const GAS_AFTER: Gas = Gas::from_tgas(10);
+const GAS_CHECK: Gas = Gas::from_tgas(5);
 
 #[near(event_json(standard = "tredio-accounts"))]
 pub enum Event<'a> {
@@ -29,6 +39,8 @@ pub enum Event<'a> {
     AccountCreated { account: &'a AccountId, owner_key: &'a str, funded: String },
     #[event_version("1.0.0")]
     AccountCreationFailed { account: &'a AccountId },
+    #[event_version("1.0.0")]
+    DepositRefunded { account: &'a AccountId, payer: &'a AccountId, amount: U128, claimable: bool },
 }
 
 #[near(contract_state)]
@@ -54,9 +66,15 @@ impl Accounts {
         Self { owner, network, protocol, account_code, created: 0 }
     }
 
-    /// New accounts use this code hash from now on; existing accounts upgrade with their passkey.
+    /// Sets the code hash accounts are born with, before the first account exists. Every
+    /// address commits to it, so changing it later would move every passkey to a new, empty
+    /// address; accounts upgrade with their passkey instead.
     pub fn set_account_code(&mut self, account_code: Base58CryptoHash) {
         require!(env::predecessor_account_id() == self.owner, "owner only");
+        require!(
+            self.created == 0,
+            "accounts exist: their addresses commit to this code hash, so upgrade them with their passkey instead"
+        );
         self.account_code = account_code;
     }
 
@@ -106,22 +124,106 @@ impl Accounts {
                 GAS_FIRST_REQUEST,
             );
         }
+        // The batch's result is its last action's. Ending with a plain view keeps it independent
+        // of whatever the first request returns (a call it makes can fail later while the
+        // account exists and holds the deposit): `on_created` then sees a failure only when the
+        // whole batch was reverted and the deposit came back here.
+        p = p.function_call("bootstrapped", b"{}".to_vec(), NearToken::from_yoctonear(0), GAS_CHECK);
         p.then(Self::ext(env::current_account_id()).with_static_gas(GAS_AFTER).on_created(
             account,
             owner_key,
-            deposit.exact_amount_display(),
+            env::predecessor_account_id(),
+            U128(deposit.as_yoctonear()),
         ))
     }
 
+    /// Counts a created account, or, when the batch failed (the runtime then refunded the
+    /// deposit to this factory), sends the deposit back to whoever paid it.
     #[private]
-    pub fn on_created(&mut self, account: AccountId, owner_key: String, funded: String) -> AccountId {
+    pub fn on_created(
+        &mut self,
+        account: AccountId,
+        owner_key: String,
+        payer: AccountId,
+        deposit: U128,
+    ) -> AccountId {
+        let amount = NearToken::from_yoctonear(deposit.0);
         if tredio_common::promise_succeeded() {
             self.created += 1;
-            Event::AccountCreated { account: &account, owner_key: &owner_key, funded }.emit();
+            Event::AccountCreated {
+                account: &account,
+                owner_key: &owner_key,
+                funded: amount.exact_amount_display(),
+            }
+            .emit();
         } else {
             Event::AccountCreationFailed { account: &account }.emit();
+            // The runtime's refund of the failed batch may land after this callback: if the
+            // factory cannot cover the deposit yet, the payer claims it with `claim_refund`.
+            let free = env::account_balance()
+                .as_yoctonear()
+                .saturating_sub(env::storage_usage() as u128 * env::storage_byte_cost().as_yoctonear());
+            if free >= deposit.0 + REFUND_RESERVE.as_yoctonear() {
+                Event::DepositRefunded {
+                    account: &account,
+                    payer: &payer,
+                    amount: deposit,
+                    claimable: false,
+                }
+                .emit();
+                Promise::new(payer).transfer(amount).detach();
+            } else {
+                Event::DepositRefunded { account: &account, payer: &payer, amount: deposit, claimable: true }
+                    .emit();
+                set_refund(&payer, stored_refund(&payer) + deposit.0);
+            }
         }
         account
+    }
+
+    /// Sends the caller the deposits of its failed creations that could not be refunded at once.
+    pub fn claim_refund(&mut self) -> Promise {
+        let payer = env::predecessor_account_id();
+        let amount = stored_refund(&payer);
+        require!(amount > 0, "nothing to refund");
+        set_refund(&payer, 0);
+        Promise::new(payer).transfer(NearToken::from_yoctonear(amount))
+    }
+
+    /// Deposits `account_id` can claim with `claim_refund`.
+    pub fn refund_of(&self, account_id: AccountId) -> U128 {
+        U128(stored_refund(&account_id))
+    }
+}
+
+/// Liquid NEAR the factory keeps when refunding at once.
+const REFUND_RESERVE: NearToken = NearToken::from_millinear(100);
+
+#[derive(BorshStorageKey)]
+#[near]
+enum Key {
+    /// Deposits to refund, per payer. Kept outside the root state so a factory deployed before
+    /// it reads its state unchanged.
+    Refunds,
+}
+
+fn refund_key(payer: &AccountId) -> Vec<u8> {
+    let mut key = Key::Refunds.into_storage_key();
+    key.extend_from_slice(payer.as_bytes());
+    key
+}
+
+fn stored_refund(payer: &AccountId) -> u128 {
+    env::storage_read(&refund_key(payer))
+        .and_then(|b| <[u8; 16]>::try_from(b.as_slice()).ok())
+        .map_or(0, u128::from_le_bytes)
+}
+
+fn set_refund(payer: &AccountId, amount: u128) {
+    if amount == 0 {
+        env::storage_remove(&refund_key(payer));
+    } else {
+        env::storage_write(&refund_key(payer), &amount.to_le_bytes());
     }
 }
 
@@ -230,6 +332,69 @@ mod tests {
     #[should_panic(expected = "compressed P-256")]
     fn rejects_bad_keys() {
         setup().account_id_of("04abcd".into());
+    }
+
+    #[test]
+    #[should_panic(expected = "accounts exist")]
+    fn the_birth_code_is_fixed_once_accounts_exist() {
+        let mut f = setup();
+        f.created = 1;
+        // Every passkey's address commits to this hash: changing it would strand existing users.
+        f.set_account_code(Base58CryptoHash::from([8u8; 32]));
+    }
+
+    #[test]
+    fn a_failed_creation_sends_the_deposit_back() {
+        let mut f = setup();
+        let account = f.account_id_of(KEY.into());
+        testing_env!(
+            VMContextBuilder::new()
+                .current_account_id("accounts.tredio.testnet".parse().unwrap())
+                .predecessor_account_id("accounts.tredio.testnet".parse().unwrap())
+                .account_balance(NearToken::from_near(5))
+                .build(),
+            near_sdk::test_vm_config(),
+            near_sdk::RuntimeFeesConfig::test(),
+            Default::default(),
+            vec![near_sdk::PromiseResult::Failed]
+        );
+        let deposit = NearToken::from_millinear(400).as_yoctonear();
+        f.on_created(account, KEY.into(), "relayer.testnet".parse().unwrap(), U128(deposit));
+        let refund = near_sdk::test_utils::get_created_receipts()
+            .into_iter()
+            .find(|r| r.receiver_id.as_str() == "relayer.testnet")
+            .expect("a refund to the payer");
+        assert!(matches!(
+            refund.actions.as_slice(),
+            [near_sdk::mock::MockAction::Transfer { deposit: d, .. }] if d.as_yoctonear() == deposit
+        ));
+        assert_eq!(f.created, 0);
+    }
+
+    #[test]
+    fn a_refund_the_factory_cannot_cover_yet_becomes_claimable() {
+        let mut f = setup();
+        let account = f.account_id_of(KEY.into());
+        let ctx = |results| {
+            testing_env!(
+                VMContextBuilder::new()
+                    .current_account_id("accounts.tredio.testnet".parse().unwrap())
+                    .predecessor_account_id("accounts.tredio.testnet".parse().unwrap())
+                    .account_balance(NearToken::from_millinear(50))
+                    .build(),
+                near_sdk::test_vm_config(),
+                near_sdk::RuntimeFeesConfig::test(),
+                Default::default(),
+                results
+            )
+        };
+        ctx(vec![near_sdk::PromiseResult::Failed]);
+        let relayer: AccountId = "relayer.testnet".parse().unwrap();
+        f.on_created(account, KEY.into(), relayer.clone(), U128(NearToken::from_near(2).as_yoctonear()));
+        assert_eq!(f.refund_of(relayer.clone()).0, NearToken::from_near(2).as_yoctonear());
+        testing_env!(VMContextBuilder::new().predecessor_account_id(relayer.clone()).build());
+        let _ = f.claim_refund();
+        assert_eq!(f.refund_of(relayer).0, 0);
     }
 
     fn hex_bytes(h: &str) -> Vec<u8> {

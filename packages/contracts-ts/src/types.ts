@@ -63,6 +63,11 @@ export interface Mark {
   /** Price with 8 decimals. */
   price: U128;
   at: number;
+  /**
+   * The asset's index on this network's Hyperliquid, as the oracle reported it (registry v2).
+   * Account v2 refuses an order whose `asset_index` differs, and any order when this is null.
+   */
+  asset_index?: number | null;
 }
 
 export interface RegistryParams {
@@ -94,7 +99,8 @@ export interface Report {
   observed_at: number;
   new_trends: NewTrend[];
   updates: { id: string; index: number }[];
-  marks: { asset: string; price: U128 }[];
+  /** `asset_index` binds the ticker to the Hyperliquid asset index orders sign (registry v2). */
+  marks: { asset: string; price: U128; asset_index?: number }[];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -272,6 +278,9 @@ export interface Session {
   gas_key: boolean;
 }
 
+/** NEAR (yoctoNEAR) a session moved into its gas key today, and the daily cap: account v2's `gas_top_up_of`. */
+export type GasTopUpView = [U128, U128];
+
 export interface HlOrder {
   asset: string;
   asset_index: number;
@@ -294,7 +303,9 @@ export type SessionAction =
   | "claim_curation"
   | "faucet"
   | { hl_order: { order: HlOrder; nonce: number } }
-  | { hl_leverage: { asset_index: number; is_cross: boolean; leverage: number; nonce: number } };
+  | { hl_leverage: { asset_index: number; is_cross: boolean; leverage: number; nonce: number } }
+  /** Account v2: moves yoctoNEAR from the account into the signing session's own gas key (capped daily). */
+  | { top_up_gas: { amount: U128 } };
 
 /** What the passkey can ask its account to do. */
 export type OwnerAction =
@@ -309,7 +320,11 @@ export type OwnerAction =
         gas_funding: U128;
       };
     }
-  | { revoke_session: { public_key: string } }
+  /**
+   * Account v2 keeps a revoked gas key on the account (dormant, unable to act; deleting a gas key
+   * burns its balance) unless `delete_key`, which also removes a dormant key. Plain keys are deleted.
+   */
+  | { revoke_session: { public_key: string; delete_key?: boolean } }
   | { fund_session: { public_key: string; amount: U128 } }
   | { freeze: { frozen: boolean } }
   | { call: { receiver_id: AccountId; method_name: string; args: string; deposit: U128; gas: string } }

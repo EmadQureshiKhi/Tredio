@@ -15,9 +15,25 @@
 //!   scope and a gross daily USDC outflow limit that inflows never offset. Session swaps are
 //!   anchored to the attention-implied value by the book; Hyperliquid orders pass the guard
 //!   below before the MPC network signs them.
-//! - **Hyperliquid guard.** A session's order must be within 2% of the oracle's fresh mark and
-//!   leverage changes at most 10x; the account then builds the exact EIP-712 digest on chain and
-//!   asks Chain Signatures to sign it for the account's derived address.
+//! - **Hyperliquid guard.** A session's order must be within 2% of the oracle's mark for the
+//!   very asset index it signs, no older than five minutes, and leverage changes at most 10x; the
+//!   account then builds the exact EIP-712 digest on chain and asks Chain Signatures to sign it
+//!   for the account's derived address.
+//!
+//! ## v2
+//!
+//! - Adding a session for a key the account already has renews it in place (no new key), so a
+//!   gas key keeps its prepaid gas. Revoking a gas key's session keeps the key, since deleting a
+//!   gas key burns its balance, but the key can no longer act: `session_call` refuses keys
+//!   without a session, and the key may call nothing else. Adding a session for such a dormant
+//!   key reactivates it. `delete_key` removes a key for good.
+//! - Token calls attach a small static gas plus all unused gas, so session transactions need
+//!   about 150 Tgas instead of 300 (and a gas key half the float).
+//! - A session can move NEAR from the account into its own gas key (`top_up_gas`), within a
+//!   daily cap.
+//! - State: `STATE` keeps the v1 layout (the factory writes it; v1 code reads it). What v2 adds
+//!   lives under its own key and starts empty, so an account upgraded from v1 needs no
+//!   migration.
 
 pub mod hyperliquid;
 #[cfg(test)]
@@ -27,10 +43,10 @@ pub mod webauthn;
 use near_sdk::json_types::{Base58CryptoHash, Base64VecU8, U128, U64};
 use near_sdk::serde_json::{self, json};
 use near_sdk::{
-    env, near, require, AccountId, Allowance, Gas, GasWeight, NearToken, PanicOnDefault, Promise,
-    PromiseError, PublicKey,
+    env, near, require, AccountId, Allowance, Gas, GasWeight, IntoStorageKey, NearToken, PanicOnDefault,
+    Promise, PromiseError, PublicKey,
 };
-use tredio_common::account_state::{AccountCore, Protocol, Scope, Session};
+use tredio_common::account_state::{AccountCore, AccountKey, Protocol, Scope, Session};
 use tredio_common::{now_secs, Side};
 
 use crate::hyperliquid::HlOrder;
@@ -40,20 +56,34 @@ use crate::webauthn::Proof;
 /// (passkey prompts take a while; block time can lag the client clock).
 pub const REQUEST_WINDOW_SECS: u64 = 600;
 pub const REQUEST_SKEW_SECS: u64 = 300;
+/// The account code's version, as `version` reports it (v1 has no such view).
+pub const VERSION: u32 = 2;
 pub const MAX_SESSION_SECS: u64 = 30 * 86_400;
+/// Most keys the account tracks: sessions plus dormant gas keys (every one is an access key).
 pub const MAX_SESSIONS: u32 = 16;
 pub const SESSION_NONCES: u32 = 4;
-/// Hyperliquid guard: price within 2% of a mark no older than two minutes, leverage at most 10x.
+/// NEAR a session may move into its own gas key per UTC day with `top_up_gas`.
+pub const GAS_TOP_UP_DAILY: NearToken = NearToken::from_millinear(500);
+/// Liquid NEAR (beyond storage) a gas top-up always leaves on the account.
+pub const ACCOUNT_RESERVE: NearToken = NearToken::from_millinear(50);
+/// Least gas a session transaction that moves tokens or closes a position must attach, so an
+/// underfunded one fails here, before it counts against the daily limit. An anchored sale needs
+/// about 110 Tgas; 150 leaves room for a swap that fills several levels.
+pub const MIN_TOKEN_CALL_GAS: Gas = Gas::from_tgas(120);
+/// Hyperliquid guard: price within 2% of a mark no older than five minutes (the oracle reports
+/// every five minutes), leverage at most 10x.
 pub const HL_MAX_DEVIATION_BPS: u128 = 200;
-pub const HL_MARK_MAX_AGE: u64 = 120;
+pub const HL_MARK_MAX_AGE: u64 = 300;
 pub const HL_MAX_LEVERAGE: u32 = 10;
 /// Chain Signatures derivation path of the account's Hyperliquid address.
 pub const HL_PATH: &str = "hyperliquid";
 const DOMAIN: &[u8] = b"tredio-account:v1:";
 
-const GAS_TOKEN_CALL: Gas = Gas::from_tgas(200);
-const GAS_SIMPLE: Gas = Gas::from_tgas(30);
+/// Static gas of a call a session makes; each also gets all gas the transaction leaves unused.
+const GAS_TOKEN_CALL: Gas = Gas::from_tgas(20);
+const GAS_SIMPLE: Gas = Gas::from_tgas(20);
 const GAS_VIEW: Gas = Gas::from_tgas(10);
+const GAS_KEY_CALLBACK: Gas = Gas::from_tgas(5);
 const GAS_SIGN: Gas = Gas::from_tgas(50);
 const GAS_AFTER_SIGN: Gas = Gas::from_tgas(10);
 const GAS_GUARD: Gas = Gas::from_tgas(90);
@@ -74,8 +104,12 @@ pub enum OwnerAction {
         gas_key: bool,
         gas_funding: U128,
     },
+    /// Ends a session. A gas key stays on the account, dormant, unless `delete_key` (deleting a
+    /// gas key burns its balance); a plain key is deleted. `delete_key` also removes a dormant key.
     RevokeSession {
         public_key: PublicKey,
+        #[serde(default)]
+        delete_key: bool,
     },
     /// Tops up a session gas key from the account's balance.
     FundSession {
@@ -178,6 +212,11 @@ pub enum SessionAction {
         leverage: u32,
         nonce: u64,
     },
+    /// Moves `amount` yoctoNEAR from the account into the signing session's own gas key, within
+    /// [`GAS_TOP_UP_DAILY`] per UTC day.
+    TopUpGas {
+        amount: U128,
+    },
 }
 
 /// An EVM-style signature from Chain Signatures: r, s (hex) and v (27 or 28).
@@ -217,6 +256,50 @@ pub struct SignatureResponse {
 pub struct Mark {
     pub price: U128,
     pub at: u64,
+    /// The asset's Hyperliquid index the oracle reported with the mark; a registry that does
+    /// not report it yields none, and the guard then refuses the order.
+    #[serde(default)]
+    pub asset_index: Option<u32>,
+}
+
+/// What v2 keeps besides [`AccountCore`], under [`AccountKey::Extension`]. Absent on accounts
+/// created or last written by v1 code, where it reads as empty.
+#[near(serializers = [borsh])]
+#[derive(Clone, Debug, Default)]
+pub struct Extension {
+    /// Gas keys whose session was revoked: still on the account, unable to act.
+    pub dormant: Vec<PublicKey>,
+    /// NEAR each session moved into its gas key today.
+    pub top_ups: Vec<GasTopUp>,
+}
+
+/// NEAR a session moved into its own gas key on one UTC day.
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GasTopUp {
+    pub public_key: PublicKey,
+    pub day: u64,
+    pub amount: U128,
+}
+
+fn extension_key() -> Vec<u8> {
+    AccountKey::Extension.into_storage_key()
+}
+
+fn load_extension() -> Extension {
+    env::storage_read(&extension_key())
+        .map(|b| near_sdk::borsh::from_slice(&b).unwrap_or_else(|_| env::panic_str("bad extension state")))
+        .unwrap_or_default()
+}
+
+fn save_extension(e: &Extension) {
+    if e.dormant.is_empty() && e.top_ups.is_empty() {
+        env::storage_remove(&extension_key());
+    } else {
+        let bytes =
+            near_sdk::borsh::to_vec(e).unwrap_or_else(|_| env::panic_str("extension encoding failed"));
+        env::storage_write(&extension_key(), &bytes);
+    }
 }
 
 #[near(event_json(standard = "tredio-account"))]
@@ -244,6 +327,16 @@ pub enum Event<'a> {
     GuardRejected { action: &'a str, reason: &'a str },
     #[event_version("1.0.0")]
     Upgraded { code_hash: &'a Base58CryptoHash },
+    /// A revoked session's gas key stays on the account, unable to act.
+    #[event_version("1.0.0")]
+    SessionKeyKept { public_key: &'a PublicKey },
+    #[event_version("1.0.0")]
+    SessionKeyDeleted { public_key: &'a PublicKey },
+    /// The key of a new session could not be added, so the session was dropped.
+    #[event_version("1.0.0")]
+    SessionKeyFailed { public_key: &'a PublicKey },
+    #[event_version("1.0.0")]
+    GasToppedUp { public_key: &'a PublicKey, amount: U128, today: U128 },
 }
 
 #[near(contract_state)]
@@ -295,9 +388,12 @@ impl Account {
     }
 
     /// Registers this account with the protocol contracts that hold per-user state. Runs once,
-    /// right after creation, from the account's own balance.
+    /// right after creation, from the account's own balance; later calls do nothing.
     pub fn bootstrap(&mut self) {
-        require!(!self.core.bootstrapped, "already bootstrapped");
+        // A no-op afterwards, so the factory can top up an existing account.
+        if self.core.bootstrapped {
+            return;
+        }
         self.core.bootstrapped = true;
         let p = &self.core.protocol;
         // USDC needs only registration; outcomes and perps keep the deposit for the balances and
@@ -336,8 +432,12 @@ impl Account {
             Need::Outcomes => s.scope.outcomes,
             Need::Perps => s.scope.perps,
             Need::Hyperliquid => s.scope.hyperliquid,
+            Need::Any => true,
         };
         require!(allowed, "action outside the session scope");
+        if moves_tokens(&action) {
+            require!(env::prepaid_gas() >= MIN_TOKEN_CALL_GAS, "attach at least 120 Tgas");
+        }
         let day = now / 86_400;
         if s.day != day {
             s.day = day;
@@ -348,8 +448,11 @@ impl Account {
         s.spent = U128(spent);
         Event::SessionAction { public_key: &key, action: name, outflow: U128(outflow), spent_today: s.spent }
             .emit();
-        self.core.sessions.insert(key, s);
-        self.run_session(action)
+        if matches!(action, SessionAction::TopUpGas { .. }) {
+            require!(s.gas_key, "not a gas key");
+        }
+        self.core.sessions.insert(key.clone(), s);
+        self.run_session(action, key, day)
     }
 
     // ---------------------------------------------------------------------------------------
@@ -369,6 +472,11 @@ impl Account {
             env::panic_str(reason)
         };
         let Ok(Some(mark)) = mark else { reject("no mark for asset") };
+        // The mark was looked up by ticker, but the order signs an asset index: they must match,
+        // or a mark of one asset would vouch for a price on another.
+        if mark.asset_index != Some(order.asset_index) {
+            reject("mark is for another asset");
+        }
         if now_secs().saturating_sub(mark.at) > HL_MARK_MAX_AGE {
             reject("stale mark");
         }
@@ -381,6 +489,20 @@ impl Account {
         }
         let cid = hyperliquid::action_hash(&hyperliquid::order_action(&order), nonce);
         self.sign_hl(cid, "order")
+    }
+
+    /// Drops a new session whose key batch failed (for example the account could not cover
+    /// the key's storage), so no session is left without a key. Returns whether the key landed.
+    #[private]
+    pub fn on_session_key(&mut self, public_key: PublicKey, created_at: u64) -> bool {
+        if tredio_common::promise_succeeded() {
+            return true;
+        }
+        if self.core.sessions.get(&public_key).is_some_and(|s| s.created_at == created_at) {
+            self.core.sessions.remove(&public_key);
+            Event::SessionKeyFailed { public_key: &public_key }.emit();
+        }
+        false
     }
 
     /// Turns the MPC answer into an EVM signature (r, s, v).
@@ -433,6 +555,27 @@ impl Account {
     pub fn nonce_used(&self, nonce: u64) -> bool {
         self.core.recent_nonces.iter().any(|(n, _)| *n == nonce)
     }
+
+    /// The account code's version (2). v1 code has no such view.
+    pub fn version(&self) -> u32 {
+        VERSION
+    }
+
+    /// Gas keys whose session was revoked: on the account, unable to act.
+    pub fn dormant_keys(&self) -> Vec<PublicKey> {
+        load_extension().dormant
+    }
+
+    /// NEAR `public_key`'s session moved into its gas key today (UTC), and the daily cap.
+    pub fn gas_top_up_of(&self, public_key: PublicKey) -> (U128, U128) {
+        let day = now_secs() / 86_400;
+        let today = load_extension()
+            .top_ups
+            .into_iter()
+            .find(|t| t.public_key == public_key && t.day == day)
+            .map_or(0, |t| t.amount.0);
+        (U128(today), U128(GAS_TOP_UP_DAILY.as_yoctonear()))
+    }
 }
 
 /// SHA-256 of the domain-tagged request text: what the passkey signs.
@@ -459,6 +602,19 @@ enum Need {
     Outcomes,
     Perps,
     Hyperliquid,
+    /// Allowed in every scope (the session's own gas).
+    Any,
+}
+
+/// Actions whose calls carry tokens or settle positions down a chain of cross-contract calls.
+fn moves_tokens(a: &SessionAction) -> bool {
+    matches!(
+        a,
+        SessionAction::Swap { .. }
+            | SessionAction::MintSets { .. }
+            | SessionAction::PerpOpen { .. }
+            | SessionAction::PerpClose { .. }
+    )
 }
 
 /// Name, scope and USDC outflow of a session action.
@@ -476,6 +632,7 @@ fn describe(a: &SessionAction) -> (&'static str, Need, u128) {
         SessionAction::PerpClose { .. } => ("perp_close", Need::Perps, 0),
         SessionAction::HlOrder { .. } => ("hl_order", Need::Hyperliquid, 0),
         SessionAction::HlLeverage { .. } => ("hl_leverage", Need::Hyperliquid, 0),
+        SessionAction::TopUpGas { .. } => ("top_up_gas", Need::Any, 0),
     }
 }
 
@@ -502,6 +659,44 @@ impl Account {
         Promise::new(receiver.clone()).function_call(method, args.to_string().into_bytes(), deposit, gas)
     }
 
+    /// A session's call: `gas` static plus every gas unit the transaction leaves unused.
+    fn session_call_to(
+        &self,
+        receiver: &AccountId,
+        method: &str,
+        args: serde_json::Value,
+        deposit: NearToken,
+        gas: Gas,
+    ) -> Promise {
+        Promise::new(receiver.clone()).function_call_weight(
+            method,
+            args.to_string().into_bytes(),
+            deposit,
+            gas,
+            GasWeight(1),
+        )
+    }
+
+    /// Moves `amount` from the account into `key`'s gas balance, within the daily cap and
+    /// leaving the account its storage and a reserve.
+    fn top_up_gas(&mut self, key: PublicKey, amount: u128, day: u64) -> Promise {
+        require!(amount > 0, "zero amount");
+        let mut ext = load_extension();
+        ext.top_ups.retain(|t| t.day == day && self.core.sessions.contains_key(&t.public_key));
+        let today = ext.top_ups.iter().find(|t| t.public_key == key).map_or(0, |t| t.amount.0) + amount;
+        require!(today <= GAS_TOP_UP_DAILY.as_yoctonear(), "daily gas top-up cap exceeded");
+        let storage = env::storage_usage() as u128 * env::storage_byte_cost().as_yoctonear();
+        let free = env::account_balance().as_yoctonear().saturating_sub(storage);
+        require!(free >= amount + ACCOUNT_RESERVE.as_yoctonear(), "not enough NEAR on the account");
+        match ext.top_ups.iter_mut().find(|t| t.public_key == key) {
+            Some(t) => t.amount = U128(today),
+            None => ext.top_ups.push(GasTopUp { public_key: key.clone(), day, amount: U128(today) }),
+        }
+        save_extension(&ext);
+        Event::GasToppedUp { public_key: &key, amount: U128(amount), today: U128(today) }.emit();
+        Promise::new(env::current_account_id()).transfer_to_gas_key(key, NearToken::from_yoctonear(amount))
+    }
+
     fn run_owner(&mut self, a: OwnerAction) -> Option<Promise> {
         let me = env::current_account_id();
         match a {
@@ -514,15 +709,9 @@ impl Account {
                 gas_key,
                 gas_funding,
             } => {
-                require!(
-                    expires_at > now_secs() && expires_at <= now_secs() + MAX_SESSION_SECS,
-                    "bad session expiry"
-                );
+                let now = now_secs();
+                require!(expires_at > now && expires_at <= now + MAX_SESSION_SECS, "bad session expiry");
                 require!(label.len() <= 32, "label too long");
-                require!(
-                    self.core.sessions.len() < MAX_SESSIONS || self.core.sessions.contains_key(&public_key),
-                    "too many sessions"
-                );
                 Event::SessionAdded {
                     public_key: &public_key,
                     label: &label,
@@ -532,45 +721,90 @@ impl Account {
                     gas_key,
                 }
                 .emit();
-                self.core.sessions.insert(
-                    public_key.clone(),
-                    Session {
-                        label,
-                        scope,
-                        created_at: now_secs(),
-                        expires_at,
-                        daily_limit,
-                        spent: U128(0),
-                        day: 0,
-                        gas_key,
-                    },
+                let funding =
+                    (gas_key && gas_funding.0 > 0).then_some(NearToken::from_yoctonear(gas_funding.0));
+                let mut ext = load_extension();
+                if let Some(s) = self.core.sessions.get(&public_key).cloned() {
+                    // Renewal: the key is already on the account (a gas key keeps its prepaid
+                    // gas). Today's spending carries over; the new terms apply from now.
+                    require!(
+                        s.gas_key == gas_key,
+                        "a session key cannot change type; revoke and delete it first"
+                    );
+                    self.core
+                        .sessions
+                        .insert(public_key.clone(), Session { label, scope, expires_at, daily_limit, ..s });
+                    return funding.map(|f| Promise::new(me).transfer_to_gas_key(public_key, f));
+                }
+                let session = Session {
+                    label,
+                    scope,
+                    created_at: now,
+                    expires_at,
+                    daily_limit,
+                    spent: U128(0),
+                    day: 0,
+                    gas_key,
+                };
+                if let Some(i) = ext.dormant.iter().position(|k| k == &public_key) {
+                    // A revoked gas key comes back with its remaining balance.
+                    require!(gas_key, "this key is a gas key");
+                    ext.dormant.remove(i);
+                    save_extension(&ext);
+                    self.core.sessions.insert(public_key.clone(), session);
+                    return funding.map(|f| Promise::new(me).transfer_to_gas_key(public_key, f));
+                }
+                require!(
+                    self.core.sessions.len() + (ext.dormant.len() as u32) < MAX_SESSIONS,
+                    "too many sessions"
                 );
+                self.core.sessions.insert(public_key.clone(), session);
                 let p = Promise::new(me.clone());
-                Some(if gas_key {
+                let p = if gas_key {
                     let p = p.add_gas_key_allowance_function_call(
                         public_key.clone(),
                         SESSION_NONCES,
                         Allowance::Unlimited,
-                        me,
+                        me.clone(),
                         "session_call".to_string(),
                     );
-                    if gas_funding.0 > 0 {
-                        p.transfer_to_gas_key(public_key, NearToken::from_yoctonear(gas_funding.0))
-                    } else {
-                        p
+                    match funding {
+                        Some(f) => p.transfer_to_gas_key(public_key.clone(), f),
+                        None => p,
                     }
                 } else {
+                    // Unlimited: an allowance is charged the attached gas at 1e9 yocto per gas
+                    // (a 300 Tgas call takes 0.3 NEAR of it), so a cap small enough to matter
+                    // would stop the key. Plain keys are meant for meta transactions, where the
+                    // relayer pays.
                     p.add_access_key_allowance(
-                        public_key,
+                        public_key.clone(),
                         Allowance::Unlimited,
-                        me,
+                        me.clone(),
                         "session_call".to_string(),
                     )
-                })
+                };
+                Some(p.then(Self::ext(me).with_static_gas(GAS_KEY_CALLBACK).on_session_key(public_key, now)))
             }
-            OwnerAction::RevokeSession { public_key } => {
-                require!(self.core.sessions.remove(&public_key).is_some(), "unknown session");
-                Event::SessionRevoked { public_key: &public_key }.emit();
+            OwnerAction::RevokeSession { public_key, delete_key } => {
+                let mut ext = load_extension();
+                ext.top_ups.retain(|t| t.public_key != public_key);
+                if let Some(s) = self.core.sessions.remove(&public_key) {
+                    Event::SessionRevoked { public_key: &public_key }.emit();
+                    if s.gas_key && !delete_key {
+                        // Deleting a gas key burns its balance: keep it, unable to act.
+                        ext.dormant.push(public_key.clone());
+                        save_extension(&ext);
+                        Event::SessionKeyKept { public_key: &public_key }.emit();
+                        return None;
+                    }
+                } else {
+                    let i = ext.dormant.iter().position(|k| k == &public_key);
+                    let Some(i) = i.filter(|_| delete_key) else { env::panic_str("unknown session") };
+                    ext.dormant.remove(i);
+                }
+                save_extension(&ext);
+                Event::SessionKeyDeleted { public_key: &public_key }.emit();
                 Some(Promise::new(me).delete_key(public_key))
             }
             OwnerAction::FundSession { public_key, amount } => {
@@ -632,16 +866,16 @@ impl Account {
         self.mpc_sign(HL_PATH, &hex_digest, 0)
     }
 
-    fn run_session(&mut self, a: SessionAction) -> Promise {
+    fn run_session(&mut self, a: SessionAction, key: PublicKey, day: u64) -> Promise {
         let p = self.core.protocol.clone();
         match a {
             SessionAction::Swap { series, side, buy, amount, min_out } => {
                 let msg = json!({ "swap": { "series": series, "side": side, "limit_tick": null, "min_out": min_out, "anchored": true } })
                     .to_string();
                 if buy {
-                    self.call(&p.usdc, "ft_transfer_call", json!({ "receiver_id": p.book, "amount": amount, "msg": msg }), ONE_YOCTO, GAS_TOKEN_CALL)
+                    self.session_call_to(&p.usdc, "ft_transfer_call", json!({ "receiver_id": p.book, "amount": amount, "msg": msg }), ONE_YOCTO, GAS_TOKEN_CALL)
                 } else {
-                    self.call(
+                    self.session_call_to(
                         &p.outcomes,
                         "mt_transfer_call",
                         json!({ "receiver_id": p.book, "token_id": format!("{series}:{}", side.as_str()), "amount": amount, "msg": msg }),
@@ -650,7 +884,7 @@ impl Account {
                     )
                 }
             }
-            SessionAction::MintSets { series, amount } => self.call(
+            SessionAction::MintSets { series, amount } => self.session_call_to(
                 &p.usdc,
                 "ft_transfer_call",
                 json!({ "receiver_id": p.outcomes, "amount": amount, "msg": json!({ "mint": { "series": series, "receiver": null } }).to_string() }),
@@ -658,9 +892,9 @@ impl Account {
                 GAS_TOKEN_CALL,
             ),
             SessionAction::RedeemSets { series, amount } => {
-                self.call(&p.outcomes, "redeem_sets", json!({ "series": series, "amount": amount }), NearToken::from_yoctonear(0), GAS_SIMPLE)
+                self.session_call_to(&p.outcomes, "redeem_sets", json!({ "series": series, "amount": amount }), NearToken::from_yoctonear(0), GAS_SIMPLE)
             }
-            SessionAction::RedeemWinnings { series, up, down } => self.call(
+            SessionAction::RedeemWinnings { series, up, down } => self.session_call_to(
                 &p.outcomes,
                 "redeem_winnings",
                 json!({ "series": series, "up": up, "down": down }),
@@ -668,9 +902,9 @@ impl Account {
                 GAS_SIMPLE,
             ),
             SessionAction::BookWithdraw { asset, amount } => {
-                self.call(&p.book, "withdraw", json!({ "asset": asset, "amount": amount }), NearToken::from_yoctonear(0), GAS_SIMPLE)
+                self.session_call_to(&p.book, "withdraw", json!({ "asset": asset, "amount": amount }), NearToken::from_yoctonear(0), GAS_SIMPLE)
             }
-            SessionAction::PerpOpen { trend, is_long, margin, leverage_bps, acceptable_index } => self.call(
+            SessionAction::PerpOpen { trend, is_long, margin, leverage_bps, acceptable_index } => self.session_call_to(
                 &p.usdc,
                 "ft_transfer_call",
                 json!({
@@ -681,17 +915,17 @@ impl Account {
                 ONE_YOCTO,
                 GAS_TOKEN_CALL,
             ),
-            SessionAction::PerpClose { id, acceptable_index } => self.call(
+            SessionAction::PerpClose { id, acceptable_index } => self.session_call_to(
                 &p.perps,
                 "close",
                 json!({ "id": id, "acceptable_index": acceptable_index }),
                 NearToken::from_yoctonear(0),
                 GAS_TOKEN_CALL,
             ),
-            SessionAction::ClaimCuration => self.call(&p.curation, "claim", json!({}), NearToken::from_yoctonear(0), GAS_SIMPLE),
+            SessionAction::ClaimCuration => self.session_call_to(&p.curation, "claim", json!({}), NearToken::from_yoctonear(0), GAS_SIMPLE),
             SessionAction::Faucet => {
                 require!(self.core.network == "testnet", "the faucet is testnet only");
-                self.call(&p.usdc, "faucet", json!({}), NearToken::from_yoctonear(0), GAS_SIMPLE)
+                self.session_call_to(&p.usdc, "faucet", json!({}), NearToken::from_yoctonear(0), GAS_SIMPLE)
             }
             SessionAction::HlOrder { order, nonce } => self
                 .call(&p.registry, "mark_of", json!({ "asset": order.asset }), NearToken::from_yoctonear(0), GAS_VIEW)
@@ -704,6 +938,7 @@ impl Account {
                 let cid = hyperliquid::action_hash(&hyperliquid::leverage_action(asset_index, is_cross, leverage), nonce);
                 self.sign_hl(cid, "leverage")
             }
+            SessionAction::TopUpGas { amount } => self.top_up_gas(key, amount.0, day),
         }
     }
 }

@@ -69,9 +69,22 @@ async fn outcome_series_mint_settle_and_redeem() -> Result<()> {
         s.worker.fast_forward(200).await?;
     }
     s.update("topic:a", 55 * POINT).await?;
-    let st: Value = s.registry.view("settlement_of").args_json(json!({ "id": "topic:a", "expiry": expiry })).await?.json()?;
+    let st: Value = s
+        .registry
+        .view("settlement_of")
+        .args_json(json!({ "id": "topic:a", "expiry": expiry }))
+        .await?
+        .json()?;
     assert_eq!(st["finalized"], true);
-    let outcome: Value = ok(s.root.call(s.outcomes.id(), "settle").args_json(json!({ "series": series })).max_gas().transact().await?).await?.json()?;
+    let outcome: Value = ok(s
+        .root
+        .call(s.outcomes.id(), "settle")
+        .args_json(json!({ "series": series }))
+        .max_gas()
+        .transact()
+        .await?)
+    .await?
+    .json()?;
     assert_eq!(outcome, "up");
 
     let alice_before = s.usdc_of(s.alice.id()).await?;
@@ -112,7 +125,13 @@ async fn minting_is_refunded_when_the_trend_cools() -> Result<()> {
 
 async fn quote_asks(s: &Stack, series: u64) -> Result<()> {
     // The market maker mints sets and rests UP asks on the book.
-    ok(s.root.call(s.book.id(), "list_series").args_json(json!({ "series": series })).max_gas().transact().await?).await?;
+    ok(s.root
+        .call(s.book.id(), "list_series")
+        .args_json(json!({ "series": series }))
+        .max_gas()
+        .transact()
+        .await?)
+    .await?;
     s.mint_sets(&s.mm, series, 100 * USDC).await?;
     ok(s.mm
         .call(s.outcomes.id(), "mt_transfer_call")
@@ -157,7 +176,12 @@ async fn anchored_swaps_fill_inside_the_band_and_refund_the_rest() -> Result<()>
     // band ends near 0.27: the 0.20 and 0.22 asks fill, 0.45 does not.
     assert_eq!(got, 40 * USDC, "both near asks filled");
     assert!(spent > 8_400_000 && spent < 8_450_000, "paid {spent} (0.2% fee included), the rest refunded");
-    let depth: Value = s.book.view("depth").args_json(json!({ "series": series, "side": "up", "levels": 5 })).await?.json()?;
+    let depth: Value = s
+        .book
+        .view("depth")
+        .args_json(json!({ "series": series, "side": "up", "levels": 5 }))
+        .await?
+        .json()?;
     assert_eq!(depth["asks"][0]["tick"], 450);
 
     // A minimum the book cannot meet refunds everything.
@@ -188,17 +212,25 @@ async fn perps_open_close_and_pay_the_curator() -> Result<()> {
         .transact()
         .await?)
     .await?;
-    let positions: Vec<Value> = s.perps.view("positions_of").args_json(json!({ "account_id": s.alice.id() })).await?.json()?;
+    let positions: Vec<Value> =
+        s.perps.view("positions_of").args_json(json!({ "account_id": s.alice.id() })).await?.json()?;
     assert_eq!(positions.len(), 1);
     let id = positions[0]["id"].as_u64().unwrap();
 
     s.update("topic:a", 55 * POINT).await?;
     let before = s.usdc_of(s.alice.id()).await?;
-    ok(s.alice.call(s.perps.id(), "close").args_json(json!({ "id": id, "acceptable_index": 0 })).max_gas().transact().await?).await?;
+    ok(s.alice
+        .call(s.perps.id(), "close")
+        .args_json(json!({ "id": id, "acceptable_index": 0 }))
+        .max_gas()
+        .transact()
+        .await?)
+    .await?;
     let gained = s.usdc_of(s.alice.id()).await? - before;
     assert!(gained > 115 * USDC && gained < 120 * USDC, "2x on +10%: {gained}");
     // Bob surfaced the trend and earned the curation share of both fees.
-    let earned: String = s.curation.view("claimable_of").args_json(json!({ "account_id": s.bob.id() })).await?.json()?;
+    let earned: String =
+        s.curation.view("claimable_of").args_json(json!({ "account_id": s.bob.id() })).await?.json()?;
     assert!(earned.parse::<u128>()? > 0);
 
     // An open priced past the acceptable index is refused and refunded.
@@ -220,9 +252,17 @@ async fn perps_open_close_and_pay_the_curator() -> Result<()> {
 async fn trend_coins_launch_from_global_code_and_trade() -> Result<()> {
     let s = Stack::new().await?;
     s.list_trend("topic:openai", 40 * POINT).await?;
-    let created = ok(s.root.call(s.coins.id(), "create_curve").args_json(json!({ "trend": "topic:openai" })).max_gas().transact().await?).await?;
+    let created = ok(s
+        .root
+        .call(s.coins.id(), "create_curve")
+        .args_json(json!({ "trend": "topic:openai" }))
+        .max_gas()
+        .transact()
+        .await?)
+    .await?;
     eprintln!("create logs: {:?}", created.logs());
-    let curve: Value = s.coins.view("get_curve").args_json(json!({ "trend": "topic:openai" })).await?.json()?;
+    let curve: Value =
+        s.coins.view("get_curve").args_json(json!({ "trend": "topic:openai" })).await?.json()?;
     assert_eq!(curve["stage"], "open");
     let coin: near_workspaces::AccountId = curve["coin"].as_str().unwrap().parse()?;
     assert_eq!(coin.as_str(), format!("topic-openai.{}", s.coins.id()));
@@ -236,7 +276,12 @@ async fn trend_coins_launch_from_global_code_and_trade() -> Result<()> {
         .transact()
         .await?)
     .await?;
-    let bal: String = s.worker.view(&coin, "ft_balance_of").args_json(json!({ "account_id": s.alice.id() })).await?.json()?;
+    let bal: String = s
+        .worker
+        .view(&coin, "ft_balance_of")
+        .args_json(json!({ "account_id": s.alice.id() }))
+        .await?
+        .json()?;
     let bal: u128 = bal.parse()?;
     assert!(bal > 0);
 
@@ -306,13 +351,21 @@ async fn a_passkey_creates_a_universal_account_with_a_guarded_session() -> Resul
     assert_eq!(keys.len(), 1, "the session is the only key");
     let user = Account::from_secret_key(account_id.clone(), session, &s.worker);
     let tgas300 = near_workspaces::types::Gas::from_tgas(300);
-    ok(user.call(&account_id, "session_call").args_json(json!({ "action": "faucet" })).gas(tgas300).transact().await?).await?;
+    ok(user
+        .call(&account_id, "session_call")
+        .args_json(json!({ "action": "faucet" }))
+        .gas(tgas300)
+        .transact()
+        .await?)
+    .await?;
     assert_eq!(s.usdc_of(&account_id).await?, 10_000 * USDC);
     s.list_trend("topic:a", 50 * POINT).await?;
     let series = s.open_series("topic:a", TEST_WINDOW).await?;
     ok(user
         .call(&account_id, "session_call")
-        .args_json(json!({ "action": { "mint_sets": { "series": series, "amount": (80 * USDC).to_string() } } }))
+        .args_json(
+            json!({ "action": { "mint_sets": { "series": series, "amount": (80 * USDC).to_string() } } }),
+        )
         .gas(tgas300)
         .transact()
         .await?)
@@ -320,7 +373,9 @@ async fn a_passkey_creates_a_universal_account_with_a_guarded_session() -> Resul
     assert_eq!(s.mt_of(&account_id, &format!("{series}:up")).await?, 80 * USDC);
     let over = user
         .call(&account_id, "session_call")
-        .args_json(json!({ "action": { "mint_sets": { "series": series, "amount": (30 * USDC).to_string() } } }))
+        .args_json(
+            json!({ "action": { "mint_sets": { "series": series, "amount": (30 * USDC).to_string() } } }),
+        )
         .gas(tgas300)
         .transact()
         .await?;

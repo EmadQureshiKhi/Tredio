@@ -20,3 +20,9 @@ base64 = "0.22"
 hex = { workspace = true }
 p256 = { version = "0.13", features = ["ecdsa"] }
 sha2 = "0.10"
+# Gas-key transactions and views, which near-workspaces does not build (same versions it uses).
+near-primitives = "0.38"
+near-crypto = "0.38"
+near-jsonrpc-client = { version = "0.23", features = ["sandbox"] }
+near-jsonrpc-primitives = "0.38"
+near-token = "0.3"

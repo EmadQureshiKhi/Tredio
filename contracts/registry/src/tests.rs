@@ -297,3 +297,29 @@ fn keeps_a_bounded_history() {
     assert_eq!(h.len(), HISTORY_LEN);
     assert_eq!(h.last().unwrap().at, T0 + HISTORY_LEN as u64 + 10);
 }
+
+#[test]
+fn marks_carry_their_hyperliquid_asset_index() {
+    let mut r = setup();
+    submit(
+        &mut r,
+        &format!(
+            r#"{{"run_id":1,"observed_at":{T0},"marks":[{{"asset":"BTC","price":"6500000000000","asset_index":0}},{{"asset":"ETH","price":"300000000000"}}]}}"#
+        ),
+    );
+    let btc = r.mark_of("BTC".into()).unwrap();
+    assert_eq!((btc.price, btc.at, btc.asset_index), (U128(6_500_000_000_000), T0, Some(0)));
+    // A mark reported without an index has none, so account guards refuse orders against it.
+    assert_eq!(r.mark_of("ETH".into()).unwrap().asset_index, None);
+    // Later marks keep the index unless the oracle reports a new one.
+    at(T0 + 1, "relayer.testnet");
+    submit(
+        &mut r,
+        &format!(
+            r#"{{"run_id":2,"observed_at":{},"marks":[{{"asset":"BTC","price":"6600000000000"}}]}}"#,
+            T0 + 1
+        ),
+    );
+    assert_eq!(r.mark_of("BTC".into()).unwrap().asset_index, Some(0));
+    assert!(get_logs().iter().all(|l| !l.contains("asset_index_set")));
+}

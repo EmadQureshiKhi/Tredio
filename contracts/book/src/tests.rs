@@ -381,3 +381,42 @@ fn conserves_value_across_many_trades() {
     assert_eq!(usdc_held, usdc_in);
     assert_eq!(up_held, up_in);
 }
+
+fn ctx_results(who: &str, secs: u64, results: Vec<near_sdk::PromiseResult>) {
+    testing_env!(
+        VMContextBuilder::new()
+            .predecessor_account_id(who.parse().unwrap())
+            .current_account_id("book.testnet".parse().unwrap())
+            .block_timestamp(secs * 1_000_000_000)
+            .prepaid_gas(Gas::from_tgas(300))
+            .build(),
+        near_sdk::test_vm_config(),
+        near_sdk::RuntimeFeesConfig::test(),
+        Default::default(),
+        results
+    );
+}
+
+#[test]
+fn a_failed_delivery_still_counts_toward_storage() {
+    let mut b = setup(0);
+    deposit_tokens(&mut b, "alice.testnet", Side::Up, 5 * ONE);
+    deposit_usdc(&mut b, "alice.testnet", 10 * ONE);
+    ctx("alice.testnet", T0, 0);
+    let _ = b.withdraw(Asset::Usdc, U128(10 * ONE));
+    // The transfer failed: the book keeps the USDC as alice's balance again.
+    ctx_results("book.testnet", T0, vec![near_sdk::PromiseResult::Failed]);
+    assert_eq!(b.after_delivery(acc("alice.testnet"), Asset::Usdc, U128(10 * ONE)).0, 0);
+    assert_eq!(usdc(&b, "alice.testnet"), 10 * ONE);
+    // Withdrawn again, this time delivered: alice still holds UP, and her storage still pays for it.
+    ctx("alice.testnet", T0, 0);
+    let _ = b.withdraw(Asset::Usdc, U128(10 * ONE));
+    assert_eq!(up(&b, "alice.testnet"), 5 * ONE);
+    let s = b.storage_balance_of(acc("alice.testnet")).unwrap();
+    let charged = s.total.as_yoctonear() - s.available.as_yoctonear();
+    let one_entry =
+        (REGISTRATION_BYTES + ORDER_ENTRY_BYTES) as u128 * env::storage_byte_cost().as_yoctonear();
+    assert_eq!(charged, one_entry);
+    ctx("alice.testnet", T0, 1);
+    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| b.storage_unregister(None))).is_err());
+}

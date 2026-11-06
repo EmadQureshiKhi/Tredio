@@ -52,3 +52,12 @@ describe("deployments", () => {
     expect(d.globalCode.account).toMatch(/^[1-9A-HJ-NP-Za-km-z]{43,44}$/);
   });
 });
+
+describe("session calls", () => {
+  test("default to the gas v1 accounts need and take v2's lower amount", async () => {
+    const { calls, SESSION_CALL_TGAS_V2 } = await import("../src/index");
+    const c = calls(deployment("testnet"));
+    expect(c.account.sessionCall("0uabc", "faucet").gas).toBe((300n * 10n ** 12n).toString());
+    expect(c.account.sessionCall("0uabc", { top_up_gas: { amount: "1" } }, SESSION_CALL_TGAS_V2).gas).toBe((150n * 10n ** 12n).toString());
+  });
+});

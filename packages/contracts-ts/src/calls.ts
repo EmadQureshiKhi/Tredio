@@ -20,6 +20,20 @@ const gas = (t: number) => (BigInt(t) * TGAS).toString();
 const ONE_YOCTO = "1";
 const ZERO = "0";
 
+/**
+ * Gas a `session_call` attaches. Account v1 gives token calls 200 Tgas of static gas, so it needs
+ * 300; account v2 gives them a small static amount plus all unused gas, so 150 is enough (it
+ * refuses token calls under 120). A gas key reserves 0.001 NEAR per Tgas attached while the call
+ * is in flight, so v2 halves the float a session needs.
+ */
+export const SESSION_CALL_TGAS_V1 = 300;
+export const SESSION_CALL_TGAS_V2 = 150;
+export const SESSION_CALL_MIN_TGAS_V2 = 120;
+/** Account v2's daily cap on `top_up_gas`, per session (yoctoNEAR). */
+export const GAS_TOP_UP_DAILY = (5n * 10n ** 23n).toString();
+/** The account code version `version` reports; v1 has no such view. */
+export const ACCOUNT_VERSION = 2;
+
 const call = (receiverId: string, methodName: string, args: Record<string, unknown>, deposit = ZERO, tgas = 100): Call => ({
   receiverId,
   methodName,
@@ -102,14 +116,22 @@ export function calls(d: Deployment) {
         call(c.usdc, "storage_deposit", { account_id: accountId, registration_only: true }, "1250000000000000000000", 30),
     },
     accounts: {
-      /** Creates (or tops up) a passkey's universal account; attach the funding as `deposit`. */
+      /**
+       * Creates (or tops up) a passkey's universal account; attach the funding as `deposit`. If
+       * the creation fails the factory sends the deposit back (or, when it cannot yet, keeps it
+       * for `claimRefund`). Accounts are born on the factory's fixed code; include an `upgrade`
+       * to the latest code in the first request.
+       */
       create: (ownerKey: string, deposit: string, first?: { request: string; proof: PasskeyProof }) =>
         call(c.accounts, "create_account", { owner_key: ownerKey, first_request: first?.request ?? null, first_proof: first?.proof ?? null }, deposit, 300),
+      /** Sends the caller deposits of failed creations the factory could not refund at once. */
+      claimRefund: () => call(c.accounts, "claim_refund", {}, ZERO, 30),
     },
     account: {
       ownerExecute: (account: string, request: string, proof: PasskeyProof) =>
         call(account, "owner_execute", { request, proof }, ZERO, 300),
-      sessionCall: (account: string, action: SessionAction) => call(account, "session_call", { action }, ZERO, 300),
+      /** Pass `SESSION_CALL_TGAS_V2` for accounts on v2 code; the default suits v1 and v2. */
+      sessionCall: (account: string, action: SessionAction, tgas = SESSION_CALL_TGAS_V1) => call(account, "session_call", { action }, ZERO, tgas),
     },
   };
 }

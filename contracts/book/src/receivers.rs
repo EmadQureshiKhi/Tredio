@@ -138,15 +138,10 @@ impl Book {
                             GAS_VIEW,
                         )
                         .then(
-                            Self::ext(env::current_account_id()).with_static_gas(GAS_AFTER_ANCHOR).with_unused_gas_weight(1).on_anchor(
-                                sender,
-                                series,
-                                side,
-                                dir,
-                                U128(amount),
-                                limit_tick,
-                                min_out,
-                            ),
+                            Self::ext(env::current_account_id())
+                                .with_static_gas(GAS_AFTER_ANCHOR)
+                                .with_unused_gas_weight(1)
+                                .on_anchor(sender, series, side, dir, U128(amount), limit_tick, min_out),
                         ),
                 )
             }

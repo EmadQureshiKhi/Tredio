@@ -230,3 +230,75 @@ fn a_failed_pool_keeps_the_curve_ready() {
     assert_eq!(c.on_pool_created("topic:openai".into(), Err(PromiseError::Failed)), Stage::Ready);
     assert!(c.get_curve("topic:openai".into()).unwrap().math.reserve > 0);
 }
+
+fn fill(c: &mut Coins) {
+    while c.get_curve("topic:openai".into()).unwrap().stage == Stage::Open {
+        buy(c, 40 * ONE_USDC, 40_000_000);
+    }
+}
+
+fn panics(f: impl FnOnce()) -> bool {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).is_err()
+}
+
+#[test]
+fn graduation_steps_never_run_twice_at_once() {
+    let mut c = setup();
+    fill(&mut c);
+    ctx("keeper.testnet", vec![]);
+    let _ = c.graduate("topic:openai".into());
+    // A second call before the pool callback would create (and pay for) a second pool.
+    ctx("keeper.testnet", vec![]);
+    assert!(panics(|| {
+        let _ = c.graduate("topic:openai".into());
+    }));
+    // A sale meanwhile would reopen the curve under the pool being created.
+    let sold = c.get_curve("topic:openai".into()).unwrap().math.sold;
+    ctx("topic-openai.coins.testnet", vec![]);
+    assert!(panics(|| {
+        let _ = c.ft_on_transfer(
+            acc("alice.testnet"),
+            U128(sold / 100),
+            r#"{"sell":{"min_out":"1","receiver":null}}"#.into(),
+        );
+    }));
+    // The callback releases the curve: the next step starts once.
+    ctx("coins.testnet", vec![]);
+    assert_eq!(c.on_pool_created("topic:openai".into(), Ok(4242)), Stage::Pooled);
+    ctx("keeper.testnet", vec![]);
+    let _ = c.graduate("topic:openai".into());
+    ctx("keeper.testnet", vec![]);
+    assert!(panics(|| {
+        let _ = c.graduate("topic:openai".into());
+    }));
+    ctx("coins.testnet", vec![PromiseResult::Successful(vec![]), PromiseResult::Successful(vec![])]);
+    assert!(c.on_grad_minted("topic:openai".into()));
+    // Two USDC deposits at once would move another curve's reserve into the exchange.
+    let coins = c.get_curve("topic:openai".into()).unwrap().grad_coins.0.to_string();
+    ctx("keeper.testnet", vec![]);
+    let _ = c.graduate("topic:openai".into());
+    ctx("coins.testnet", vec![PromiseResult::Successful(format!("\"{coins}\"").into_bytes())]);
+    assert!(c.on_deposited("topic:openai".into(), true));
+    ctx("keeper.testnet", vec![]);
+    let _ = c.graduate("topic:openai".into());
+    ctx("keeper.testnet", vec![]);
+    assert!(panics(|| {
+        let _ = c.graduate("topic:openai".into());
+    }));
+}
+
+#[test]
+fn a_lost_graduation_callback_expires() {
+    let mut c = setup();
+    fill(&mut c);
+    ctx("keeper.testnet", vec![]);
+    let _ = c.graduate("topic:openai".into());
+    // The callback never ran: after the timeout the step can be retried, and sales resume.
+    testing_env!(VMContextBuilder::new()
+        .predecessor_account_id(acc("keeper.testnet"))
+        .current_account_id(acc("coins.testnet"))
+        .account_balance(NearToken::from_near(100))
+        .block_timestamp((T0 + 3_600) * 1_000_000_000)
+        .build());
+    let _ = c.graduate("topic:openai".into());
+}

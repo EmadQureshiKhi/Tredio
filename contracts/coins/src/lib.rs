@@ -137,6 +137,9 @@ pub(crate) enum Key {
     ByCoin,
     OwedCoins,
     OwedUsdc,
+    /// Graduation steps waiting on their callback, per trend (see `graduation`). Kept outside
+    /// the root state so contracts deployed before it read their state unchanged.
+    StepInFlight,
 }
 
 #[near(contract_state)]
@@ -233,7 +236,8 @@ impl Coins {
         require!(!self.curves.contains_key(&trend), "curve exists");
         self.read_index(&trend).then(
             Self::ext(env::current_account_id())
-                .with_static_gas(GAS_CALLBACK.saturating_mul(2)).with_unused_gas_weight(1)
+                .with_static_gas(GAS_CALLBACK.saturating_mul(2))
+                .with_unused_gas_weight(1)
                 .on_create_checked(trend),
         )
     }
@@ -492,6 +496,9 @@ impl Coins {
     fn sell(&mut self, trend: &str, seller: &AccountId, coins: u128, min_out: u128, receiver: &AccountId) {
         let mut c = self.get(trend);
         require!(matches!(c.stage, Stage::Open | Stage::Ready), "curve closed");
+        // While the pool is being created a sale could drop the reserve under the threshold and
+        // reopen the curve, orphaning the pool the factory just paid for.
+        require!(c.stage != Stage::Ready || Self::step_in_flight(trend).is_none(), "graduation in progress");
         let t = c.math.sell(coins, min_out).unwrap_or_else(|e| Self::curve_error(e));
         if c.stage == Stage::Ready && c.math.reserve < self.graduation_reserve {
             c.stage = Stage::Open;
@@ -535,7 +542,8 @@ impl FungibleTokenReceiver for Coins {
                 PromiseOrValue::Promise(
                     self.read_index(&trend).then(
                         Self::ext(env::current_account_id())
-                            .with_static_gas(GAS_CALLBACK.saturating_mul(2)).with_unused_gas_weight(1)
+                            .with_static_gas(GAS_CALLBACK.saturating_mul(2))
+                            .with_unused_gas_weight(1)
                             .on_buy(sender_id, receiver, trend, amount, min_out),
                     ),
                 )

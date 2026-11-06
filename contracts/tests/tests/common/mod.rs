@@ -46,7 +46,12 @@ pub struct Stack {
 }
 
 async fn sub(root: &Account, name: &str, near: u128) -> Result<Account> {
-    Ok(root.create_subaccount(name).initial_balance(NearToken::from_near(near)).transact().await?.into_result()?)
+    Ok(root
+        .create_subaccount(name)
+        .initial_balance(NearToken::from_near(near))
+        .transact()
+        .await?
+        .into_result()?)
 }
 
 async fn deploy(root: &Account, name: &str, crate_name: &str, near: u128) -> Result<Contract> {
@@ -79,8 +84,19 @@ pub async fn ok(r: near_workspaces::result::ExecutionFinalResult) -> Result<Done
 
 /// Publishes `code` as a global contract and returns its base58 hash.
 pub async fn publish_global(root: &Account, code: &[u8]) -> Result<String> {
-    let publisher = deploy(root, "publisher", "tredio_test_publisher", 60).await?;
-    ok(publisher.call("publish").args_json(json!({ "code": STANDARD.encode(code) })).max_gas().transact().await?).await?;
+    publish_global_as(root, "publisher", code).await
+}
+
+/// Publishes `code` as a global contract through a new publisher account named `name`.
+pub async fn publish_global_as(root: &Account, name: &str, code: &[u8]) -> Result<String> {
+    let publisher = deploy(root, name, "tredio_test_publisher", 60).await?;
+    ok(publisher
+        .call("publish")
+        .args_json(json!({ "code": STANDARD.encode(code) }))
+        .max_gas()
+        .transact()
+        .await?)
+    .await?;
     Ok(code_hash(code))
 }
 
@@ -89,11 +105,18 @@ pub async fn now(worker: &Worker<Sandbox>) -> Result<u64> {
 }
 
 impl Stack {
+    /// The whole stack, with accounts born on the account code just built.
     pub async fn new() -> Result<Self> {
+        Self::with_account_code(&wasm("tredio_account")).await
+    }
+
+    /// The whole stack, with the accounts factory creating accounts on `account_code`.
+    pub async fn with_account_code(account_code: &[u8]) -> Result<Self> {
         let worker = near_workspaces::sandbox().await?;
         let root = worker.root_account()?;
         let oracle_key = SigningKey::from_bytes(&[11u8; 32]);
-        let oracle_pk = format!("ed25519:{}", bs58::encode(oracle_key.verifying_key().as_bytes()).into_string());
+        let oracle_pk =
+            format!("ed25519:{}", bs58::encode(oracle_key.verifying_key().as_bytes()).into_string());
 
         let treasury = sub(&root, "treasury", 10).await?;
         let alice = sub(&root, "alice", 20).await?;
@@ -112,13 +135,23 @@ impl Stack {
         let coin_hash = publish_global(&root, &wasm("tredio_coin")).await?;
         let account_hash = {
             let p2 = deploy(&root, "publisher2", "tredio_test_publisher", 60).await?;
-            let code = wasm("tredio_account");
-            ok(p2.call("publish").args_json(json!({ "code": STANDARD.encode(&code) })).max_gas().transact().await?).await?;
-            code_hash(&code)
+            ok(p2
+                .call("publish")
+                .args_json(json!({ "code": STANDARD.encode(account_code) }))
+                .max_gas()
+                .transact()
+                .await?)
+            .await?;
+            code_hash(account_code)
         };
 
         let r = root.id();
-        ok(usdc.call("new").args_json(json!({ "owner": r, "drip_amount": (10_000 * USDC).to_string(), "drip_cooldown": 0 })).transact().await?).await?;
+        ok(usdc
+            .call("new")
+            .args_json(json!({ "owner": r, "drip_amount": (10_000 * USDC).to_string(), "drip_cooldown": 0 }))
+            .transact()
+            .await?)
+        .await?;
         ok(registry
             .call("new")
             .args_json(json!({
@@ -135,7 +168,12 @@ impl Stack {
         .await?;
         ok(outcomes.call("new").args_json(json!({ "owner": r, "usdc": usdc.id(), "registry": registry.id(), "test_window": TEST_WINDOW })).transact().await?).await?;
         ok(book.call("new").args_json(json!({ "owner": r, "usdc": usdc.id(), "outcomes": outcomes.id(), "registry": registry.id(), "treasury": treasury.id(), "taker_fee_bps": 20 })).transact().await?).await?;
-        ok(curation.call("new").args_json(json!({ "owner": r, "usdc": usdc.id(), "treasury": treasury.id() })).transact().await?).await?;
+        ok(curation
+            .call("new")
+            .args_json(json!({ "owner": r, "usdc": usdc.id(), "treasury": treasury.id() }))
+            .transact()
+            .await?)
+        .await?;
         ok(perps.call("new").args_json(json!({ "owner": r, "usdc": usdc.id(), "registry": registry.id(), "curation": curation.id(), "treasury": treasury.id(), "max_oi_per_side": (1_000_000 * USDC).to_string() })).transact().await?).await?;
         ok(coins
             .call("new")
@@ -163,9 +201,19 @@ impl Stack {
         .await?;
 
         // Wiring.
-        ok(root.call(registry.id(), "add_consumer").args_json(json!({ "account_id": outcomes.id() })).transact().await?).await?;
+        ok(root
+            .call(registry.id(), "add_consumer")
+            .args_json(json!({ "account_id": outcomes.id() }))
+            .transact()
+            .await?)
+        .await?;
         for source in [perps.id(), coins.id()] {
-            ok(root.call(curation.id(), "add_source").args_json(json!({ "account_id": source })).transact().await?).await?;
+            ok(root
+                .call(curation.id(), "add_source")
+                .args_json(json!({ "account_id": source }))
+                .transact()
+                .await?)
+            .await?;
         }
         // Storage: protocol contracts with USDC, users with the protocol.
         for holder in [outcomes.id(), book.id(), perps.id(), curation.id(), coins.id(), treasury.id()] {
@@ -180,7 +228,13 @@ impl Stack {
         for user in [&alice, &bob, &mm] {
             ok(user.call(usdc.id(), "faucet").transact().await?).await?;
             for c in [outcomes.id(), book.id(), perps.id()] {
-                ok(user.call(c, "storage_deposit").args_json(json!({})).deposit(NearToken::from_millinear(200)).transact().await?).await?;
+                ok(user
+                    .call(c, "storage_deposit")
+                    .args_json(json!({}))
+                    .deposit(NearToken::from_millinear(200))
+                    .transact()
+                    .await?)
+                .await?;
             }
         }
         // The book holds outcome tokens for its traders.
@@ -191,7 +245,13 @@ impl Stack {
             .transact()
             .await?)
         .await?;
-        ok(root.call(book.id(), "storage_deposit").args_json(json!({ "account_id": treasury.id() })).deposit(NearToken::from_millinear(50)).transact().await?).await?;
+        ok(root
+            .call(book.id(), "storage_deposit")
+            .args_json(json!({ "account_id": treasury.id() }))
+            .deposit(NearToken::from_millinear(50))
+            .transact()
+            .await?)
+        .await?;
         // Seed the perps pool.
         ok(mm
             .call(usdc.id(), "ft_transfer_call")
@@ -223,7 +283,12 @@ impl Stack {
     }
 
     /// Signs and submits an oracle report observed now.
-    pub async fn report(&self, new_trends: Value, updates: Value, marks: Value) -> Result<near_workspaces::result::ExecutionFinalResult> {
+    pub async fn report(
+        &self,
+        new_trends: Value,
+        updates: Value,
+        marks: Value,
+    ) -> Result<near_workspaces::result::ExecutionFinalResult> {
         let run = self.run_id.get() + 1;
         self.run_id.set(run);
         let observed = now(&self.worker).await?;
@@ -256,17 +321,30 @@ impl Stack {
     }
 
     pub async fn usdc_of(&self, who: &near_workspaces::AccountId) -> Result<u128> {
-        let v: String = self.usdc.view("ft_balance_of").args_json(json!({ "account_id": who })).await?.json()?;
+        let v: String =
+            self.usdc.view("ft_balance_of").args_json(json!({ "account_id": who })).await?.json()?;
         Ok(v.parse()?)
     }
 
     pub async fn mt_of(&self, who: &near_workspaces::AccountId, token: &str) -> Result<u128> {
-        let v: String = self.outcomes.view("mt_balance_of").args_json(json!({ "account_id": who, "token_id": token })).await?.json()?;
+        let v: String = self
+            .outcomes
+            .view("mt_balance_of")
+            .args_json(json!({ "account_id": who, "token_id": token }))
+            .await?
+            .json()?;
         Ok(v.parse()?)
     }
 
     pub async fn open_series(&self, trend: &str, window: u64) -> Result<u64> {
-        let r = ok(self.root.call(self.outcomes.id(), "open_series").args_json(json!({ "trend": trend, "window": window })).max_gas().transact().await?).await?;
+        let r = ok(self
+            .root
+            .call(self.outcomes.id(), "open_series")
+            .args_json(json!({ "trend": trend, "window": window }))
+            .max_gas()
+            .transact()
+            .await?)
+        .await?;
         let id: Option<u64> = r.json()?;
         id.ok_or_else(|| anyhow::anyhow!("series not opened"))
     }
@@ -301,7 +379,9 @@ impl Passkey {
         let mut tagged = b"tredio-account:v1:".to_vec();
         tagged.extend_from_slice(request.as_bytes());
         let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(&tagged));
-        let client = format!(r#"{{"type":"webauthn.get","challenge":"{challenge}","origin":"https://app.tredio.bid"}}"#);
+        let client = format!(
+            r#"{{"type":"webauthn.get","challenge":"{challenge}","origin":"https://app.tredio.bid"}}"#
+        );
         let mut auth = Sha256::digest(b"tredio.bid").to_vec();
         auth.push(0x05);
         auth.extend_from_slice(&[0, 0, 0, 1]);
@@ -313,5 +393,174 @@ impl Passkey {
             "client_data_json": client,
             "signature": hex::encode(sig.to_bytes()),
         })
+    }
+}
+
+/// The account code testnet accounts run today (v1, global hash J1GvtY5x...), kept so the
+/// upgrade path is tested against the exact deployed bytes.
+pub fn account_v1_wasm() -> Vec<u8> {
+    let path = format!("{}/fixtures/account_v1.wasm", env!("CARGO_MANIFEST_DIR"));
+    std::fs::read(&path).unwrap_or_else(|_| panic!("missing {path}"))
+}
+
+pub const ACCOUNT_V1_HASH: &str = "J1GvtY5xj7QuNwmdDFM56EYxmTvwp1wHqkPZjY7CNK9x";
+
+/// An owner request for `account`, created now with `nonce`, as the app builds it.
+pub async fn owner_request(
+    worker: &Worker<Sandbox>,
+    account: &near_workspaces::AccountId,
+    nonce: u64,
+    actions: Value,
+) -> Result<String> {
+    Ok(json!({ "account": account, "network": "testnet", "nonce": nonce, "created_at": now(worker).await? - 60, "actions": actions }).to_string())
+}
+
+/// Gas-key transactions and views over raw JSON-RPC: near-workspaces signs only with plain
+/// access keys and cannot decode gas-key permissions.
+pub mod gas_key {
+    use super::*;
+    use near_jsonrpc_client::{methods, JsonRpcClient};
+    use near_jsonrpc_primitives::types::query::QueryResponseKind;
+    use near_primitives::transaction::{
+        Action, FunctionCallAction, NonceMode, SignedTransaction, Transaction, TransactionNonce,
+        TransactionV1,
+    };
+    use near_primitives::types::{BlockReference, Finality};
+    use near_primitives::views::{
+        AccessKeyPermissionView, FinalExecutionOutcomeViewEnum, FinalExecutionStatus, QueryRequest,
+        TxExecutionStatus,
+    };
+
+    fn client(worker: &Worker<Sandbox>) -> JsonRpcClient {
+        JsonRpcClient::connect(worker.rpc_addr())
+    }
+
+    fn pk(key: &near_workspaces::types::PublicKey) -> near_crypto::PublicKey {
+        key.to_string().parse().expect("public key")
+    }
+
+    async fn query(worker: &Worker<Sandbox>, request: QueryRequest) -> Option<QueryResponseKind> {
+        client(worker)
+            .call(methods::query::RpcQueryRequest {
+                block_reference: BlockReference::Finality(Finality::None),
+                request,
+            })
+            .await
+            .ok()
+            .map(|r| r.kind)
+    }
+
+    /// A gas key's permission on `account`, if the key exists and is a function-call gas key:
+    /// (balance in yoctoNEAR, receiver, method names).
+    pub async fn info(
+        worker: &Worker<Sandbox>,
+        account: &near_workspaces::AccountId,
+        key: &near_workspaces::types::PublicKey,
+    ) -> Option<(u128, String, Vec<String>)> {
+        let request =
+            QueryRequest::ViewAccessKey { account_id: account.as_str().parse().ok()?, public_key: pk(key) };
+        match query(worker, request).await? {
+            QueryResponseKind::AccessKey(k) => match k.permission {
+                AccessKeyPermissionView::GasKeyFunctionCall {
+                    balance, receiver_id, method_names, ..
+                } => Some((balance.as_yoctonear(), receiver_id, method_names)),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// True when `key` is any access key on `account`.
+    pub async fn exists(
+        worker: &Worker<Sandbox>,
+        account: &near_workspaces::AccountId,
+        key: &near_workspaces::types::PublicKey,
+    ) -> bool {
+        let Ok(account_id) = account.as_str().parse() else { return false };
+        matches!(
+            query(worker, QueryRequest::ViewAccessKey { account_id, public_key: pk(key) }).await,
+            Some(QueryResponseKind::AccessKey(_))
+        )
+    }
+
+    /// What a gas-key transaction did: whether every receipt succeeded, the logs, and the
+    /// failure if any.
+    pub struct Outcome {
+        pub success: bool,
+        pub failure: Option<String>,
+        pub logs: Vec<String>,
+        pub tokens_burnt: u128,
+    }
+
+    /// Signs `method(args)` on `account` with the gas key `secret` (nonce lane 0) and waits
+    /// for it. `Err` when the network refused the transaction itself.
+    pub async fn call(
+        worker: &Worker<Sandbox>,
+        account: &near_workspaces::AccountId,
+        secret: &near_workspaces::types::SecretKey,
+        method: &str,
+        args: Value,
+        tgas: u64,
+    ) -> std::result::Result<Outcome, String> {
+        let signer_id: near_primitives::types::AccountId =
+            account.as_str().parse().map_err(|e| format!("{e}"))?;
+        let secret: near_crypto::SecretKey = secret.to_string().parse().map_err(|e| format!("{e:?}"))?;
+        let public_key = secret.public_key();
+        let nonces = match query(
+            worker,
+            QueryRequest::ViewGasKeyNonces { account_id: signer_id.clone(), public_key: public_key.clone() },
+        )
+        .await
+        {
+            Some(QueryResponseKind::GasKeyNonces(n)) => n.nonces,
+            _ => return Err("not a gas key".into()),
+        };
+        let block = worker.view_block().await.map_err(|e| e.to_string())?;
+        let tx = Transaction::V1(TransactionV1 {
+            signer_id: signer_id.clone(),
+            public_key,
+            nonce: TransactionNonce::from_nonce_and_index(nonces[0] + 1, 0),
+            receiver_id: signer_id,
+            block_hash: near_primitives::hash::CryptoHash(block.hash().0),
+            actions: vec![Action::FunctionCall(Box::new(FunctionCallAction {
+                method_name: method.into(),
+                args: args.to_string().into_bytes(),
+                gas: near_primitives::types::Gas::from_teragas(tgas),
+                deposit: near_token::NearToken::from_yoctonear(0),
+            }))],
+            nonce_mode: NonceMode::Monotonic,
+        });
+        let signature = secret.sign(tx.get_hash_and_size().0.as_ref());
+        let signed = SignedTransaction::new(signature, tx);
+        let r = client(worker)
+            .call(methods::send_tx::RpcSendTransactionRequest {
+                signed_transaction: signed,
+                wait_until: TxExecutionStatus::Final,
+            })
+            .await
+            .map_err(|e| format!("{e:?}"))?;
+        let outcome = match r.final_execution_outcome {
+            Some(FinalExecutionOutcomeViewEnum::FinalExecutionOutcome(o)) => o,
+            Some(FinalExecutionOutcomeViewEnum::FinalExecutionOutcomeWithReceipt(o)) => o.final_outcome,
+            None => return Err("no outcome".into()),
+        };
+        let mut failure = match &outcome.status {
+            FinalExecutionStatus::Failure(e) => Some(format!("{e:?}")),
+            _ => None,
+        };
+        for r in &outcome.receipts_outcome {
+            if let near_primitives::views::ExecutionStatusView::Failure(e) = &r.outcome.status {
+                failure.get_or_insert_with(|| format!("{e:?}"));
+            }
+        }
+        let logs = std::iter::once(&outcome.transaction_outcome)
+            .chain(outcome.receipts_outcome.iter())
+            .flat_map(|o| o.outcome.logs.clone())
+            .collect();
+        let tokens_burnt = std::iter::once(&outcome.transaction_outcome)
+            .chain(outcome.receipts_outcome.iter())
+            .map(|o| o.outcome.tokens_burnt.as_yoctonear())
+            .sum();
+        Ok(Outcome { success: failure.is_none(), failure, logs, tokens_burnt })
     }
 }

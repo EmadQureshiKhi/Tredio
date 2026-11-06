@@ -503,10 +503,17 @@ impl Book {
         if tredio_common::promise_succeeded() {
             return amount;
         }
-        // Keep it in the book, withdrawable later. The book pays for this balance's storage
-        // itself, so the account need not be registered and is not charged.
+        // Keep it in the book, withdrawable later, even when the account's storage is full or
+        // it is not registered (the book then pays for the entry). A registered account's new
+        // entry is counted, so the debit that later removes it releases an entry it holds.
         let key = (to.clone(), asset);
-        *self.balances.entry(key).or_insert(0) += amount.0;
+        match self.balances.get_mut(&key) {
+            Some(b) => *b += amount.0,
+            None => {
+                self.storage.force_add_entry(&to);
+                self.balances.insert(key, amount.0);
+            }
+        }
         Event::DeliveryFailed { account: &to, asset, amount }.emit();
         U128(0)
     }

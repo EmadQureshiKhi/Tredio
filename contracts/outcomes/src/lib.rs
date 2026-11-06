@@ -432,12 +432,14 @@ impl Outcomes {
         if tredio_common::promise_succeeded() {
             return amount;
         }
+        // The burned tokens come back even if the owner's storage filled up meanwhile (someone
+        // can send them dust): failing here would lose both the tokens and the payout.
         let mut s = self.get(series);
         if up.0 > 0 {
-            self.mint(&mut s, Side::Up, &owner, up.0);
+            self.restore(&mut s, Side::Up, &owner, up.0);
         }
         if down.0 > 0 {
-            self.mint(&mut s, Side::Down, &owner, down.0);
+            self.restore(&mut s, Side::Down, &owner, down.0);
         }
         s.backing += amount.0;
         self.total_backing += amount.0;
@@ -513,6 +515,20 @@ impl Outcomes {
         self.credit(s.id, side, owner, amount);
         *s.supply_mut(side) += amount;
         mt::emit_mint(owner, &[token_id(s.id, side)], &[amount], None);
+    }
+
+    /// Mints back tokens a failed payout burned, without requiring storage room.
+    fn restore(&mut self, s: &mut Series, side: Side, owner: &AccountId, amount: u128) {
+        let key = (s.id, side, owner.clone());
+        match self.balances.get_mut(&key) {
+            Some(b) => *b += amount,
+            None => {
+                self.storage.force_add_entry(owner);
+                self.balances.insert(key, amount);
+            }
+        }
+        *s.supply_mut(side) += amount;
+        mt::emit_mint(owner, &[token_id(s.id, side)], &[amount], Some("payout failed"));
     }
 
     fn burn(&mut self, s: &mut Series, side: Side, owner: &AccountId, amount: u128) {
