@@ -7,14 +7,18 @@ import {
   base58Encode,
   cached,
   failureOf,
+  FASTNEAR_RPC,
+  isRefused,
   isTransient,
   nep413Hash,
   publicKeyOf,
   returnValue,
+  RpcRotation,
+  rpcEndpoints,
   toNear,
   verifyNep413Signature,
   verifyPasskey,
-  type Viewer,
+  Viewer,
   walletWatch,
 } from "../src/index";
 
@@ -149,5 +153,77 @@ describe("cached readings", () => {
     const w = await wallet();
     expect(w.balance).toBe("2");
     expect(w.gasKeys[0]).toEqual({ publicKey: "ed25519:x", balance: "0.3", nonces: 4 });
+  });
+});
+
+describe("RPC providers", () => {
+  test("one FastNEAR endpoint per key, each key once, then the public defaults or the given URLs", () => {
+    const e = rpcEndpoints("testnet", [], ["k1", " k2 ", "k1", ""]);
+    expect(e.slice(0, 2)).toEqual([
+      { url: FASTNEAR_RPC.testnet, headers: { authorization: "Bearer k1" } },
+      { url: FASTNEAR_RPC.testnet, headers: { authorization: "Bearer k2" } },
+    ]);
+    expect(e.slice(2).every((x) => !x.headers)).toBe(true);
+    expect(e.length).toBeGreaterThan(2);
+    expect(rpcEndpoints("testnet", ["https://a.example"])).toEqual([{ url: "https://a.example" }]);
+  });
+
+  test("keyed providers take turns, keyless ones follow from the last that answered, a refused key waits at the back", () => {
+    let now = 0;
+    const r = new RpcRotation([{ url: "k", headers: { a: "1" } }, { url: "k", headers: { a: "2" } }, { url: "o1" }, { url: "o2" }], () => now);
+    expect(r.order()).toEqual([0, 1, 2, 3]);
+    expect(r.order()).toEqual([1, 0, 2, 3]);
+    r.answered(3);
+    expect(r.order()).toEqual([0, 1, 3, 2]);
+    r.refused(1);
+    expect(r.order()).toEqual([0, 3, 2, 1]);
+    expect(r.order()).toEqual([0, 3, 2, 1]);
+    now += 10 * 60_000;
+    expect(r.order()).toEqual([1, 0, 3, 2]);
+  });
+
+  test("a refusal is an HTTP 401 or 403 or FastNEAR's invalid key answer, never a contract's message", () => {
+    expect(isRefused(new Error("HTTP 403: Forbidden"))).toBe(true);
+    expect(isRefused(new Error("rpc 401"))).toBe(true);
+    expect(isRefused(new Error("Invalid API key"))).toBe(true);
+    expect(isRefused(new Error("Smart contract panicked: 403 is not a market"))).toBe(false);
+    expect(isRefused(new Error("rpc 429"))).toBe(false);
+  });
+
+  test("reads rotate across keys, carry each key in its header and get past a refused key", async () => {
+    const seen: string[] = [];
+    const server = Bun.serve({
+      port: 0,
+      fetch: async (req) => {
+        const auth = req.headers.get("authorization") ?? "none";
+        seen.push(auth);
+        if (auth === "Bearer bad") return new Response("Invalid API key", { status: 403 });
+        const { method, params } = (await req.json()) as { method: string; params: { method_name?: string } };
+        if (method === "status") return Response.json({ jsonrpc: "2.0", id: 1, result: { sync_info: { latest_block_height: 7, latest_block_time: "2026-11-06T00:00:00Z" } } });
+        const bytes = [...new TextEncoder().encode(JSON.stringify({ method: params.method_name }))];
+        return Response.json({ jsonrpc: "2.0", id: 1, result: { result: bytes, logs: [], block_height: 7, block_hash: "11111111111111111111111111111111" } });
+      },
+    });
+    const url = `http://localhost:${server.port}`;
+    const warn = console.warn;
+    console.warn = () => undefined;
+    try {
+      const v = new Viewer("testnet", [
+        { url, headers: { authorization: "Bearer good1" } },
+        { url, headers: { authorization: "Bearer bad" } },
+        { url, headers: { authorization: "Bearer good2" } },
+        url,
+      ]);
+      expect((await v.head()).height).toBe(7);
+      expect(await v.rpc<{ sync_info: unknown }>("status", [])).toBeDefined();
+      expect(await v.view<{ method: string }>("registry.tredio.testnet", "last_run_id")).toEqual({ method: "last_run_id" });
+      expect(await v.view<{ method: string }>("registry.tredio.testnet", "get_oracle")).toEqual({ method: "get_oracle" });
+      // Turns go 1, 2, 3, 1 by position: good1; bad (refused, so good2 answers its turn); good2; good1. The bad key
+      // is tried once, then waits at the back, and the keyless URL is never needed.
+      expect(seen).toEqual(["Bearer good1", "Bearer bad", "Bearer good2", "Bearer good2", "Bearer good1"]);
+    } finally {
+      console.warn = warn;
+      server.stop(true);
+    }
   });
 });

@@ -25,11 +25,19 @@ const DEFAULT_RPC_URLS: Record<Network, string[]> = {
   testnet: [DEPLOYMENT.rpc, "https://testnet-rpc.intea.rs", "https://near-testnet.drpc.org"],
   mainnet: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.near.org"],
 };
-const configuredRpcs = (process.env.NEXT_PUBLIC_NEAR_RPC_URLS ?? "")
-  .split(",")
-  .map((u) => u.trim())
-  .filter(Boolean);
-export const RPC_URLS: readonly string[] = configuredRpcs.length > 0 ? configuredRpcs : [...new Set(DEFAULT_RPC_URLS[NETWORK])];
+const listOf = (v: string | undefined) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+const configuredRpcs = listOf(process.env.NEXT_PUBLIC_NEAR_RPC_URLS);
+/**
+ * FastNEAR browser keys (NEXT_PUBLIC_FASTNEAR_KEYS): keys made for browsers in FastNEAR's
+ * dashboard, locked to this app's origins, so shipping them in the bundle is safe. They lead,
+ * each visitor starting on a random one so visitors spread across them; the public endpoints follow.
+ */
+const FASTNEAR_RPC: Record<Network, string> = { testnet: "https://rpc.testnet.fastnear.com", mainnet: "https://rpc.mainnet.fastnear.com" };
+const keyedRpcs = listOf(process.env.NEXT_PUBLIC_FASTNEAR_KEYS)
+  .map((key) => ({ key, at: Math.random() }))
+  .sort((a, b) => a.at - b.at)
+  .map(({ key }) => `${FASTNEAR_RPC[NETWORK]}?apiKey=${encodeURIComponent(key)}`);
+export const RPC_URLS: readonly string[] = [...new Set([...keyedRpcs, ...(configuredRpcs.length > 0 ? configuredRpcs : DEFAULT_RPC_URLS[NETWORK])])];
 
 /** NearBlocks, where every Tredio contract and account can be read. */
 export const EXPLORER_NAME = "NearBlocks";

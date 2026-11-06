@@ -4,8 +4,8 @@ import { FatalError, Neardata, RateLimiter } from "../src/neardata";
 import { fakeNeardata } from "./fixtures/fake-neardata";
 import { scenario } from "./fixtures/scenario";
 
-const client = (fetch: typeof globalThis.fetch, apiKey?: string) =>
-  new Neardata({ baseUrl: "https://testnet.neardata.example", rpm: 6000, log: silentLog, fetch, apiKey, throttleMs: 50 });
+const client = (fetch: typeof globalThis.fetch, ...apiKeys: string[]) =>
+  new Neardata({ baseUrl: "https://testnet.neardata.example", rpm: 6000, log: silentLog, fetch, apiKeys, throttleMs: 50 });
 
 describe("Neardata", () => {
   test("blocks, skipped heights, future heights and the final head", async () => {
@@ -54,6 +54,19 @@ describe("Neardata", () => {
 
     const denied = (async () => new Response("Unauthorized", { status: 401 })) as unknown as typeof globalThis.fetch;
     await expect(client(denied, "bad").block(5)).rejects.toBeInstanceOf(FatalError);
+  });
+
+  test("several keys take turns, and a refused one is dropped while the others carry on", async () => {
+    const seen: string[] = [];
+    const fetch = (async (_: RequestInfo | URL, init?: RequestInit) => {
+      const auth = new Headers(init?.headers).get("authorization") ?? "";
+      seen.push(auth);
+      return auth === "Bearer bad" ? new Response("Invalid API key", { status: 403 }) : new Response("null");
+    }) as typeof globalThis.fetch;
+    const nd = client(fetch, "k1", "bad", "k2");
+    for (const h of [1, 2, 3, 4]) expect(await nd.block(h)).toEqual({ kind: "skipped", height: h });
+    // The refused key is asked once; its request goes again at once on the next key, and the two left alternate.
+    expect(seen).toEqual(["Bearer k1", "Bearer bad", "Bearer k1", "Bearer k2", "Bearer k1"]);
   });
 
   test("a height below the archive is fatal", async () => {

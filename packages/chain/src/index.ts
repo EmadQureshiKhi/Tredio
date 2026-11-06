@@ -28,6 +28,30 @@ export const DEFAULT_RPCS: Record<"testnet" | "mainnet", string[]> = {
 
 export type Network = "testnet" | "mainnet";
 
+/** An RPC provider: its URL and, for a keyed one, the header that carries its API key. */
+export interface RpcEndpoint {
+  url: string;
+  headers?: Record<string, string>;
+}
+
+/** Where a service reads and sends: plain URLs, keyed endpoints, or both. */
+export type RpcEndpoints = readonly (string | RpcEndpoint)[];
+
+/** FastNEAR's documented RPC hosts, where an API key lifts the per-address limit. */
+export const FASTNEAR_RPC: Record<Network, string> = { testnet: "https://rpc.testnet.fastnear.com", mainnet: "https://rpc.mainnet.fastnear.com" };
+
+/**
+ * A service's RPC providers: one FastNEAR endpoint per API key (`Authorization: Bearer`), then
+ * `urls`, or the public defaults, as fallback. Requests take the keyed endpoints in turn, so
+ * several keys share the load evenly; the public ones answer when every key is limited or refused.
+ */
+export function rpcEndpoints(network: Network, urls: readonly string[] = [], fastnearKeys: readonly string[] = []): RpcEndpoint[] {
+  const keyed = [...new Set(fastnearKeys.map((k) => k.trim()).filter(Boolean))].map((key) => ({ url: FASTNEAR_RPC[network], headers: { authorization: `Bearer ${key}` } }));
+  return [...keyed, ...(urls.length > 0 ? urls : DEFAULT_RPCS[network]).map((url) => ({ url }))];
+}
+
+const endpointOf = (e: string | RpcEndpoint): RpcEndpoint => (typeof e === "string" ? { url: e } : e);
+
 /** True for errors worth retrying on another provider or later (network, rate limit, timeout). */
 export function isTransient(e: unknown): boolean {
   const m = String((e as Error)?.message ?? e).toLowerCase();
@@ -35,17 +59,81 @@ export function isTransient(e: unknown): boolean {
   return /fetch failed|network|timeout|timed out|429|too many|rate limit|deprecated|503|502|504|econnreset|socket|unavailable/.test(m);
 }
 
+/** True when a provider turned the request away for its key: an HTTP 401 or 403 (FastNEAR: 403 "Invalid API key"). */
+export function isRefused(e: unknown): boolean {
+  return /^(HTTP|rpc) 40[13]\b|invalid api key/i.test(String((e as Error)?.message ?? e));
+}
+
 const FAILOVER_ROUNDS = 3;
 const FAILOVER_BACKOFF_MS = 500;
+const REFUSED_REST_MS = 10 * 60_000;
+
+/**
+ * The order to try providers in for one request. Keyed providers take turns, so several API keys
+ * carry equal shares; keyless ones follow, the last that answered first. A provider that refuses
+ * its key sits out for ten minutes at the back of the line, so a revoked key costs one request
+ * every ten minutes rather than one per call.
+ */
+export class RpcRotation {
+  private turn = 0;
+  private lead = 0;
+  private readonly keyed: number[];
+  private readonly open: number[];
+  private readonly restUntil: number[];
+
+  constructor(
+    readonly endpoints: readonly RpcEndpoint[],
+    private readonly now: () => number = Date.now,
+  ) {
+    this.keyed = endpoints.flatMap((e, i) => (e.headers ? [i] : []));
+    this.open = endpoints.flatMap((e, i) => (e.headers ? [] : [i]));
+    this.restUntil = endpoints.map(() => 0);
+  }
+
+  /** Provider indexes for the next request, best first. */
+  order(): number[] {
+    const k = this.keyed.length;
+    const o = this.open.length;
+    const keyed = Array.from({ length: k }, (_, j) => this.keyed[(this.turn + j) % k]!);
+    if (k > 0) this.turn = (this.turn + 1) % k;
+    const all = [...keyed, ...Array.from({ length: o }, (_, j) => this.open[(this.lead + j) % o]!)];
+    const now = this.now();
+    return [...all.filter((i) => this.restUntil[i]! <= now), ...all.filter((i) => this.restUntil[i]! > now)];
+  }
+
+  answered(provider: number): void {
+    const j = this.open.indexOf(provider);
+    if (j >= 0) this.lead = j;
+  }
+
+  refused(provider: number): void {
+    this.restUntil[provider] = this.now() + REFUSED_REST_MS;
+    console.warn(JSON.stringify({ msg: "rpc provider refused its key", url: this.endpoints[provider]!.url, keyed: Boolean(this.endpoints[provider]!.headers), restSec: REFUSED_REST_MS / 1000 }));
+  }
+}
+
+/**
+ * near-kit retries a failed request on the same provider with waits of 1, 2, 4 and 8 s; Tredio
+ * fails over to the next provider instead, so a provider that is down or limiting costs a request,
+ * not fifteen seconds.
+ */
+const nearAt = (network: Network, e: RpcEndpoint, extra: Record<string, unknown> = {}) =>
+  new Near({ network: { networkId: network, rpcUrl: e.url }, headers: e.headers, retryConfig: { maxRetries: 0 }, ...extra });
 
 /** Read-only access with provider failover. */
 export class Viewer {
+  readonly endpoints: RpcEndpoint[];
   private readonly clients: Near[];
-  private next = 0;
+  private readonly rotation: RpcRotation;
 
-  constructor(readonly network: Network, readonly urls: string[] = DEFAULT_RPCS[network]) {
-    if (!urls.length) throw new Error("no RPC URL");
-    this.clients = urls.map((rpcUrl) => new Near({ network: { networkId: network, rpcUrl } }));
+  constructor(
+    readonly network: Network,
+    endpoints: RpcEndpoints = DEFAULT_RPCS[network],
+  ) {
+    if (!endpoints.length) throw new Error("no RPC URL");
+    this.endpoints = endpoints.map(endpointOf);
+    this.clients = this.endpoints.map((e) => nearAt(network, e));
+    this.rotation = new RpcRotation(this.endpoints);
   }
 
   async view<T>(contractId: string, method: string, args: object = {}): Promise<T> {
@@ -53,23 +141,23 @@ export class Viewer {
   }
 
   /**
-   * Tries each provider in turn, starting from the last one that worked; when every provider
-   * answers with a transient error (a rate limit, a timeout), waits and goes round again, up to
-   * three rounds, so a burst from several services on one address delays a read instead of failing it.
+   * Tries the providers in the rotation's order; when every one answers with a transient error
+   * (a rate limit, a timeout) or refuses its key, waits and goes round again, up to three rounds,
+   * so a burst from several services on one address delays a read instead of failing it.
    */
   private async failover<T>(attempt: (provider: number) => Promise<T>): Promise<T> {
     let last: unknown;
     for (let round = 0; round < FAILOVER_ROUNDS; round++) {
       if (round > 0) await new Promise((r) => setTimeout(r, FAILOVER_BACKOFF_MS * 3 ** (round - 1) * (0.75 + Math.random() / 2)));
-      for (let i = 0; i < this.urls.length; i++) {
-        const provider = (this.next + i) % this.urls.length;
+      for (const provider of this.rotation.order()) {
         try {
           const result = await attempt(provider);
-          this.next = provider;
+          this.rotation.answered(provider);
           return result;
         } catch (e) {
           last = e;
-          if (!isTransient(e)) throw e;
+          if (isRefused(e)) this.rotation.refused(provider);
+          else if (!isTransient(e)) throw e;
         }
       }
     }
@@ -107,9 +195,9 @@ export class Viewer {
 
   async rpc<T>(method: string, params: unknown): Promise<T> {
     return this.failover(async (i) => {
-      const res = await fetch(this.urls[i]!, {
+      const res = await fetch(this.endpoints[i]!.url, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...this.endpoints[i]!.headers },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
         signal: AbortSignal.timeout(15_000),
       });
@@ -129,7 +217,8 @@ export interface SenderOptions {
   privateKey: string;
   /** Use the key as a gas key with this many nonce lanes (it must have been added as one). */
   gasKeyLanes?: number;
-  rpcUrls?: string[];
+  /** Providers (see `rpcEndpoints`); the network's public defaults when unset. */
+  rpc?: RpcEndpoints;
 }
 
 /** A failed transaction or receipt, with the contract's panic message when there is one. */
@@ -185,12 +274,13 @@ export function publicKeyOf(secret: string): string {
 
 export class Sender {
   readonly accountId: string;
-  private readonly rpcUrls: string[];
+  readonly endpoints: RpcEndpoint[];
   /** The key this sender signs with. */
   readonly publicKey: string;
   readonly network: Network;
   /** One client per RPC provider: signing reads the key's nonce and a recent block, and a rate-limited provider hands over. */
   private readonly clients: Near[];
+  private readonly rotation: RpcRotation;
   private readonly lanes: number;
   private readonly busy: boolean[];
   private readonly waiters: Array<(lane: number) => void> = [];
@@ -200,15 +290,10 @@ export class Sender {
     this.accountId = o.accountId;
     this.publicKey = publicKeyOf(o.privateKey);
     this.network = o.network;
-    this.rpcUrls = o.rpcUrls ?? DEFAULT_RPCS[o.network];
-    this.clients = this.rpcUrls.map(
-      (rpcUrl) =>
-        new Near({
-          network: { networkId: o.network, rpcUrl },
-          privateKey: o.privateKey as PrivateKey,
-          defaultSignerId: o.accountId,
-        }),
-    );
+    this.endpoints = (o.rpc ?? DEFAULT_RPCS[o.network]).map(endpointOf);
+    if (!this.endpoints.length) throw new Error("no RPC URL");
+    this.clients = this.endpoints.map((e) => nearAt(o.network, e, { privateKey: o.privateKey as PrivateKey, defaultSignerId: o.accountId }));
+    this.rotation = new RpcRotation(this.endpoints);
     this.lanes = o.gasKeyLanes ?? 0;
     this.busy = Array.from({ length: this.lanes }, () => false);
   }
@@ -249,22 +334,26 @@ export class Sender {
       // Signing reads the key's nonce and a recent block; nothing has gone out yet, so a provider that
       // rate-limits it hands over to the next, for a couple of rounds like Viewer's reads.
       let tx: TransactionBuilder | null = null;
+      let via = -1;
       let signError: unknown = null;
       for (let round = 0; round < FAILOVER_ROUNDS && !tx; round++) {
         if (round > 0) await new Promise((r) => setTimeout(r, FAILOVER_BACKOFF_MS * 3 ** (round - 1) * (0.75 + Math.random() / 2)));
-        for (const near of this.clients) {
-          let t = build(near.transaction(this.accountId));
+        for (const provider of this.rotation.order()) {
+          let t = build(this.clients[provider]!.transaction(this.accountId));
           if (lane !== null) t = t.useGasKey(lane);
           try {
             await t.sign();
             tx = t;
+            via = provider;
+            this.rotation.answered(provider);
             break;
           } catch (e) {
             signError = e;
-            if (!isTransient(e)) break;
+            if (isRefused(e)) this.rotation.refused(provider);
+            else if (!isTransient(e)) break;
           }
         }
-        if (signError && !tx && !isTransient(signError)) break;
+        if (signError && !tx && !isTransient(signError) && !isRefused(signError)) break;
       }
       if (!tx) throw new TxError(`could not sign: ${String((signError as Error)?.message ?? signError)}`);
       // Signed once: a broadcast that fails in transit is retried with the same bytes elsewhere and
@@ -277,7 +366,7 @@ export class Sender {
         const details = (e as { details?: unknown }).details;
         const message = details ? `${(e as Error).message}: ${JSON.stringify(details)}` : String((e as Error).message ?? e);
         if (!isTransient(e) || !hash) throw new TxError(message, hash);
-        const landed = await this.recover(tx.serialize(), hash, waitUntil);
+        const landed = await this.recover(tx.serialize(), hash, waitUntil, via);
         if (!landed) throw new TxError(message, hash);
         o = landed;
       }
@@ -303,26 +392,26 @@ export class Sender {
    * After a broadcast failed in transit: sends the same signed bytes through the other providers,
    * then looks the hash up for up to half a minute. Null when the transaction is nowhere to be found.
    */
-  private async recover(signed: Uint8Array, hash: string, waitUntil: string): Promise<FinalExecutionOutcome | null> {
-    const call = async <T>(url: string, method: string, params: unknown): Promise<T> => {
-      const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }), signal: AbortSignal.timeout(20_000) });
+  private async recover(signed: Uint8Array, hash: string, waitUntil: string, via: number): Promise<FinalExecutionOutcome | null> {
+    const call = async <T>(e: RpcEndpoint, method: string, params: unknown): Promise<T> => {
+      const res = await fetch(e.url, { method: "POST", headers: { "content-type": "application/json", ...e.headers }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }), signal: AbortSignal.timeout(20_000) });
       if (!res.ok) throw new Error(`rpc ${res.status}`);
       const body = (await res.json()) as { result?: T; error?: { cause?: { name?: string }; message?: string } };
       if (body.error) throw new Error(body.error.cause?.name ?? body.error.message ?? "rpc error");
       return body.result as T;
     };
     const signedB64 = Buffer.from(signed).toString("base64");
-    for (const url of this.rpcUrls.slice(1)) {
+    for (const e of this.endpoints.filter((_, i) => i !== via)) {
       try {
-        return await call<FinalExecutionOutcome>(url, "send_tx", { signed_tx_base64: signedB64, wait_until: waitUntil });
+        return await call<FinalExecutionOutcome>(e, "send_tx", { signed_tx_base64: signedB64, wait_until: waitUntil });
       } catch {
         // Already known, rate limited or unreachable: the lookup below settles it.
       }
     }
     for (let i = 0; i < 10; i++) {
-      for (const url of this.rpcUrls) {
+      for (const e of this.endpoints) {
         try {
-          return await call<FinalExecutionOutcome>(url, "EXPERIMENTAL_tx_status", { tx_hash: hash, sender_account_id: this.accountId, wait_until: waitUntil });
+          return await call<FinalExecutionOutcome>(e, "EXPERIMENTAL_tx_status", { tx_hash: hash, sender_account_id: this.accountId, wait_until: waitUntil });
         } catch {
           // Not seen there yet.
         }

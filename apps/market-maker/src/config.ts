@@ -1,4 +1,4 @@
-import { DEFAULT_RPCS } from "@tredio/chain";
+import { type RpcEndpoint, rpcEndpoints } from "@tredio/chain";
 import { type Deployment, deployment as deploymentOf } from "@tredio/contracts";
 import { z } from "zod";
 
@@ -10,6 +10,8 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(4300),
   NEAR_NETWORK: z.enum(["testnet", "mainnet"]).default("testnet"),
   NEAR_RPC_URLS: optional(z.string()),
+  /** FastNEAR API keys (comma-separated): requests take them in turn, ahead of the public providers. */
+  FASTNEAR_API_KEYS: optional(z.string()),
   DEPLOYMENT_JSON: optional(z.string()),
   MM_ACCOUNT_ID: z.string().min(2),
   MM_PRIVATE_KEY: z.string().regex(/^ed25519:/),
@@ -42,11 +44,11 @@ const schema = z.object({
   STATE_FILE: z.string().default(".mm-state.json"),
 });
 
-export type Config = z.infer<typeof schema> & { deployment: Deployment; rpcUrls: string[] };
+export type Config = z.infer<typeof schema> & { deployment: Deployment; rpc: RpcEndpoint[] };
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const c = schema.parse(env);
   const deployment = c.DEPLOYMENT_JSON ? (JSON.parse(c.DEPLOYMENT_JSON) as Deployment) : deploymentOf(c.NEAR_NETWORK);
-  const rpcUrls = list(c.NEAR_RPC_URLS).length > 0 ? list(c.NEAR_RPC_URLS) : DEFAULT_RPCS[c.NEAR_NETWORK];
-  return { ...c, deployment, rpcUrls };
+  const rpc = rpcEndpoints(c.NEAR_NETWORK, list(c.NEAR_RPC_URLS), list(c.FASTNEAR_API_KEYS));
+  return { ...c, deployment, rpc };
 }

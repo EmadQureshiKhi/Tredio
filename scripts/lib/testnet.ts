@@ -10,10 +10,12 @@ import { p256 } from "@noble/curves/nist.js";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { deployment, requestChallenge, type PasskeyProof } from "@tredio/contracts";
-import { Sender, Viewer } from "@tredio/chain";
+import { rpcEndpoints, Sender, Viewer } from "@tredio/chain";
 
 export const D = deployment("testnet");
-export const viewer = new Viewer("testnet");
+/** FastNEAR API keys from FASTNEAR_API_KEYS (comma-separated) lead, as in the services. */
+export const RPC = rpcEndpoints("testnet", [], (process.env.FASTNEAR_API_KEYS ?? "").split(","));
+export const viewer = new Viewer("testnet", RPC);
 
 const b64url = (b: Uint8Array) => Buffer.from(b).toString("base64url");
 const hex = (b: Uint8Array) => Buffer.from(b).toString("hex");
@@ -28,7 +30,7 @@ export function keyOf(accountId: string): string {
 }
 
 export const senderFor = (accountId: string, gasKeyLanes?: number) =>
-  new Sender({ network: "testnet", accountId, privateKey: keyOf(accountId), gasKeyLanes });
+  new Sender({ network: "testnet", accountId, privateKey: keyOf(accountId), gasKeyLanes, rpc: RPC });
 
 /** A software passkey: P-256 over SHA-256(authData || SHA-256(clientDataJSON)), as WebAuthn does. */
 export class SoftPasskey {

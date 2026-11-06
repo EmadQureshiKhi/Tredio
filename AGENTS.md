@@ -61,5 +61,7 @@ pnpm test:contracts
 - Returning a joint promise (`a.and(b)`) from a contract method is not allowed; detach instead.
 - Some contract refusals are logged events, not failures (`*_refused`, `*_rejected`): read the receipts' logs, not just the status.
 - Public RPCs rate-limit per IP and answer a browser's 429 without CORS headers; keep polling modest and use the failover lists.
+  Services, the indexer and the scripts take FastNEAR API keys in `FASTNEAR_API_KEYS` (comma-separated, one per request in turn, ahead of the public endpoints); the app takes origin-locked browser keys in `NEXT_PUBLIC_FASTNEAR_KEYS`.
+  near-kit clients run with `retryConfig: { maxRetries: 0 }`, since its own retries wait up to 15 s on one provider before Tredio's failover moves on.
 - 1Click quotes need an existing mainnet recipient, and confidential quotes need a partner JWT.
 - Hyperliquid testnet has no leaderboard; leaders come from mainnet's.

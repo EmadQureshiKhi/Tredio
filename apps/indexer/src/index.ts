@@ -25,7 +25,7 @@ const common = { sql, tracker, network: cfg.NETWORK, startBlock: rt.startBlock, 
 let feed: { status: IngestStatus; beat(): void; run(): Promise<void> };
 let source: Record<string, unknown>;
 if (cfg.INDEXER_SOURCE === "txs") {
-  const api = new TxApi({ baseUrl: cfg.txApiUrl, apiKey: cfg.TX_API_KEY, rpm: cfg.TX_API_RPM, log, signal: stop.signal, onAttempt: () => beat() });
+  const api = new TxApi({ baseUrl: cfg.txApiUrl, apiKeys: cfg.txApiKeys, rpm: cfg.TX_API_RPM, log, signal: stop.signal, onAttempt: () => beat() });
   const core = [...new Set([...Object.values(tracker.deployment.contracts), ...cfg.relayers])];
   feed = new TxIngestor({
     ...common,
@@ -38,11 +38,11 @@ if (cfg.INDEXER_SOURCE === "txs") {
     pollMs: cfg.TX_POLL_MS,
     pendingMaxBlocks: cfg.TX_PENDING_MAX_BLOCKS,
   });
-  source = { source: "txs", txApi: cfg.txApiUrl, apiKey: Boolean(cfg.TX_API_KEY), rpm: cfg.TX_API_RPM, relayers: cfg.relayers };
+  source = { source: "txs", txApi: cfg.txApiUrl, apiKeys: cfg.txApiKeys.length, rpm: cfg.TX_API_RPM, relayers: cfg.relayers };
 } else {
-  const neardata = new Neardata({ baseUrl: cfg.neardataUrl, apiKey: cfg.NEARDATA_API_KEY, rpm: cfg.NEARDATA_RPM, log, signal: stop.signal, onAttempt: () => beat() });
+  const neardata = new Neardata({ baseUrl: cfg.neardataUrl, apiKeys: cfg.neardataKeys, rpm: cfg.NEARDATA_RPM, log, signal: stop.signal, onAttempt: () => beat() });
   feed = new Ingestor({ ...common, neardata, concurrency: cfg.NEARDATA_CONCURRENCY, pollMs: cfg.POLL_MS });
-  source = { source: "blocks", neardata: cfg.neardataUrl, apiKey: Boolean(cfg.NEARDATA_API_KEY), rpm: cfg.NEARDATA_RPM };
+  source = { source: "blocks", neardata: cfg.neardataUrl, apiKeys: cfg.neardataKeys.length, rpm: cfg.NEARDATA_RPM };
 }
 beat = () => feed.beat();
 

@@ -1,4 +1,4 @@
-import { DEFAULT_RPCS } from "@tredio/chain";
+import { type RpcEndpoint, rpcEndpoints } from "@tredio/chain";
 import { type Deployment, deployment as deploymentOf } from "@tredio/contracts";
 import { z } from "zod";
 import { NEAR, parseTargets, type Target, USDC } from "./targets";
@@ -11,6 +11,8 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(4500),
   NEAR_NETWORK: z.enum(["testnet", "mainnet"]).default("testnet"),
   NEAR_RPC_URLS: optional(z.string()),
+  /** FastNEAR API keys (comma-separated): requests take them in turn, ahead of the public providers. */
+  FASTNEAR_API_KEYS: optional(z.string()),
   DEPLOYMENT_JSON: optional(z.string()),
   TREASURY_ACCOUNT_ID: z.string().min(2),
   TREASURY_PRIVATE_KEY: z.string().regex(/^ed25519:/),
@@ -34,14 +36,14 @@ const schema = z.object({
   STATE_FILE: z.string().default(".topup-state.json"),
 });
 
-export type Config = z.infer<typeof schema> & { deployment: Deployment; rpcUrls: string[]; targets: Target[]; usdcTargets: Target[]; dailyCapUsdc: bigint };
+export type Config = z.infer<typeof schema> & { deployment: Deployment; rpc: RpcEndpoint[]; targets: Target[]; usdcTargets: Target[]; dailyCapUsdc: bigint };
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const c = schema.parse(env);
   const deployment = c.DEPLOYMENT_JSON ? (JSON.parse(c.DEPLOYMENT_JSON) as Deployment) : deploymentOf(c.NEAR_NETWORK);
-  const rpcUrls = list(c.NEAR_RPC_URLS).length > 0 ? list(c.NEAR_RPC_URLS) : DEFAULT_RPCS[c.NEAR_NETWORK];
+  const rpc = rpcEndpoints(c.NEAR_NETWORK, list(c.NEAR_RPC_URLS), list(c.FASTNEAR_API_KEYS));
   const usdcTargets = parseTargets(c.USDC_TARGETS, "usdc");
   if (usdcTargets.length > 0 && c.NEAR_NETWORK === "mainnet") throw new Error("USDC_TARGETS are testnet only: mainnet USDC is real money");
   if (usdcTargets.length > 0 && !(c.USDC_MINTER_ACCOUNT_ID && c.USDC_MINTER_PRIVATE_KEY)) throw new Error("USDC_TARGETS need USDC_MINTER_ACCOUNT_ID and USDC_MINTER_PRIVATE_KEY");
-  return { ...c, deployment, rpcUrls, targets: parseTargets(c.TARGETS, "near"), usdcTargets, dailyCapUsdc: BigInt(Math.round(c.DAILY_CAP_USDC)) * USDC };
+  return { ...c, deployment, rpc, targets: parseTargets(c.TARGETS, "near"), usdcTargets, dailyCapUsdc: BigInt(Math.round(c.DAILY_CAP_USDC)) * USDC };
 }

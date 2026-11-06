@@ -81,7 +81,7 @@ const venue = new SessionVenue({
   sessionKey,
   network,
   policy,
-  chain: nearSessionChain(viewer, D, account, secretKey, viewer.urls, versions),
+  chain: nearSessionChain(viewer, D, account, secretKey, viewer.endpoints, versions),
   hyperliquid: logged,
   addressOf: async () => address,
   nonces: new Nonces(),

@@ -12,7 +12,7 @@
 import { readFileSync } from "node:fs";
 import { AccountVersions, calls, type OwnerAction, ownerRequest, requestJson, type Report, type Series, sessionCallTgas, upgradeToV2 } from "@tredio/contracts";
 import { Sender } from "@tredio/chain";
-import { D, SoftPasskey, newEd25519, nowSecs, senderFor, signReport, viewer } from "./lib/testnet";
+import { D, RPC, SoftPasskey, newEd25519, nowSecs, senderFor, signReport, viewer } from "./lib/testnet";
 
 const C = calls(D);
 const USDC = 1_000_000n;
@@ -78,7 +78,7 @@ const version = await new AccountVersions((a) => viewer.view<number>(a, "version
 if (upgrade && version < 2) throw new Error(`deployments name v2 account code, but ${account} runs v${version} after its first request`);
 const tgas = sessionCallTgas(version);
 log("account code", `v${version}`, `${tgas} Tgas a session call`);
-const user = new Sender({ network: "testnet", accountId: account, privateKey: session.secretKey, gasKeyLanes: 4 });
+const user = new Sender({ network: "testnet", accountId: account, privateKey: session.secretKey, gasKeyLanes: 4, rpc: RPC });
 const drip = await user.send(C.account.sessionCall(account, "faucet", tgas));
 const bal = await untilFinal(
   () => viewer.view<string>(D.contracts.usdc, "ft_balance_of", { account_id: account }),

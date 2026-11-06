@@ -59,7 +59,7 @@ const backtestBody = z.object({ rule: z.unknown(), days: z.number().int().min(1)
 /** The relayer the paid routes settle through, from config; null leaves them off. */
 export function configuredSettler(cfg: Config): Settler | null {
   if (!cfg.X402_RELAYER_ACCOUNT || !cfg.X402_RELAYER_KEY) return null;
-  return new RelayerSettler(new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.X402_RELAYER_ACCOUNT, privateKey: cfg.X402_RELAYER_KEY, rpcUrls: cfg.rpcUrls }));
+  return new RelayerSettler(new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.X402_RELAYER_ACCOUNT, privateKey: cfg.X402_RELAYER_KEY, rpc: cfg.rpc }));
 }
 
 export function x402Routes(d: X402Deps): Hono {

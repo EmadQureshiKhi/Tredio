@@ -6,8 +6,8 @@ import { Keeper } from "./keeper";
 
 const cfg = loadConfig(process.env);
 const log = (fields: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ service: "keeper", msg, ...fields }));
-const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpcUrls);
-const sender = new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.KEEPER_ACCOUNT_ID, privateKey: cfg.KEEPER_PRIVATE_KEY, gasKeyLanes: cfg.KEEPER_GAS_KEY_LANES, rpcUrls: cfg.rpcUrls });
+const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpc);
+const sender = new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.KEEPER_ACCOUNT_ID, privateKey: cfg.KEEPER_PRIVATE_KEY, gasKeyLanes: cfg.KEEPER_GAS_KEY_LANES, rpc: cfg.rpc });
 const executor = new Executor(sender, log);
 const rotating = cfg.ROTATION_URL
   ? async () => {

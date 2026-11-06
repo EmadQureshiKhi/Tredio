@@ -9,8 +9,8 @@ import { KeySigner } from "./signer";
 
 const cfg = loadConfig(process.env);
 const log = (fields: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ service: "oracle", msg, ...fields }));
-const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpcUrls);
-const sender = new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.ORACLE_ACCOUNT_ID, privateKey: cfg.ORACLE_PRIVATE_KEY, rpcUrls: cfg.rpcUrls });
+const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpc);
+const sender = new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.ORACLE_ACCOUNT_ID, privateKey: cfg.ORACLE_PRIVATE_KEY, rpc: cfg.rpc });
 const signer = cfg.ORACLE_MODE === "local" ? new KeySigner(cfg.REPORT_SIGNING_KEY!) : null;
 const enclave =
   cfg.ORACLE_MODE === "outlayer"

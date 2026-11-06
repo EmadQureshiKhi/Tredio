@@ -14,7 +14,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ed25519 } from "@noble/curves/ed25519.js";
-import { base58Decode, DEFAULT_RPCS, Viewer } from "@tredio/chain";
+import { base58Decode, rpcEndpoints, Viewer } from "@tredio/chain";
 import { accountCodeHashes, deployment, type Network } from "@tredio/contracts";
 
 const ROOT = join(import.meta.dir, "..");
@@ -38,7 +38,7 @@ const proofs = JSON.parse(readFileSync(join(ROOT, `deployments/${NETWORK}-proofs
   settledSeries: { series: number; trend: string; window: number; openTx: string; settleTx: string; keeper: string };
 };
 const args = new Set(process.argv.slice(2));
-const viewer = new Viewer(NETWORK, DEFAULT_RPCS[NETWORK]);
+const viewer = new Viewer(NETWORK, rpcEndpoints(NETWORK, [], (process.env.FASTNEAR_API_KEYS ?? "").split(",")));
 const nowSec = () => Math.floor(Date.now() / 1000);
 const sha256 = (data: string) => createHash("sha256").update(data).digest();
 

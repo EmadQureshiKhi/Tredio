@@ -34,6 +34,18 @@ test("a key raises the default rate; explicit values win", () => {
   expect(loadConfig({ ...base, NETWORK: "mainnet", NEARDATA_URL: "https://x.example/" }).neardataUrl).toBe("https://x.example");
 });
 
+test("shared FastNEAR keys feed both feeds, each key adds to the default rate, a feed's own key wins", () => {
+  const c = loadConfig({ ...base, FASTNEAR_API_KEYS: "a, b,a" });
+  expect(c.txApiKeys).toEqual(["a", "b"]);
+  expect(c.neardataKeys).toEqual(["a", "b"]);
+  expect(c.TX_API_RPM).toBe(2 * KEY_RPM);
+  const own = loadConfig({ ...base, FASTNEAR_API_KEYS: "a,b", TX_API_KEY: "t" });
+  expect(own.txApiKeys).toEqual(["t"]);
+  expect(own.TX_API_RPM).toBe(KEY_RPM);
+  expect(own.neardataKeys).toEqual(["a", "b"]);
+  expect(loadConfig(base).txApiKeys).toEqual([]);
+});
+
 test("rejects a missing database and unsafe schema names", () => {
   expect(() => loadConfig({})).toThrow(/DATABASE_URL/);
   expect(() => loadConfig({ ...base, INDEXER_SCHEMA: 'x"; drop' })).toThrow(/INDEXER_SCHEMA/);

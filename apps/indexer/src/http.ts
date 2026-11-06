@@ -5,10 +5,11 @@
  *   `rpm` a minute.
  * - A 429 pauses every request: Retry-After when above 0 (FastNEAR sends 0), otherwise 10 s
  *   doubling to 2 minutes while the limit lasts. 5xx answers and network errors back off per
- *   request (1 s doubling to 30 s, with jitter). Both retry until the stop signal fires; 401 and
- *   403 are fatal.
- * - An API key goes in `Authorization: Bearer`. Redirects drop that header, so they are followed
- *   by hand and the header is sent again.
+ *   request (1 s doubling to 30 s, with jitter). Both retry until the stop signal fires.
+ * - An API key goes in `Authorization: Bearer`, several keys in turn. Redirects drop that header,
+ *   so they are followed by hand and the header is sent again.
+ * - A 401 or 403 drops the key that drew it and the request goes again with the next; it is fatal
+ *   only for the last key (or without one).
  */
 import type { Log } from "./log";
 
@@ -16,6 +17,14 @@ export class FatalError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "FatalError";
+  }
+}
+
+/** A key was refused and dropped; the request goes again at once with the next key. */
+class KeyRefusedError extends Error {
+  constructor() {
+    super("key refused");
+    this.name = "KeyRefusedError";
   }
 }
 
@@ -89,7 +98,8 @@ export class RateLimiter {
 export interface RequesterOptions {
   /** For logs: "neardata" or "tx api". */
   name: string;
-  apiKey?: string;
+  /** FastNEAR API keys, taken in turn. */
+  apiKeys?: readonly string[];
   rpm: number;
   log: Log;
   signal?: AbortSignal;
@@ -111,9 +121,13 @@ export class Requester {
   private readonly fetchImpl: typeof fetch;
   private readonly minThrottle: number;
   private throttle: number;
+  private keys: string[];
+  private turn = 0;
+  private readonly keyOf = new WeakMap<Response, string>();
   requests = 0;
 
   constructor(private readonly o: RequesterOptions) {
+    this.keys = [...new Set(o.apiKeys ?? [])];
     this.limiter = new RateLimiter(o.rpm);
     this.minThrottle = this.throttle = o.throttleMs ?? THROTTLE_MIN_MS;
     this.fetchImpl = o.fetch ?? fetch;
@@ -121,16 +135,18 @@ export class Requester {
 
   /** One request, redirects followed by hand (unless `follow` is false) so the key header survives. */
   async send(url: URL, init: { method?: string; body?: string } = {}, follow = true): Promise<Response> {
+    const key = this.keys.length > 0 ? this.keys[this.turn++ % this.keys.length] : undefined;
     for (let hop = 0; ; hop++) {
       await this.limiter.take(this.o.signal);
       this.requests++;
       const headers: Record<string, string> = { accept: "application/json" };
       if (init.body !== undefined) headers["content-type"] = "application/json";
-      if (this.o.apiKey) headers.authorization = `Bearer ${this.o.apiKey}`;
+      if (key) headers.authorization = `Bearer ${key}`;
       const timeout = AbortSignal.timeout(this.o.timeoutMs ?? 30_000);
       const signal = this.o.signal ? AbortSignal.any([this.o.signal, timeout]) : timeout;
       const res = await this.fetchImpl(url, { method: init.method ?? "GET", body: init.body, headers, redirect: "manual", signal });
       const location = res.headers.get("location");
+      if (key) this.keyOf.set(res, key);
       if (!follow || res.status < 300 || res.status >= 400 || !location) return res;
       if (hop >= MAX_REDIRECTS) throw new Error(`too many redirects for ${url.pathname}`);
       await res.body?.cancel();
@@ -138,11 +154,19 @@ export class Requester {
     }
   }
 
-  /** Throws for anything but a 2xx answer: FatalError for 401/403, HttpError otherwise. */
+  /** Throws for anything but a 2xx answer: on 401/403 the key is dropped (FatalError for the last one), HttpError otherwise. */
   async check(res: Response): Promise<void> {
     if (res.ok) return;
     const text = (await res.text().catch(() => "")).slice(0, 200);
-    if (res.status === 401 || res.status === 403) throw new FatalError(`${this.o.name} refused the request (${res.status}): check the API key`);
+    if (res.status === 401 || res.status === 403) {
+      const key = this.keyOf.get(res);
+      if (key && this.keys.length > 1) {
+        this.keys = this.keys.filter((k) => k !== key);
+        this.o.log.warn(`${this.o.name} refused an API key; going on with the others`, { status: res.status, keysLeft: this.keys.length });
+        throw new KeyRefusedError();
+      }
+      throw new FatalError(`${this.o.name} refused the request (${res.status}): check the API key`);
+    }
     throw new HttpError(res.status, text, res.headers.get("retry-after"));
   }
 
@@ -156,6 +180,7 @@ export class Requester {
         return r;
       } catch (e) {
         if (e instanceof FatalError || this.o.signal?.aborted) throw this.o.signal?.aborted ? new StoppedError() : e;
+        if (e instanceof KeyRefusedError) continue;
         if (e instanceof HttpError && e.status === 429) {
           // Every request waits out a rate limit (the next attempt waits in the limiter). Only a
           // limit hit after the last pause ended extends it, doubling the pause each time.

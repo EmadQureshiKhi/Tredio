@@ -4,8 +4,8 @@ import { Relayer } from "./relayer";
 import { createServer } from "./server";
 
 const cfg = loadConfig(process.env);
-const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpcUrls);
-const sender = new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.RELAYER_ACCOUNT_ID, privateKey: cfg.RELAYER_PRIVATE_KEY, gasKeyLanes: cfg.RELAYER_GAS_KEY_LANES, rpcUrls: cfg.rpcUrls });
+const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpc);
+const sender = new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.RELAYER_ACCOUNT_ID, privateKey: cfg.RELAYER_PRIVATE_KEY, gasKeyLanes: cfg.RELAYER_GAS_KEY_LANES, rpc: cfg.rpc });
 const relayer = new Relayer({
   sender,
   viewer,

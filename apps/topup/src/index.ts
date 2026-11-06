@@ -7,10 +7,10 @@ import { TopUp } from "./topup";
 
 const cfg = loadConfig(process.env);
 const log = (fields: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ service: "topup", msg, ...fields }));
-const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpcUrls);
-const treasury = new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.TREASURY_ACCOUNT_ID, privateKey: cfg.TREASURY_PRIVATE_KEY, rpcUrls: cfg.rpcUrls });
+const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpc);
+const treasury = new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.TREASURY_ACCOUNT_ID, privateKey: cfg.TREASURY_PRIVATE_KEY, rpc: cfg.rpc });
 const minter =
-  cfg.USDC_MINTER_ACCOUNT_ID && cfg.USDC_MINTER_PRIVATE_KEY ? new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.USDC_MINTER_ACCOUNT_ID, privateKey: cfg.USDC_MINTER_PRIVATE_KEY, rpcUrls: cfg.rpcUrls }) : null;
+  cfg.USDC_MINTER_ACCOUNT_ID && cfg.USDC_MINTER_PRIVATE_KEY ? new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.USDC_MINTER_ACCOUNT_ID, privateKey: cfg.USDC_MINTER_PRIVATE_KEY, rpc: cfg.rpc }) : null;
 const store = {
   load: (): Record<string, TargetMemory> => (existsSync(cfg.STATE_FILE) ? (JSON.parse(readFileSync(cfg.STATE_FILE, "utf8")) as Record<string, TargetMemory>) : {}),
   save: (m: Record<string, TargetMemory>) => {

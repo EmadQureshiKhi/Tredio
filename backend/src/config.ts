@@ -1,4 +1,4 @@
-import { DEFAULT_RPCS } from "@tredio/chain";
+import { type RpcEndpoint, rpcEndpoints } from "@tredio/chain";
 import { type Deployment, deployment as deploymentOf } from "@tredio/contracts";
 import { z } from "zod";
 import { parseServices, type ServiceProbe } from "./status";
@@ -34,6 +34,8 @@ const schema = z.object({
   NEAR_NETWORK: z.enum(["testnet", "mainnet"]).default("testnet"),
   /** Comma-separated RPC endpoints, tried in order; FastNEAR and NEAR's own by default. */
   NEAR_RPC_URLS: optional(z.string()),
+  /** FastNEAR API keys (comma-separated): requests take them in turn, ahead of the public providers. */
+  FASTNEAR_API_KEYS: optional(z.string()),
   /** A deployment file's JSON, to point at contracts other than the bundled deployment. */
   DEPLOYMENT_JSON: optional(z.string()),
 
@@ -166,7 +168,7 @@ const schema = z.object({
 
 export type Config = z.infer<typeof schema> & {
   deployment: Deployment;
-  rpcUrls: string[];
+  rpc: RpcEndpoint[];
   frontendOrigins: string[];
   landingOrigins: string[];
   /** What the admin system view probes: STATUS_SERVICES, then ADMIN_SERVICES, the first entry of each name winning. */
@@ -183,8 +185,8 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     throw new Error("ELFA_PROXIES carry requests to api.elfa.ai only; ELFA_API_BASE must point there");
   }
   const deployment = parsed.DEPLOYMENT_JSON ? (JSON.parse(parsed.DEPLOYMENT_JSON) as Deployment) : deploymentOf(parsed.NEAR_NETWORK);
-  const rpcUrls = list(parsed.NEAR_RPC_URLS).length > 0 ? list(parsed.NEAR_RPC_URLS) : DEFAULT_RPCS[parsed.NEAR_NETWORK];
+  const rpc = rpcEndpoints(parsed.NEAR_NETWORK, list(parsed.NEAR_RPC_URLS), list(parsed.FASTNEAR_API_KEYS));
   for (const a of parsed.ADMIN_ACCOUNTS) accountId.parse(a);
   const systemServices = [...parseServices(parsed.STATUS_SERVICES), ...parseServices(parsed.ADMIN_SERVICES)].filter((s, i, all) => all.findIndex((x) => x.name === s.name) === i);
-  return { ...parsed, deployment, rpcUrls, frontendOrigins: list(parsed.FRONTEND_URL), landingOrigins: list(parsed.LANDING_URL), systemServices };
+  return { ...parsed, deployment, rpc, frontendOrigins: list(parsed.FRONTEND_URL), landingOrigins: list(parsed.LANDING_URL), systemServices };
 }

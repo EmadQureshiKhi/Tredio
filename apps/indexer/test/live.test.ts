@@ -9,7 +9,7 @@ const live = process.env.INDEXER_LIVE === "1";
 
 /** Hits FastNEAR's testnet neardata: two requests. Run with INDEXER_LIVE=1. */
 test.skipIf(!live)("fetches and reads the testnet final block", async () => {
-  const nd = new Neardata({ baseUrl: "https://testnet.neardata.xyz", apiKey: process.env.NEARDATA_API_KEY || undefined, rpm: 60, log: silentLog });
+  const nd = new Neardata({ baseUrl: "https://testnet.neardata.xyz", apiKeys: process.env.NEARDATA_API_KEY ? [process.env.NEARDATA_API_KEY] : [], rpm: 60, log: silentLog });
   const head = await nd.finalHeight();
   expect(head).toBeGreaterThan(276_376_358);
   const r = await nd.block(head);
@@ -24,7 +24,7 @@ test.skipIf(!live)("fetches and reads the testnet final block", async () => {
 
 /** Hits FastNEAR's testnet transactions API: three requests. Run with INDEXER_LIVE=1. */
 test.skipIf(!live)("reads the tx API's head, a contract's transactions and their receipts", async () => {
-  const api = new TxApi({ baseUrl: "https://tx.test.fastnear.com", apiKey: process.env.TX_API_KEY || undefined, rpm: 30, log: silentLog });
+  const api = new TxApi({ baseUrl: "https://tx.test.fastnear.com", apiKeys: process.env.TX_API_KEY ? [process.env.TX_API_KEY] : [], rpm: 30, log: silentLog });
   const [head] = await api.blocks(1);
   expect(Math.abs(Date.now() - head!.time.getTime())).toBeLessThan(10 * 60_000);
   const { txs } = await api.accountTxs("usdc.tredio.testnet", 276_376_358, head!.height);

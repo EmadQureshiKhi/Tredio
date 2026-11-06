@@ -1,4 +1,4 @@
-import { DEFAULT_RPCS, publicKeyOf } from "@tredio/chain";
+import { publicKeyOf, type RpcEndpoint, rpcEndpoints } from "@tredio/chain";
 import { type Deployment, deployment as deploymentOf } from "@tredio/contracts";
 import { z } from "zod";
 
@@ -11,6 +11,8 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(4400),
   NEAR_NETWORK: z.enum(["testnet", "mainnet"]).default("testnet"),
   NEAR_RPC_URLS: optional(z.string()),
+  /** FastNEAR API keys (comma-separated): requests take them in turn, ahead of the public providers. */
+  FASTNEAR_API_KEYS: optional(z.string()),
   DEPLOYMENT_JSON: optional(z.string()),
   /** The backend's database: the executor reads and writes its Autopilot tables (the backend owns the schema). */
   DATABASE_URL: z.string().min(1),
@@ -41,15 +43,15 @@ const schema = z.object({
 
 export type Config = z.infer<typeof schema> & {
   deployment: Deployment;
-  rpcUrls: string[];
+  rpc: RpcEndpoint[];
   bot: { account: string; secretKey: string; sessionKey: string } | null;
 };
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const c = schema.parse(env);
   const deployment = c.DEPLOYMENT_JSON ? (JSON.parse(c.DEPLOYMENT_JSON) as Deployment) : deploymentOf(c.NEAR_NETWORK);
-  const rpcUrls = list(c.NEAR_RPC_URLS).length > 0 ? list(c.NEAR_RPC_URLS) : DEFAULT_RPCS[c.NEAR_NETWORK];
+  const rpc = rpcEndpoints(c.NEAR_NETWORK, list(c.NEAR_RPC_URLS), list(c.FASTNEAR_API_KEYS));
   if (Boolean(c.AUTOPILOT_BOT_ACCOUNT) !== Boolean(c.AUTOPILOT_BOT_SESSION_KEY)) throw new Error("set AUTOPILOT_BOT_ACCOUNT and AUTOPILOT_BOT_SESSION_KEY together");
   const bot = c.AUTOPILOT_BOT_ACCOUNT && c.AUTOPILOT_BOT_SESSION_KEY ? { account: c.AUTOPILOT_BOT_ACCOUNT, secretKey: c.AUTOPILOT_BOT_SESSION_KEY, sessionKey: publicKeyOf(c.AUTOPILOT_BOT_SESSION_KEY) } : null;
-  return { ...c, deployment, rpcUrls, bot };
+  return { ...c, deployment, rpc, bot };
 }

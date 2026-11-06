@@ -18,6 +18,8 @@ const Env = z.object({
   TX_API_URL: opt(z.string().url()),
   TX_API_KEY: opt(z.string().min(1)),
   TX_API_RPM: opt(z.coerce.number().int().min(1)),
+  /** FastNEAR API keys (comma-separated) for both feeds, taken in turn; NEARDATA_API_KEY or TX_API_KEY wins for its feed. */
+  FASTNEAR_API_KEYS: opt(z.string()),
   /** Accounts that relay owner requests (comma-separated), listed like the contracts. */
   RELAYER_ACCOUNT_ID: opt(z.string().min(2)),
   TX_SAFETY_BLOCKS: int(10, 0),
@@ -47,9 +49,11 @@ export const TX_FREE_RPM = 55;
 /** The relayer the deploy scripts create, per network. */
 const DEFAULT_RELAYERS: Record<string, string> = { testnet: "tredio-relayer.testnet" };
 
-export type Config = Omit<z.infer<typeof Env>, "NEARDATA_RPM" | "TX_API_RPM" | "RELAYER_ACCOUNT_ID"> & {
+export type Config = Omit<z.infer<typeof Env>, "NEARDATA_RPM" | "TX_API_RPM" | "RELAYER_ACCOUNT_ID" | "FASTNEAR_API_KEYS"> & {
   NEARDATA_RPM: number;
   TX_API_RPM: number;
+  neardataKeys: string[];
+  txApiKeys: string[];
   neardataUrl: string;
   txApiUrl: string;
   relayers: string[];
@@ -62,11 +66,17 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     throw new Error(`invalid configuration: ${issues}`);
   }
   const c = parsed.data;
-  const { RELAYER_ACCOUNT_ID, ...rest } = c;
+  const { RELAYER_ACCOUNT_ID, FASTNEAR_API_KEYS, ...rest } = c;
+  const shared = [...new Set((FASTNEAR_API_KEYS ?? "").split(",").map((k) => k.trim()).filter(Boolean))];
+  const neardataKeys = c.NEARDATA_API_KEY ? [c.NEARDATA_API_KEY] : shared;
+  const txApiKeys = c.TX_API_KEY ? [c.TX_API_KEY] : shared;
   return {
     ...rest,
-    NEARDATA_RPM: c.NEARDATA_RPM ?? (c.NEARDATA_API_KEY ? KEY_RPM : FREE_RPM),
-    TX_API_RPM: c.TX_API_RPM ?? (c.TX_API_KEY ? KEY_RPM : TX_FREE_RPM),
+    // Each key brings its own allowance, so the default rate grows with the number of keys.
+    NEARDATA_RPM: c.NEARDATA_RPM ?? (neardataKeys.length > 0 ? KEY_RPM * neardataKeys.length : FREE_RPM),
+    TX_API_RPM: c.TX_API_RPM ?? (txApiKeys.length > 0 ? KEY_RPM * txApiKeys.length : TX_FREE_RPM),
+    neardataKeys,
+    txApiKeys,
     neardataUrl: (c.NEARDATA_URL ?? `https://${c.NETWORK}.neardata.xyz`).replace(/\/+$/, ""),
     txApiUrl: (c.TX_API_URL ?? `https://tx.${c.NETWORK === "mainnet" ? "main" : "test"}.fastnear.com`).replace(/\/+$/, ""),
     relayers: (RELAYER_ACCOUNT_ID ?? DEFAULT_RELAYERS[c.NETWORK] ?? "").split(",").map((a) => a.trim()).filter(Boolean),

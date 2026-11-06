@@ -1,4 +1,4 @@
-import { DEFAULT_RPCS } from "@tredio/chain";
+import { type RpcEndpoint, rpcEndpoints } from "@tredio/chain";
 import { type Deployment, deployment as deploymentOf } from "@tredio/contracts";
 import { z } from "zod";
 
@@ -11,6 +11,8 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(4100),
   NEAR_NETWORK: z.enum(["testnet", "mainnet"]).default("testnet"),
   NEAR_RPC_URLS: optional(z.string()),
+  /** FastNEAR API keys (comma-separated): requests take them in turn, ahead of the public providers. */
+  FASTNEAR_API_KEYS: optional(z.string()),
   DEPLOYMENT_JSON: optional(z.string()),
   /** The account that pays, and its key (`ed25519:<base58>`). */
   RELAYER_ACCOUNT_ID: z.string().min(2),
@@ -47,12 +49,12 @@ const schema = z.object({
   TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
 });
 
-export type Config = z.infer<typeof schema> & { deployment: Deployment; rpcUrls: string[]; origins: string[] };
+export type Config = z.infer<typeof schema> & { deployment: Deployment; rpc: RpcEndpoint[]; origins: string[] };
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const c = schema.parse(env);
   const deployment = c.DEPLOYMENT_JSON ? (JSON.parse(c.DEPLOYMENT_JSON) as Deployment) : deploymentOf(c.NEAR_NETWORK);
   if (c.NEAR_NETWORK === "mainnet" && !c.ACTIVATION_TICKET_SIGNER) throw new Error("ACTIVATION_TICKET_SIGNER is required on mainnet");
-  const rpcUrls = list(c.NEAR_RPC_URLS).length > 0 ? list(c.NEAR_RPC_URLS) : DEFAULT_RPCS[c.NEAR_NETWORK];
-  return { ...c, deployment, rpcUrls, origins: list(c.FRONTEND_URL) };
+  const rpc = rpcEndpoints(c.NEAR_NETWORK, list(c.NEAR_RPC_URLS), list(c.FASTNEAR_API_KEYS));
+  return { ...c, deployment, rpc, origins: list(c.FRONTEND_URL) };
 }

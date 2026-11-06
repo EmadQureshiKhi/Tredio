@@ -1,4 +1,4 @@
-import { Viewer } from "@tredio/chain";
+import { type RpcEndpoints, Viewer } from "@tredio/chain";
 import type { Checkpoint, Deployment, RegistryParams, Trend } from "@tredio/contracts";
 
 /**
@@ -40,12 +40,12 @@ export class ChainReader {
   private inflight: Promise<{ trends: ChainTrend[]; lastRunId: bigint }> | null = null;
 
   constructor(
-    rpcUrls: readonly string[],
+    rpc: RpcEndpoints,
     readonly deployment: Deployment,
     private readonly ttlMs = 15_000,
     private readonly maxStaleMs = 5 * 60_000,
   ) {
-    this.viewer = new Viewer(deployment.network, [...rpcUrls]);
+    this.viewer = new Viewer(deployment.network, rpc);
   }
 
   get registry(): string {

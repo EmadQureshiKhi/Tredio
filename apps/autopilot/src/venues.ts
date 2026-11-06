@@ -1,5 +1,5 @@
 import { open } from "@tredio/autopilot";
-import { publicKeyOf, Sender, type Viewer } from "@tredio/chain";
+import { publicKeyOf, type RpcEndpoints, Sender, type Viewer } from "@tredio/chain";
 import { type AccountVersions, calls, type Deployment, type Session, sessionCallTgas } from "@tredio/contracts";
 import type { ExecutorDb, GrantRow, Route } from "./db";
 import type { Log } from "./log";
@@ -199,8 +199,8 @@ export function nearGrantChain(viewer: Viewer): GrantChain {
  * gas key with the gas the account's code version needs (300 Tgas on v1, 150 on v2), the version
  * read once per account through `versions` (shared by every venue).
  */
-export function nearSessionChain(viewer: Viewer, deployment: Deployment, account: string, secretKey: string, rpcUrls: string[], versions: AccountVersions): SessionChain {
-  const sender = new Sender({ network: deployment.network, accountId: account, privateKey: secretKey, gasKeyLanes: 1, rpcUrls });
+export function nearSessionChain(viewer: Viewer, deployment: Deployment, account: string, secretKey: string, rpc: RpcEndpoints, versions: AccountVersions): SessionChain {
+  const sender = new Sender({ network: deployment.network, accountId: account, privateKey: secretKey, gasKeyLanes: 1, rpc });
   const c = calls(deployment);
   return {
     session: (a, publicKey) => viewer.view<Session | null>(a, "session", { public_key: publicKey }),

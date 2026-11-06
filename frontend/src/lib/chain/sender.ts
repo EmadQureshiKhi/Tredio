@@ -105,7 +105,8 @@ export class GasKeySender {
   private nearAt(url: string): Near {
     let n = this.nears.get(url);
     if (!n) {
-      n = new Near({ network: { networkId: NETWORK, rpcUrl: url }, privateKey: this.secretKey as PrivateKey, defaultSignerId: this.account });
+      // No near-kit retries (1, 2, 4 and 8 s on the same RPC): a failing RPC hands over to the next at once.
+      n = new Near({ network: { networkId: NETWORK, rpcUrl: url }, privateKey: this.secretKey as PrivateKey, defaultSignerId: this.account, retryConfig: { maxRetries: 0 } });
       this.nears.set(url, n);
     }
     return n;

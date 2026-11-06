@@ -6,8 +6,8 @@ import { Engine, type EngineState } from "./engine";
 
 const cfg = loadConfig(process.env);
 const log = (fields: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ service: "market-maker", msg, ...fields }));
-const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpcUrls);
-const sender = new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.MM_ACCOUNT_ID, privateKey: cfg.MM_PRIVATE_KEY, gasKeyLanes: cfg.MM_GAS_KEY_LANES, rpcUrls: cfg.rpcUrls });
+const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpc);
+const sender = new Sender({ network: cfg.NEAR_NETWORK, accountId: cfg.MM_ACCOUNT_ID, privateKey: cfg.MM_PRIVATE_KEY, gasKeyLanes: cfg.MM_GAS_KEY_LANES, rpc: cfg.rpc });
 // Order ids live only here: deleting the file strands resting orders until a kill switch or cancel_expired clears them.
 const store = {
   load: (): EngineState => (existsSync(cfg.STATE_FILE) ? (JSON.parse(readFileSync(cfg.STATE_FILE, "utf8")) as EngineState) : { orders: {}, series: [], requotedAt: {} }),

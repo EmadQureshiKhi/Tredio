@@ -44,10 +44,10 @@ const startedAt = Date.now();
 const cfg = loadConfig(process.env);
 const sql = connect(cfg.DATABASE_URL);
 const applied = await migrate(sql);
-log.info({ migrations: applied.length, network: cfg.NEAR_NETWORK, rpcEndpoints: cfg.rpcUrls.length }, "database ready");
+log.info({ migrations: applied.length, network: cfg.NEAR_NETWORK, rpcEndpoints: cfg.rpc.length }, "database ready");
 
 const store = new Store(sql);
-const chain = new ChainReader(cfg.rpcUrls, cfg.deployment);
+const chain = new ChainReader(cfg.rpc, cfg.deployment);
 // The first page view should not pay for the first registry read.
 void chain.trends().catch((e: Error) => log.warn({ err: e.message }, "registry warm-up failed"));
 
@@ -296,6 +296,7 @@ const system = new SystemMonitor({
   secrets: secretsOf({
     keys: [
       ...cfg.ELFA_API_KEYS,
+      ...cfg.rpc.flatMap((e) => (e.headers?.authorization ? [e.headers.authorization.replace(/^Bearer /, "")] : [])),
       ...cfg.NANSEN_API_KEYS,
       cfg.NEARAI_API_KEY,
       cfg.ONECLICK_JWT,
@@ -306,7 +307,7 @@ const system = new SystemMonitor({
       cfg.X402_RELAYER_KEY,
     ],
     routes: cfg.ELFA_PROXIES,
-    urls: [...cfg.rpcUrls, cfg.DATABASE_URL, cfg.INDEXER_DATABASE_URL],
+    urls: [...cfg.rpc.map((e) => e.url), cfg.DATABASE_URL, cfg.INDEXER_DATABASE_URL],
   }),
   startedAt,
 });
