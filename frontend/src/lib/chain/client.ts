@@ -27,7 +27,7 @@ export class ViewError extends Error {
 
 const transient = (e: unknown) => {
   const m = String((e as Error)?.message ?? e).toLowerCase();
-  return e instanceof TypeError || /fetch|network|timeout|timed out|429|too many|502|503|504|unavailable|rpc \d+/.test(m);
+  return e instanceof TypeError || /fetch|network|timeout|timed out|429|too many|rate limit|deprecated|502|503|504|unavailable|rpc \d+/.test(m);
 };
 
 /**
@@ -88,7 +88,9 @@ async function send<T>(body: string, timeoutMs: number): Promise<T> {
       try {
         const res = await fetch(p.url, { method: "POST", headers: { "content-type": "application/json" }, body, signal: AbortSignal.timeout(timeoutMs) });
         if (!res.ok) throw new RpcError(`rpc ${res.status}`);
-        const answer = (await res.json()) as { result?: T; error?: { cause?: { name?: string; info?: unknown }; message?: string; data?: unknown } };
+        const answer = (await res.json()) as { result?: T; error?: { cause?: { name?: string; info?: unknown }; message?: string; data?: unknown; code?: number } };
+        // FastNEAR answers a rate limit with HTTP 200 and a JSON-RPC error (code -429): the provider rests like on an HTTP 429.
+        if (answer.error?.code === -429 || /rate limit|deprecated/i.test(answer.error?.message ?? "")) throw new RpcError("rpc 429");
         p.strikes = 0;
         p.restUntil = 0;
         // The provider that answered leads from now on.

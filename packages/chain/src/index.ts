@@ -20,8 +20,9 @@ export * from "./proofs";
 export * from "./x402";
 
 export const DEFAULT_RPCS: Record<"testnet" | "mainnet", string[]> = {
-  // Intear's endpoint is slower but takes bursts the others refuse when several services share an address.
-  testnet: ["https://test.rpc.fastnear.com", "https://testnet-rpc.intea.rs", "https://rpc.testnet.near.org"],
+  // Intear's endpoint is slower but takes bursts the others refuse when several services share an address;
+  // dRPC replaces rpc.testnet.near.org, which now answers every call with a deprecation error.
+  testnet: ["https://test.rpc.fastnear.com", "https://testnet-rpc.intea.rs", "https://near-testnet.drpc.org"],
   mainnet: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.near.org"],
 };
 
@@ -30,7 +31,8 @@ export type Network = "testnet" | "mainnet";
 /** True for errors worth retrying on another provider or later (network, rate limit, timeout). */
 export function isTransient(e: unknown): boolean {
   const m = String((e as Error)?.message ?? e).toLowerCase();
-  return /fetch failed|network|timeout|timed out|429|too many|503|502|504|econnreset|socket|unavailable/.test(m);
+  // FastNEAR answers a rate limit with HTTP 200 and a JSON-RPC error (code -429, "Rate limits exceeded").
+  return /fetch failed|network|timeout|timed out|429|too many|rate limit|deprecated|503|502|504|econnreset|socket|unavailable/.test(m);
 }
 
 const FAILOVER_ROUNDS = 3;
@@ -112,8 +114,9 @@ export class Viewer {
         signal: AbortSignal.timeout(15_000),
       });
       if (!res.ok) throw new Error(`rpc ${res.status}`);
-      const body = (await res.json()) as { result?: T; error?: { cause?: { name?: string }; message?: string } };
-      if (body.error) throw new Error(body.error.cause?.name ?? body.error.message ?? "rpc error");
+      const body = (await res.json()) as { result?: T; error?: { cause?: { name?: string }; message?: string; code?: number } };
+      // A named cause (UNKNOWN_ACCOUNT) is the node's answer; otherwise keep the code, which tells a rate limit (-429) from a refusal.
+      if (body.error) throw new Error(body.error.cause?.name ?? `${body.error.message ?? "rpc error"}${body.error.code !== undefined ? ` (${body.error.code})` : ""}`);
       return body.result as T;
     });
   }

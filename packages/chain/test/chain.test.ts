@@ -100,6 +100,9 @@ describe("outcomes", () => {
     expect(isTransient(new Error("HTTP 429 Too Many Requests"))).toBe(true);
     expect(isTransient(new Error("fetch failed"))).toBe(true);
     expect(isTransient(new Error("Account does not exist"))).toBe(false);
+    // FastNEAR's JSON-RPC rate limit and near.org's deprecation answer, as Viewer.rpc words them.
+    expect(isTransient(new Error("Rate limits exceeded, please slow down (-429)"))).toBe(true);
+    expect(isTransient(new Error("WARNING! THIS ENDPOINT IS DEPRECATED! (-429)"))).toBe(true);
   });
 
   test("formats yoctoNEAR without float rounding", () => {

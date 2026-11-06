@@ -21,8 +21,8 @@ export const DEPLOYMENT: Deployment = deployment(NETWORK);
  * NEXT_PUBLIC_NEAR_RPC_URLS (comma-separated) overrides them.
  */
 const DEFAULT_RPC_URLS: Record<Network, string[]> = {
-  // Intear's endpoint is slower but sends CORS headers and takes bursts the others refuse.
-  testnet: [DEPLOYMENT.rpc, "https://testnet-rpc.intea.rs", "https://rpc.testnet.near.org"],
+  // Intear's endpoint is slower but sends CORS headers and takes bursts the others refuse; dRPC replaces rpc.testnet.near.org, which is deprecated.
+  testnet: [DEPLOYMENT.rpc, "https://testnet-rpc.intea.rs", "https://near-testnet.drpc.org"],
   mainnet: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.near.org"],
 };
 const configuredRpcs = (process.env.NEXT_PUBLIC_NEAR_RPC_URLS ?? "")
