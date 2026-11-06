@@ -35,6 +35,7 @@ const proofs = JSON.parse(readFileSync(join(ROOT, `deployments/${NETWORK}-proofs
     attestations: string;
   };
   x402Payment: { tx: string; relayer: string; payer: string; amount: string };
+  settledSeries: { series: number; trend: string; window: number; openTx: string; settleTx: string; keeper: string };
 };
 const args = new Set(process.argv.slice(2));
 const viewer = new Viewer(NETWORK, DEFAULT_RPCS[NETWORK]);
@@ -211,6 +212,16 @@ async function chain() {
     const signed = ed25519.verify(Buffer.from(out.signature, "base64"), sha256(out.report_json), base58Decode(out.public_key.replace(/^ed25519:/, "")));
     if (!signed) return fail("the run's report signature does not verify under the key it printed");
     return ok(`tx ${run.tx.slice(0, 10)}...: TDX quote over wasm ${run.wasmSha256.slice(0, 12)}... (the recorded build); its report verifies under ${run.enclavePublicKey.slice(0, 18)}...`);
+  });
+
+  await check(S, "An Up/Down series settled from the registry", async () => {
+    const { series, trend, settleTx, keeper } = proofs.settledSeries;
+    const s = await viewer.view<{ trend: string; expiry: number; outcome: string } | null>(D.contracts.outcomes, "get_series", { series });
+    if (!s || s.trend !== trend) return fail(`series ${series} is not ${trend}`);
+    const settlement = await viewer.view<{ finalized: boolean; value: number }>(D.contracts.registry, "settlement_of", { id: trend, expiry: s.expiry });
+    const o = await viewer.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: settleTx, sender_account_id: keeper, wait_until: "NONE" });
+    if (s.outcome === "open" || !settlement.finalized || !("SuccessValue" in o.status)) return fail(`series ${series}: outcome ${s.outcome}, settlement finalized ${settlement.finalized}`);
+    return ok(`series ${series} (${trend}) settled ${s.outcome} at ${(settlement.value / 1e6).toFixed(2)} by ${settleTx.slice(0, 10)}...`);
   });
 
   await check(S, "x402 payment settled in USDC on NEAR", async () => {

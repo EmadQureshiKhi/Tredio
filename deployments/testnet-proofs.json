@@ -41,5 +41,13 @@
     "relayer": "tredio-relayer.testnet",
     "payer": "tredio.testnet",
     "amount": "10000"
+  },
+  "settledSeries": {
+    "series": 6,
+    "trend": "topic:world-cup",
+    "window": 900,
+    "openTx": "4mxS6GSbgofhyyK4iza2QubUnm7u9vVyc6KuXTqj5cpF",
+    "settleTx": "2YNerBhhpGTNGbri9qfPjSxxqU5Pw7qofGG874LKwGBP",
+    "keeper": "tredio-keeper.testnet"
   }
 }
