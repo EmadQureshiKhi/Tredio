@@ -888,22 +888,25 @@ export class SystemMonitor {
       { label: "Stale indexes", value: staleTrends === null ? "?" : String(staleTrends), tone: (staleTrends ?? 0) > 0 ? "bad" : "ok" },
       ...(keeperOracle ? [{ label: "Keeper sees", value: `${num(keeperOracle.live) ?? 0} live, ${num(keeperOracle.stale) ?? 0} stale` }] : []),
     ];
-    services.push({
-      name: "oracle",
-      state: oracle.ok ? "up" : lastRunAgeSec === null || lastRunAgeSec > d.oracleStaleSec ? "down" : "degraded",
-      core: true,
-      httpStatus: null,
-      latencyMs: null,
-      lastSuccessAt: lastRunAt,
-      lastError: oracle.error,
-      alerts: [],
-      facts: oracleFacts,
-      wallets: [],
-      rpc: [],
-      reason: oracle.ok ? null : lastRunAgeSec === null ? "no report on chain" : lastRunAgeSec > d.oracleStaleSec ? `no report for ${ageText(lastRunAgeSec)}` : `${staleTrends} stale ${staleTrends === 1 ? "index" : "indexes"}`,
-      derived: true,
-    });
-    if (d.indexer) {
+    // A probed oracle or indexer service already has its row; its on-chain state shows in its own card.
+    const probed = new Set(services.map((x) => x.name));
+    if (!probed.has("oracle"))
+      services.push({
+        name: "oracle",
+        state: oracle.ok ? "up" : lastRunAgeSec === null || lastRunAgeSec > d.oracleStaleSec ? "down" : "degraded",
+        core: true,
+        httpStatus: null,
+        latencyMs: null,
+        lastSuccessAt: lastRunAt,
+        lastError: oracle.error,
+        alerts: [],
+        facts: oracleFacts,
+        wallets: [],
+        rpc: [],
+        reason: oracle.ok ? null : lastRunAgeSec === null ? "no report on chain" : lastRunAgeSec > d.oracleStaleSec ? `no report for ${ageText(lastRunAgeSec)}` : `${staleTrends} stale ${staleTrends === 1 ? "index" : "indexes"}`,
+        derived: true,
+      });
+    if (d.indexer && !probed.has("indexer")) {
       services.push({
         name: "indexer",
         state: indexer.error ? "down" : (indexer.lagSec ?? 0) > INDEXER_LAG_BAD_SEC ? "down" : (indexer.lagSec ?? 0) > INDEXER_LAG_WARN_SEC ? "degraded" : "up",

@@ -30,6 +30,9 @@ export function isTransient(e: unknown): boolean {
   return /fetch failed|network|timeout|timed out|429|too many|503|502|504|econnreset|socket|unavailable/.test(m);
 }
 
+const FAILOVER_ROUNDS = 3;
+const FAILOVER_BACKOFF_MS = 500;
+
 /** Read-only access with provider failover. */
 export class Viewer {
   private readonly clients: Near[];
@@ -41,15 +44,28 @@ export class Viewer {
   }
 
   async view<T>(contractId: string, method: string, args: object = {}): Promise<T> {
+    return this.failover((i) => this.clients[i]!.view<T>(contractId, method, args) as Promise<T>);
+  }
+
+  /**
+   * Tries each provider in turn, starting from the last one that worked; when every provider
+   * answers with a transient error (a rate limit, a timeout), waits and goes round again, up to
+   * three rounds, so a burst from several services on one address delays a read instead of failing it.
+   */
+  private async failover<T>(attempt: (provider: number) => Promise<T>): Promise<T> {
     let last: unknown;
-    for (let i = 0; i < this.clients.length; i++) {
-      const c = this.clients[(this.next + i) % this.clients.length]!;
-      try {
-        return (await c.view<T>(contractId, method, args)) as T;
-      } catch (e) {
-        last = e;
-        if (!isTransient(e)) throw e;
-        this.next = (this.next + 1) % this.clients.length;
+    for (let round = 0; round < FAILOVER_ROUNDS; round++) {
+      if (round > 0) await new Promise((r) => setTimeout(r, FAILOVER_BACKOFF_MS * 3 ** (round - 1) * (0.75 + Math.random() / 2)));
+      for (let i = 0; i < this.urls.length; i++) {
+        const provider = (this.next + i) % this.urls.length;
+        try {
+          const result = await attempt(provider);
+          this.next = provider;
+          return result;
+        } catch (e) {
+          last = e;
+          if (!isTransient(e)) throw e;
+        }
       }
     }
     throw last;
@@ -85,27 +101,20 @@ export class Viewer {
   }
 
   async rpc<T>(method: string, params: unknown): Promise<T> {
-    let last: unknown;
-    for (let i = 0; i < this.urls.length; i++) {
-      const url = this.urls[(this.next + i) % this.urls.length]!;
-      try {
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-          signal: AbortSignal.timeout(15_000),
-        });
-        if (!res.ok) throw new Error(`rpc ${res.status}`);
-        const body = (await res.json()) as { result?: T; error?: { cause?: { name?: string }; message?: string } };
-        if (body.error) throw new Error(body.error.cause?.name ?? body.error.message ?? "rpc error");
-        return body.result as T;
-      } catch (e) {
-        last = e;
-        if (!isTransient(e)) throw e;
-      }
-    }
-    throw last;
+    return this.failover(async (i) => {
+      const res = await fetch(this.urls[i]!, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) throw new Error(`rpc ${res.status}`);
+      const body = (await res.json()) as { result?: T; error?: { cause?: { name?: string }; message?: string } };
+      if (body.error) throw new Error(body.error.cause?.name ?? body.error.message ?? "rpc error");
+      return body.result as T;
+    });
   }
+
 }
 
 export interface SenderOptions {

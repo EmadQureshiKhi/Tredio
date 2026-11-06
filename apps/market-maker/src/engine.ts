@@ -33,6 +33,12 @@ export interface EngineState {
   series: number[];
   /** Unix seconds of the last re-quote per market. */
   requotedAt: Record<string, number>;
+  /**
+   * The last ladder read per market and the market's trade count then: our orders can only change
+   * when the market trades (or we re-quote), so an unchanged count reuses it instead of reading
+   * every order again.
+   */
+  seen?: Record<string, { trades: number; ids: number[]; bids: Array<[number, string]>; asks: Array<[number, string]> }>;
 }
 
 export interface StateStore {
@@ -82,12 +88,23 @@ export class Engine {
   }
 
   /** Our live orders of a market as a ladder, with the ids still resting. */
-  private async liveLadder(key: string): Promise<{ ladder: Ladder; ids: number[] }> {
+  private async liveLadder(series: number, side: Side): Promise<{ ladder: Ladder; ids: number[] }> {
+    const key = `${series}:${side}`;
+    const market = await this.view<Market | null>(this.d.contracts.book, "get_market", { series, side });
+    const seen = this.state.seen?.[key];
+    if (seen && market && seen.trades === market.trades) {
+      const level = ([tick, size]: [number, string]): Level => ({ tick, size: raw(size) });
+      return { ladder: { bids: seen.bids.map(level), asks: seen.asks.map(level) }, ids: seen.ids };
+    }
     const ids = this.state.orders[key] ?? [];
     const orders = (await Promise.all(ids.map((id) => this.view<Order | null>(this.d.contracts.book, "get_order", { order_id: id }).catch(() => null)))).filter((o): o is Order => o !== null);
     const bids = orders.filter((o) => o.dir === "buy").sort((a, b) => b.tick - a.tick);
     const asks = orders.filter((o) => o.dir === "sell").sort((a, b) => a.tick - b.tick);
     const level = (o: Order): Level => ({ tick: o.tick, size: raw(o.remaining) });
+    if (market) {
+      this.state.seen ??= {};
+      this.state.seen[key] = { trades: market.trades, ids: orders.map((o) => o.id), bids: bids.map((o) => [o.tick, o.remaining]), asks: asks.map((o) => [o.tick, o.remaining]) };
+    }
     return { ladder: { bids: bids.map(level), asks: asks.map(level) }, ids: orders.map((o) => o.id) };
   }
 
@@ -141,6 +158,8 @@ export class Engine {
     const r = await this.sender.send<Placement[]>(this.C.book.batchUpdate(cancels, places));
     this.state.orders[key] = (r.value ?? []).flatMap((p) => (p.order_id !== null ? [p.order_id] : []));
     this.state.requotedAt[key] = nowSec;
+    // The new orders are read once on the next tick.
+    if (this.state.seen) delete this.state.seen[key];
     this.save();
   }
 
@@ -150,6 +169,7 @@ export class Engine {
       if (ids.length === 0) continue;
       await this.sender.send(this.C.book.batchUpdate(ids, [])).catch((e: Error) => this.log({ key, err: e.message }, "cancel failed"));
       this.state.orders[key] = [];
+      if (this.state.seen) delete this.state.seen[key];
       this.save();
     }
   }
@@ -163,6 +183,7 @@ export class Engine {
         const key = `${id}:${side}`;
         if ((this.state.orders[key] ?? []).length > 0) await this.sender.send(this.C.book.batchUpdate(this.state.orders[key]!, [])).catch(() => undefined);
         this.state.orders[key] = [];
+        if (this.state.seen) delete this.state.seen[key];
         const onBook = await this.bookBalance({ token: { series: id, side } });
         if (onBook > 0n) await this.sender.send(this.C.book.withdraw({ token: { series: id, side } }, onBook.toString()));
       }
@@ -224,7 +245,7 @@ export class Engine {
     let equity = usdc(margin) + usdc(raw(await this.view<string>(this.d.contracts.usdc, "ft_balance_of", { account_id: this.me })));
     for (const { series: s } of picked) {
       const fair = Number(await this.view<string>(this.d.contracts.registry, "fair_up", { id: s.trend, opening: s.opening_index, expiry: s.expiry })) / TOKEN;
-      const live = { up: await this.liveLadder(`${s.id}:up`), down: await this.liveLadder(`${s.id}:down`) };
+      const live = { up: await this.liveLadder(s.id, "up"), down: await this.liveLadder(s.id, "down") };
       const restingAsks = (l: Ladder) => l.asks.reduce((a, x) => a + x.size, 0n);
       const restingBids = (l: Ladder) => l.bids.reduce((a, x) => a + (x.size * BigInt(x.tick)) / 1000n, 0n);
       let held = {

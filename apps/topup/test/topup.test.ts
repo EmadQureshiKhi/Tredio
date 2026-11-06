@@ -35,7 +35,9 @@ describe("plan", () => {
   });
 });
 
-test("burn per day counts refills", () => {
+test("burn per day counts refills, and waits for six hours of samples", () => {
+  const short = { ...freshMemory(), samples: [{ at: 0, balance: "5" }, { at: 3_600_000, balance: "4" }] };
+  expect(burnPerDay(short, 3_600_000)).toBeNull();
   const m = { ...freshMemory(), samples: [{ at: 0, balance: (5n * NEAR).toString() }, { at: DAY_MS / 2, balance: (4n * NEAR).toString() }], sent: [{ at: DAY_MS / 4, amount: (1n * NEAR).toString() }] };
   expect(burnPerDay(m, DAY_MS / 2)).toBe(4n * NEAR);
 });

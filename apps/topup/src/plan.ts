@@ -28,6 +28,7 @@ export interface PlanOptions {
 }
 
 export const DAY_MS = 86_400_000;
+export const MIN_BURN_SPAN_MS = 6 * 3_600_000;
 
 export const freshMemory = (): TargetMemory => ({ lastTransfer: null, sent: [], failures: 0, retryAt: 0, samples: [] });
 
@@ -61,7 +62,8 @@ export function plan(targets: readonly Target[], balances: ReadonlyMap<string, b
 /**
  * NEAR (or USDC) a target used over the last day, from its balance samples and what it received:
  * the drop in balance plus the refills, over the time the samples span, scaled to a day. Null
- * until the samples span at least an hour.
+ * until the samples span six hours, so a one-off spend (an account creation) is not read as a
+ * day's pace.
  */
 export function burnPerDay(m: TargetMemory, nowMs: number): bigint | null {
   const samples = m.samples.filter((s) => nowMs - s.at <= DAY_MS);
@@ -69,7 +71,7 @@ export function burnPerDay(m: TargetMemory, nowMs: number): bigint | null {
   const first = samples[0]!;
   const last = samples[samples.length - 1]!;
   const span = last.at - first.at;
-  if (span < 3_600_000) return null;
+  if (span < MIN_BURN_SPAN_MS) return null;
   const received = m.sent.filter((s) => s.at > first.at && s.at <= last.at).reduce((a, s) => a + BigInt(s.amount), 0n);
   const used = BigInt(first.balance) + received - BigInt(last.balance);
   return used <= 0n ? 0n : (used * BigInt(DAY_MS)) / BigInt(span);
