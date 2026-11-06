@@ -1,9 +1,10 @@
 "use client";
-import { Activity, Radio } from "lucide-react";
+import { Activity, Boxes, Fuel, Radio } from "lucide-react";
 import type { ReactNode } from "react";
-import { Badge, Card, cn, ErrorNote, RefreshIcon, Skeleton } from "@/components/ui";
+import { Badge, Card, cn, ErrorNote, ExplorerLink, RefreshIcon, Skeleton } from "@/components/ui";
+import { explorerAddress } from "@/lib/config";
 import type { SystemStatus } from "@/lib/api";
-import { integer } from "@/lib/format";
+import { integer, shortAddress } from "@/lib/format";
 import { useTrends } from "@/lib/hooks/queries";
 import { useNow } from "@/features/portfolio/parts";
 import { serviceInfo, useStatusPage } from "./data";
@@ -49,8 +50,12 @@ export default function Status() {
       {s ? (
         <>
           <Overall s={s} since={since} stale={status.isError} />
-          <OracleCard s={s} since={since} />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <OracleCard s={s} since={since} />
+            <ChainCard s={s} since={since} />
+          </div>
           <ServicesCard s={s} />
+          <FleetCard s={s} />
         </>
       ) : null}
     </div>
@@ -72,7 +77,7 @@ function StateBadge({ ok, testId }: { ok: boolean; testId?: string }) {
 }
 
 function Overall({ s, since, stale }: { s: SystemStatus; since: number; stale: boolean }) {
-  const down = [...s.services.filter((x) => !x.ok).map((x) => serviceInfo(x.name).label), ...(s.oracle.ok ? [] : ["the attention oracle"])];
+  const down = [...s.services.filter((x) => !x.ok).map((x) => serviceInfo(x.name).label), ...(s.oracle.ok ? [] : ["the attention oracle"]), ...(s.chain.ok ? [] : ["the NEAR head"])];
   const lastRun = s.oracle.lastRunAgeSec === null ? null : s.oracle.lastRunAgeSec + since;
   return (
     <section aria-label="Overall status" className="relative overflow-hidden rounded-[24px] border border-line bg-surface px-5 py-6 sm:px-8 sm:py-7" data-testid="status-overall" data-ok={s.ok}>
@@ -132,6 +137,32 @@ function OracleCard({ s, since }: { s: SystemStatus; since: number }) {
   );
 }
 
+/** The NEAR network the contracts run on, as the API sees its newest block. */
+function ChainCard({ s, since }: { s: SystemStatus; since: number }) {
+  const age2 = s.chain.ageSec === null ? null : s.chain.ageSec + since;
+  return (
+    <Card className="flex flex-col gap-4 p-5 sm:p-6" data-testid="status-chain">
+      <div className="flex items-start justify-between gap-3">
+        <span className="flex items-center gap-2.5">
+          <Boxes className="size-[18px] text-primary" aria-hidden />
+          <h2 className="whitespace-nowrap font-strong text-[15px] text-text">NEAR {s.network === "mainnet" ? "mainnet" : "testnet"}</h2>
+        </span>
+        <StateBadge ok={s.chain.ok} testId="chain-state" />
+      </div>
+      <div>
+        <p className="text-[11.5px] uppercase tracking-[0.08em] text-text-3">Newest block</p>
+        <p className="num-display mt-1 font-display text-[40px] leading-none text-text" data-testid="chain-height">
+          {s.chain.height === null ? "-" : integer(s.chain.height)}
+        </p>
+      </div>
+      <div className="flex flex-col gap-2 border-t border-line pt-4">
+        <Fact label="Block age" value={age2 === null ? "-" : age(age2)} tone={s.chain.ok ? undefined : "warn"} />
+      </div>
+      <p className="text-[13px] leading-5 text-text-2">Every market, account and session lives in Tredio&rsquo;s contracts on NEAR. Blocks land about every second; trades from a session go straight to it.</p>
+    </Card>
+  );
+}
+
 function ServicesCard({ s }: { s: SystemStatus }) {
   return (
     <Card className="overflow-hidden" data-testid="status-services">
@@ -139,26 +170,81 @@ function ServicesCard({ s }: { s: SystemStatus }) {
         <h2 className="font-strong text-[15px] text-text">Services</h2>
         <p className="mt-0.5 text-[13px] text-text-2">Each one&rsquo;s health endpoint, as Tredio&rsquo;s API reaches it.</p>
       </div>
+      {s.services.length === 0 ? (
+        <p className="border-t border-line px-5 py-4 text-[13px] text-text-3 sm:px-6">This API does not check any services.</p>
+      ) : (
+        <ul className="divide-y divide-line border-t border-line">
+          {s.services.map((x) => {
+            const info = serviceInfo(x.name);
+            return (
+              <li key={x.name} className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-start sm:gap-6 sm:px-6" data-testid="status-service" data-name={x.name} data-ok={x.ok}>
+                <div className="flex items-center justify-between gap-3 sm:w-[180px] sm:shrink-0 sm:justify-start">
+                  <span className="flex items-center gap-2.5 font-strong text-[14px] text-text">
+                    <Dot ok={x.ok} />
+                    {info.label}
+                  </span>
+                  <span className="num text-[12.5px] text-text-3 sm:hidden">{x.ok && x.latencyMs !== null ? `${x.latencyMs} ms` : x.ok ? "" : "no answer"}</span>
+                </div>
+                <p className="min-w-0 flex-1 text-[13px] leading-5 text-text-2">{info.body}</p>
+                <div className="hidden shrink-0 items-center gap-3 sm:flex">
+                  <span className="num w-[64px] text-right text-[12.5px] text-text-3">{x.ok && x.latencyMs !== null ? `${x.latencyMs} ms` : x.ok ? "" : "no answer"}</span>
+                  <StateBadge ok={x.ok} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * The fleet: each account a service sends from, its NEAR and its gas keys. A gas key carries its
+ * own prepaid NEAR and parallel nonce lanes, so a service sends several transactions at once.
+ */
+function FleetCard({ s }: { s: SystemStatus }) {
+  if (s.fleet.length === 0) return null;
+  return (
+    <Card className="overflow-hidden" data-testid="status-fleet">
+      <div className="flex items-start gap-2.5 px-5 pb-4 pt-5 sm:px-6">
+        <Fuel className="mt-0.5 size-[18px] shrink-0 text-primary" aria-hidden />
+        <div>
+          <h2 className="font-strong text-[15px] text-text">Service fleet</h2>
+          <p className="mt-0.5 text-[13px] text-text-2">The accounts Tredio&rsquo;s services send from, with their gas keys: each key holds its own prepaid NEAR for gas and parallel nonce lanes, so a service sends many transactions at once.</p>
+        </div>
+      </div>
       <ul className="divide-y divide-line border-t border-line">
-        {s.services.map((x) => {
-          const info = serviceInfo(x.name);
-          return (
-            <li key={x.name} className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-start sm:gap-6 sm:px-6" data-testid="status-service" data-name={x.name} data-ok={x.ok}>
-              <div className="flex items-center justify-between gap-3 sm:w-[180px] sm:shrink-0 sm:justify-start">
-                <span className="flex items-center gap-2.5 font-strong text-[14px] text-text">
-                  <Dot ok={x.ok} />
-                  {info.label}
-                </span>
-                <span className="num text-[12.5px] text-text-3 sm:hidden">{x.ok && x.latencyMs !== null ? `${x.latencyMs} ms` : x.ok ? "" : "no answer"}</span>
-              </div>
-              <p className="min-w-0 flex-1 text-[13px] leading-5 text-text-2">{info.body}</p>
-              <div className="hidden shrink-0 items-center gap-3 sm:flex">
-                <span className="num w-[64px] text-right text-[12.5px] text-text-3">{x.ok && x.latencyMs !== null ? `${x.latencyMs} ms` : x.ok ? "" : "no answer"}</span>
-                <StateBadge ok={x.ok} />
-              </div>
-            </li>
-          );
-        })}
+        {s.fleet.map((w) => (
+          <li key={`${w.service}-${w.account}`} className="flex flex-col gap-3 px-5 py-4 sm:px-6" data-testid="fleet-wallet" data-account={w.account}>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="font-strong text-[14px] text-text">{serviceInfo(w.service).label}</span>
+                {w.label && w.label.toLowerCase() !== w.service.toLowerCase() ? <span className="truncate text-[12.5px] text-text-3">{w.label}</span> : null}
+              </span>
+              <span className="flex items-center gap-3">
+                <ExplorerLink href={explorerAddress(w.account)} className="num font-mono text-[12.5px] text-text-2">
+                  {shortAddress(w.account)}
+                </ExplorerLink>
+                <span className="num font-strong text-[13.5px] text-text">{w.balance === null ? "-" : `${Number(w.balance).toLocaleString("en-US", { maximumFractionDigits: 3 })} NEAR`}</span>
+              </span>
+            </div>
+            {w.gasKeys.length > 0 ? (
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {w.gasKeys.map((k) => (
+                  <li key={k.publicKey} className="flex items-center justify-between gap-3 rounded-xl bg-surface-2 px-3 py-2 text-[12.5px]">
+                    <span className="num truncate font-mono text-text-2">Gas key {shortAddress(k.publicKey.replace(/^ed25519:/, ""))}</span>
+                    <span className="num shrink-0 text-text">
+                      {Number(k.balance).toLocaleString("en-US", { maximumFractionDigits: 3 })} NEAR · {k.nonces} {k.nonces === 1 ? "lane" : "lanes"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-[12.5px] text-text-3">Sends with a regular key, one transaction at a time.</p>
+            )}
+          </li>
+        ))}
       </ul>
     </Card>
   );

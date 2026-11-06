@@ -149,7 +149,7 @@ function Composer({ trend, tab }: { trend: Trend; tab: Tab }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unlocking, setUnlocking] = useState(false);
-  const identity = account.privateIdentity?.identity ?? null;
+  const identity = account.privateIdentity;
   const live = trend.status === "active" || trend.status === "cooling";
 
   if (!account.authenticated) {
@@ -160,6 +160,13 @@ function Composer({ trend, tab }: { trend: Trend; tab: Tab }) {
           Sign in
         </Button>
       </div>
+    );
+  }
+  if (!identity && account.kind === "wallet") {
+    return (
+      <p className="rounded-2xl bg-surface-2 px-4 py-3.5 text-[13px] leading-5 text-text-2">
+        Calls and posts are signed by a caller identity a passkey derives, kept apart from the trading account. A NEAR wallet cannot hold one, so join the thread from a passkey account.
+      </p>
     );
   }
   if (!identity) {

@@ -58,7 +58,7 @@ export function TrendCard({ trend: t, tradable, className, morph = true }: { tre
                 Cooling
               </Badge>
             ) : null}
-            {tradable ? <Badge tone="primary">Asset perp</Badge> : null}
+            {tradable ? <Badge tone="primary">Hyperliquid</Badge> : null}
           </div>
           <Morph name={morphName("title", t)} on={morph}>
             <h3 className="mt-2.5 line-clamp-2 w-fit font-strong text-[16px] leading-6 text-text">{name}</h3>

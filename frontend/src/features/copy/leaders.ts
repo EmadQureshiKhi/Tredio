@@ -1,40 +1,41 @@
 "use client";
+import { APP_URL as HL_APP_URL } from "@tredio/hyperliquid";
 import { useMemo } from "react";
-import type { CallerRow } from "@/lib/api";
+import type { HlLeader } from "@/lib/api";
+import { HL_NETWORK } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
-import { BOT_ADDRESS, isBot, useLeaderboard } from "@/features/autopilot/shared/data";
+import { BOT_ACCOUNT, useHlAddress, useHlLeaders } from "@/features/autopilot/shared/data";
 
 /**
- * Who a trading account is: the Tredio bot, a caller who linked it (by handle), or just an
- * address. Linking is public, so this is what anyone can see.
+ * Who a copy leader is. Copies follow a Hyperliquid address: the Tredio bot's (its NEAR account's
+ * Chain Signatures address), or a trader on Hyperliquid mainnet's public leaderboard (testnet has
+ * none, so a testnet follower copies their mainnet positions into its own testnet account).
  */
+export type DirectoryLeader = HlLeader & { followers: number };
+
 export function useLeaderDirectory() {
-  const board = useLeaderboard();
+  const board = useHlLeaders();
+  const bot = useHlAddress(BOT_ACCOUNT);
   return useMemo(() => {
-    const byAccount = new Map<string, CallerRow>();
-    for (const c of board.data?.callers ?? []) if (c.linked_account) byAccount.set(c.linked_account.toLowerCase(), c);
-    const caller = (account: string) => byAccount.get(account.toLowerCase()) ?? null;
+    const leaders = board.data?.leaders ?? [];
+    const botAddress = bot.data ?? null;
+    const byAddress = new Map(leaders.map((l) => [l.address.toLowerCase(), l]));
+    const isBot = (address: string | null | undefined) => Boolean(address) && botAddress !== null && address!.toLowerCase() === botAddress;
+    const leader = (address: string) => byAddress.get(address.toLowerCase()) ?? null;
     return {
-      loading: board.isLoading,
-      caller,
-      name: (account: string) => (isBot(account) ? "Tredio bot" : caller(account)?.handle ? `@${caller(account)!.handle}` : shortAddress(account)),
-      /** The profile page: the caller's, or the account's own record. */
-      href: (account: string) => {
-        const c = caller(account);
-        return `/c/${c ? (c.handle ?? c.address) : account.toLowerCase()}`;
-      },
-      /** The bot, then linked callers with a resolved track record, by score. */
-      featured: (exclude?: string | null) => {
-        const seen = new Set<string>([BOT_ADDRESS]);
-        const out: Array<{ account: string; caller: CallerRow | null }> = [{ account: BOT_ADDRESS, caller: null }];
-        for (const c of board.data?.callers ?? []) {
-          const a = c.linked_account?.toLowerCase();
-          if (!a || seen.has(a) || a === exclude?.toLowerCase() || c.resolved === 0) continue;
-          seen.add(a);
-          out.push({ account: a, caller: c });
-        }
-        return out.slice(0, 7);
-      },
+      loading: board.isLoading || (BOT_ACCOUNT !== null && bot.isLoading),
+      error: board.error,
+      botAddress,
+      isBot,
+      leader,
+      name: (address: string) => (isBot(address) ? "Tredio bot" : (leader(address)?.displayName ?? shortAddress(address))),
+      /** The leader on Hyperliquid's explorer: the bot trades on this network, leaderboard traders on mainnet. */
+      href: (address: string) => `${HL_APP_URL[isBot(address) ? HL_NETWORK : "mainnet"]}/explorer/address/${address}`,
+      /** The bot, then the leaderboard's best by monthly profit. */
+      featured: (limit = 9): Array<{ address: string; leader: DirectoryLeader | null }> => [
+        ...(botAddress ? [{ address: botAddress, leader: null }] : []),
+        ...leaders.slice(0, limit).map((l) => ({ address: l.address.toLowerCase(), leader: l })),
+      ],
     };
-  }, [board.data, board.isLoading]);
+  }, [board.data, board.isLoading, board.error, bot.data, bot.isLoading]);
 }

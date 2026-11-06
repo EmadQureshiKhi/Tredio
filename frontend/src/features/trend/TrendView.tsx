@@ -16,6 +16,7 @@ import { useTrend, useTrends } from "@/lib/hooks/queries";
 import { useSheets } from "@/lib/sheets";
 import { baseIdentifier, listingNumber, trendName } from "@/lib/trends";
 import { AlertButton } from "@/features/alerts/AlertSheet";
+import { ReviewChip } from "./ReviewChip";
 import { useRegistryIndex, useSeries } from "./data";
 import OnChain from "./OnChain";
 import Thread from "./Thread";
@@ -114,7 +115,7 @@ function Header({ trend, history }: { trend: Trend; history: TrendDetail["index"
   const name = trendName(trend);
   const listing = listingNumber(trend.identifier);
   const retired = trend.status === "retired";
-  const stale = live.data !== undefined && !live.data.fresh && !retired;
+  const stale = live.data != null && !live.data.fresh && !retired;
   const shareText = `Attention on ${name} is at ${index.toFixed(1)}${change ? ` (${change.pct >= 0 ? "+" : ""}${change.pct.toFixed(1)}% ${change.label === "24h" ? "in 24h" : "since listing"})` : ""}. Trade it on Tredio.`;
   return (
     <header className="flex flex-col gap-3">
@@ -134,6 +135,7 @@ function Header({ trend, history }: { trend: Trend; history: TrendDetail["index"
               <Badge tone="down">Retired</Badge>
             ) : null}
             {trend.ticker ? <Badge tone="primary">{trend.ticker}</Badge> : null}
+            {trend.reviewHash ? <ReviewChip hash={trend.reviewHash} /> : null}
             <span className="font-mono text-[12px] text-text-3">{baseIdentifier(trend.identifier)}</span>
             {listing > 1 ? <span className="text-[12px] text-text-3">· Listing {listing}</span> : null}
           </div>
@@ -142,7 +144,7 @@ function Header({ trend, history }: { trend: Trend; history: TrendDetail["index"
           </Morph>
           {trend.summary ? <p className="mt-2 max-w-2xl text-[14.5px] leading-6 text-text-2">{trend.summary}</p> : null}
         </div>
-        <div className="flex shrink-0 items-end justify-between gap-6 md:justify-end">
+        <div className="flex shrink-0 flex-wrap items-end justify-between gap-x-6 gap-y-3 md:justify-end">
           <div>
             <p className="text-[11.5px] uppercase tracking-[0.08em] text-text-3">Attention index</p>
             <div className="mt-1 flex items-baseline gap-2.5">
@@ -154,7 +156,7 @@ function Header({ trend, history }: { trend: Trend; history: TrendDetail["index"
               {change ? (
                 <span className="flex items-baseline gap-1">
                   <Delta value={change.pct} className="text-[14px]" />
-                  <span className="text-[12px] text-text-3">{change.label}</span>
+                  <span className="whitespace-nowrap text-[12px] text-text-3">{change.label}</span>
                 </span>
               ) : null}
             </div>
@@ -212,7 +214,7 @@ function IndexCard({ detail }: { detail: TrendDetail }) {
   const [range, setRange] = useState<Range>("24h");
   const series = useSeries(detail.trend.id);
   const live = useRegistryIndex(detail.trend.id);
-  const day = series.data?.find((s) => s.window === 86_400 && s.outcome === 0);
+  const day = series.data?.find((s) => s.window === 86_400 && s.outcome === "open");
   const pts = useMemo(() => {
     // The window ends at the newest reading, so the chart never depends on the render clock.
     const newest = Math.max(live.data?.updatedAt ?? 0, detail.index[detail.index.length - 1]?.t ?? 0);
@@ -344,7 +346,7 @@ function SourcesCard({ detail, relisted }: { detail: TrendDetail; relisted: stri
       )}
       <p className="border-t border-line px-5 py-3.5 text-[12px] leading-5 text-text-3">
         Measured by the Tredio oracle and recorded in the{" "}
-        <ExplorerLink href={explorerAddress(DEPLOYMENT.registry)} className="gap-1 whitespace-nowrap text-text-2">
+        <ExplorerLink href={explorerAddress(DEPLOYMENT.contracts.registry)} className="gap-1 whitespace-nowrap text-text-2">
           registry contract
         </ExplorerLink>
       </p>
@@ -352,12 +354,12 @@ function SourcesCard({ detail, relisted }: { detail: TrendDetail; relisted: stri
   );
 }
 
-/** The surfacer the registry records for trends the radar found itself. */
-const RADAR_SURFACER = "radar";
+/** The radar's own finds carry no surfacer on chain (the API reports it empty, older listings "radar"). */
+const isRadar = (surfacer: string) => surfacer === "" || surfacer === "radar";
 
 function CurationCard({ trend }: { trend: Trend }) {
   const open = useSheets((s) => s.open);
-  const radar = trend.surfacer === RADAR_SURFACER;
+  const radar = isRadar(trend.surfacer);
   return (
     <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
@@ -373,9 +375,9 @@ function CurationCard({ trend }: { trend: Trend }) {
             {radar ? "Found by the Tredio radar" : (
               <>
                 Surfaced by{" "}
-                <Link href={`/c/${trend.surfacer}`} className="num font-mono text-[13px] text-primary hover:underline">
+                <a href={explorerAddress(trend.surfacer)} target="_blank" rel="noreferrer" className="num font-mono text-[13px] text-primary hover:underline">
                   {shortAddress(trend.surfacer)}
-                </Link>
+                </a>
               </>
             )}
           </p>

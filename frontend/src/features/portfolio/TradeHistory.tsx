@@ -3,25 +3,23 @@ import { useQuery } from "@tanstack/react-query";
 import { History } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Badge, Button, ButtonLink, cn, ErrorNote, ExplorerLink, Skeleton } from "@/components/ui";
+import { Badge, Button, ButtonLink, cn, ErrorNote, ReceiptLink, Skeleton } from "@/components/ui";
 import { StatTile } from "@/features/autopilot/shared/kit";
 import { type AccountHistory, type ActivityItem, history, type Trend } from "@/lib/api";
-import { explorerTx } from "@/lib/config";
 import { ago, usdc } from "@/lib/format";
 import { baseIdentifier, trendName } from "@/lib/trends";
 import { action, statusOf, useActivity } from "./activity";
-import { portfolioKey } from "./hooks";
+import { portfolioKey } from "./keys";
 import { SectionCard, signedUsdc } from "./parts";
 
 /**
  * The account's track record and trade history from the indexer: what it made, how often it
- * won, and every perp, coin, outcome and asset perp trade, newest first. The holdings above are
+ * won, and every perp, coin, outcome and Hyperliquid trade, newest first. The holdings above are
  * read live; this is the record of what already happened.
  */
 
 const SHOWN = 10;
-const KIND: Record<ActivityItem["kind"], string> = { perp: "Attention perp", coin: "Trend coin", outcome: "Up or down", assetPerp: "Asset perp" };
-
+const KIND: Record<ActivityItem["kind"], string> = { perp: "Attention perp", coin: "Trend coin", outcome: "Up or down", assetPerp: "Hyperliquid" };
 
 function useAccountHistory(address: string | undefined) {
   const key = portfolioKey(address);
@@ -35,8 +33,6 @@ function useAccountHistory(address: string | undefined) {
   const activity = useActivity(address);
   return { account, activity };
 }
-
-
 
 export function TradeHistory({ address, trends }: { address: string; trends: readonly Trend[] }) {
   const { account, activity } = useAccountHistory(address);
@@ -88,7 +84,7 @@ export function TradeHistory({ address, trends }: { address: string; trends: rea
             {items.length > 0 ? (
               <ul className="divide-y divide-line rounded-2xl border border-line" data-testid="history-activity">
                 {(all ? items : items.slice(0, SHOWN)).map((item, i) => (
-                  <ActivityRow key={`${item.tx ?? i}-${item.kind}-${item.at}-${i}`} item={item} name={item.kind === "assetPerp" ? item.label : item.identifier ? (names.get(item.identifier) ?? baseIdentifier(item.identifier)) : item.label} />
+                  <ActivityRow key={`${item.receipt ?? i}-${item.kind}-${item.at}-${i}`} item={item} name={item.kind === "assetPerp" ? item.label : item.identifier ? (names.get(item.identifier) ?? baseIdentifier(item.identifier)) : item.label} />
                 ))}
               </ul>
             ) : null}
@@ -110,7 +106,6 @@ function Record({ stats }: { stats: NonNullable<AccountHistory["stats"]> }) {
     { label: "Up or down", v: stats.perProduct.outcome },
     { label: "Attention perps", v: stats.perProduct.perp },
     { label: "Trend coins", v: stats.perProduct.coin },
-    { label: "Asset perps", v: stats.perProduct.assetPerp },
   ];
   return (
     <div className="flex flex-col gap-3" data-testid="history-record">
@@ -164,10 +159,10 @@ function ActivityRow({ item, name }: { item: ActivityItem; name: string }) {
         <p className="num text-[13px] text-text">{item.amountUsdc === null ? "-" : `${usdc(item.amountUsdc)}`}</p>
         {item.pnlUsdc !== null ? <p className={cn("num font-strong text-[12px]", Math.abs(item.pnlUsdc) < 0.005 ? "text-text-3" : item.pnlUsdc > 0 ? "text-up" : "text-down")}>{signedUsdc(item.pnlUsdc)}</p> : <p className="text-[12px] text-text-3">USDC</p>}
       </div>
-      {item.tx ? (
-        <ExplorerLink href={explorerTx(item.tx)} size="icon" className="-mr-1.5 w-[28px] shrink-0 justify-end gap-1 rounded-lg px-1.5 py-1.5 text-[12px] hover:bg-surface-2 sm:w-[96px]" testId="history-tx">
+      {item.receipt ? (
+        <ReceiptLink receipt={item.receipt} className="-mr-1.5 w-[28px] shrink-0 justify-end gap-1 rounded-lg px-1.5 py-1.5 text-[12px] hover:bg-surface-2 sm:w-[96px]" testId="history-tx">
           <span className="sr-only sm:not-sr-only">explorer</span>
-        </ExplorerLink>
+        </ReceiptLink>
       ) : (
         <span className="-mr-1.5 w-[28px] shrink-0 sm:w-[96px]" />
       )}

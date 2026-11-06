@@ -32,8 +32,10 @@ export interface ServiceInfo {
 export const SERVICES: Record<string, ServiceInfo> = {
   keeper: { label: "Keeper", body: "Opens and lists each new Up or down series, settles expired ones, keeps perp funding current, liquidates unsafe positions, retires quiet trends and graduates full curves." },
   "market-maker": { label: "Market maker", body: "Quotes UP and DOWN on the order book for every listed series, so there is always a price to buy or sell at." },
-  relayer: { label: "Relayer", body: "Pays the network fees for passkey accounts, so every trade is free and nobody needs to hold a fee token." },
-  autopilot: { label: "Autopilot", body: "Runs Autopilot rules and copy trading on asset perps around the clock, within the limits each account granted." },
+  relayer: { label: "Relayer", body: "Creates passkey accounts, relays passkey-signed requests and refills each trading session's gas key, so nobody needs to hold NEAR to trade." },
+  autopilot: { label: "Autopilot", body: "Runs Autopilot rules and copy trading on Hyperliquid around the clock, through each account's own guarded session." },
+  oracle: { label: "Oracle", body: "Measures attention from every source and writes each trend's index, with Hyperliquid marks, to the registry in signed reports." },
+  indexer: { label: "Indexer", body: "Reads Tredio's events from every NEAR block into the history behind portfolios, leaderboards and trend stats." },
   topup: { label: "Top-up", body: "Keeps every Tredio service account that sends transactions funded from one treasury, so the oracle, keeper, relayer and market maker never stall." },
 };
 

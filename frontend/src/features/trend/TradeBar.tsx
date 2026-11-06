@@ -15,9 +15,9 @@ import { useNow } from "./ticket";
 export default function TradeBar({ trend }: { trend: Trend }) {
   const series = useSeries(trend.id);
   const now = useNow(5_000);
-  const s = useMemo(() => orderSeries(series.data ?? []).find((x) => x.outcome === 0 && x.expiry > now / 1000), [series.data, now]);
-  const upBook = useBook(s?.listed ? s.upMarket : undefined);
-  const downBook = useBook(s?.listed ? s.downMarket : undefined);
+  const s = useMemo(() => orderSeries(series.data ?? []).find((x) => x.outcome === "open" && x.expiry > now / 1000), [series.data, now]);
+  const upBook = useBook(s?.listed ? s.series : undefined, "up");
+  const downBook = useBook(s?.listed ? s.series : undefined, "down");
   const [side, setSide] = useState<Side | null>(null);
   // Kept while the sheet animates out.
   const [last, setLast] = useState<Side>("up");

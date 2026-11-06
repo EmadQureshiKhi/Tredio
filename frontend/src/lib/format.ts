@@ -62,8 +62,16 @@ export const integer = (v: number) => NF0.format(v);
 /** Probability (0 to 1) as cents: 0.53 shows as 53c. */
 export const cents = (v: number) => `${(v * 100).toFixed(1)}c`;
 
+/**
+ * An account, key or address short enough for a row: a readable NEAR name stays whole
+ * (`alice.testnet`), a long named one keeps its start and its network suffix, and derived ids
+ * (`0u...` accounts, implicit accounts, caller identities, Hyperliquid addresses) keep both ends.
+ */
 export function shortAddress(a: string | null | undefined): string {
   if (!a) return "";
+  if (a.length <= 20) return a;
+  const named = /^(.+?)\.(testnet|near)$/.exec(a);
+  if (named && !/^0u/.test(a)) return `${named[1]!.slice(0, 10)}...${named[2]}`;
   return `${a.slice(0, 6)}...${a.slice(-4)}`;
 }
 

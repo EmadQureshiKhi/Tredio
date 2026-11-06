@@ -1,17 +1,17 @@
 "use client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bot, CirclePause, Fingerprint, SlidersHorizontal, Users } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 import { Avatar } from "@/components/shell/AppShell";
 import { Badge, Button, Card, cn, Empty, ErrorNote, Skeleton } from "@/components/ui";
+import { IS_MAINNET } from "@/lib/config";
 import { describeError, useAccount } from "@/lib/account/AccountProvider";
 import { autopilot, type Follow } from "@/lib/api";
-import { usdc } from "@/lib/format";
+import { compact, usdc } from "@/lib/format";
 import { notify } from "@/lib/toast";
 import { GrantCard } from "@/features/autopilot/grant/GrantCard";
 import { GrantSheet } from "@/features/autopilot/grant/GrantSheet";
-import { grantUsable, isBot, useFollows, useGrant, usePerformance } from "@/features/autopilot/shared/data";
+import { BOT_ACCOUNT, grantUsable, useFollows, useGrant, usePerformance } from "@/features/autopilot/shared/data";
 import { PageHeader, SectionTitle, StaleNote, useConfirm } from "@/features/autopilot/shared/kit";
 import { LeaderCard, LeaderCardSkeleton } from "@/features/autopilot/shared/LeaderCard";
 import { FollowSheet } from "./FollowSheet";
@@ -28,14 +28,15 @@ export default function CopyPage() {
     setSheet({ leader, name });
     setOpen(true);
   };
-  const following = new Set((follows.data?.follows ?? []).map((f) => f.leader));
-  const featured = dir.featured(account.address);
+  const following = new Set((follows.data?.follows ?? []).map((f) => f.leader.toLowerCase()));
+  const featured = dir.featured();
+  const passkey = account.kind !== "wallet";
 
   return (
     <div className="flex flex-col gap-8 [font-feature-settings:'calt'_0]">
       <PageHeader
         title="Copy trading"
-        description="Follow a trader's asset perp positions on your own account: every open, add, trim and close, scaled to your size and held inside caps you choose."
+        description="Follow a trader's Hyperliquid positions from your own account: every open, add, trim and close, scaled to your size and held inside caps you choose."
       />
       <div className={cn("grid items-start gap-6", account.authenticated ? "lg:grid-cols-[minmax(0,1fr)_360px]" : "")}>
         <div className="flex min-w-0 flex-col gap-8">
@@ -52,13 +53,13 @@ export default function CopyPage() {
                 <ul className="flex flex-col gap-3" data-testid="follow-list">
                   {follows.data.follows.map((f) => (
                     <li key={f.id}>
-                      <FollowRow follow={f} name={dir.name(f.leader)} href={dir.href(f.leader)} onEdit={() => show(f.leader, dir.name(f.leader))} />
+                      <FollowRow follow={f} name={dir.name(f.leader)} href={dir.href(f.leader)} bot={dir.isBot(f.leader)} monthPnl={dir.leader(f.leader)?.pnl ?? null} onEdit={() => show(f.leader, dir.name(f.leader))} />
                     </li>
                   ))}
                 </ul>
               ) : (
                 <Card>
-                  <Empty icon={<Users className="size-6" />} title="Not following anyone yet" body="Start with the Tredio bot below: its rules and its record are public." />
+                  <Empty icon={<Users className="size-6" />} title="Not following anyone yet" body={dir.botAddress ? "Start with the Tredio bot below: its rules and its record are public." : "Pick a trader below. Their record on Hyperliquid is public."} />
                 </Card>
               )}
             </section>
@@ -66,7 +67,7 @@ export default function CopyPage() {
             <Card className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-strong text-[15px] text-text">Sign in to copy a trader</p>
-                <p className="mt-1 max-w-lg text-[13.5px] leading-5 text-text-2">Copies run through Autopilot&rsquo;s asset-perps-only access with a daily cap. You can pause or stop any copy at any time.</p>
+                <p className="mt-1 max-w-lg text-[13.5px] leading-5 text-text-2">Copies run through Autopilot&rsquo;s Hyperliquid-only access, which your account contract guards. You can pause or stop any copy at any time.</p>
               </div>
               <Button size="lg" icon={<Fingerprint className="size-[18px]" aria-hidden />} onClick={account.login} className="shrink-0">
                 Sign in
@@ -74,21 +75,22 @@ export default function CopyPage() {
             </Card>
           )}
           <section aria-labelledby="featured-title" className="flex flex-col gap-4">
-            <SectionTitle id="featured-title" title="Leaders to follow" subtitle="The Tredio bot, and callers whose calls have a resolved record and who linked their trading account" />
+            <SectionTitle id="featured-title" title="Leaders to follow" subtitle={`${dir.botAddress ? "The Tredio bot, and the" : "The"} best traders this month on Hyperliquid mainnet's public leaderboard${IS_MAINNET ? "" : " (testnet has none: a copy here mirrors their mainnet positions into your testnet account)"}`} />
             <div className={cn("grid gap-4 sm:grid-cols-2", account.authenticated ? "" : "xl:grid-cols-3")}>
-              {featured.map(({ account: a, caller }) => (
+              {featured.map(({ address, leader }) => (
                 <LeaderCard
-                  key={a}
-                  account={a}
-                  name={isBot(a) ? undefined : dir.name(a)}
-                  subtitle={caller ? (caller.resolved ? `Caller: ${Math.round(caller.hitRate * 100)}% of ${caller.resolved} call${caller.resolved === 1 ? "" : "s"} hit` : `Caller: ${caller.open} open call${caller.open === 1 ? "" : "s"}`) : undefined}
-                  href={dir.href(a)}
-                  featured={isBot(a)}
-                  following={following.has(a)}
-                  onFollow={() => (account.authenticated ? show(a, isBot(a) ? undefined : dir.name(a)) : account.login())}
+                  key={address}
+                  address={address}
+                  leader={leader}
+                  bot={dir.isBot(address)}
+                  name={dir.name(address)}
+                  href={dir.href(address)}
+                  following={following.has(address)}
+                  onFollow={passkey ? () => (account.authenticated ? show(address, dir.name(address)) : account.login()) : undefined}
                 />
               ))}
               {dir.loading ? <LeaderCardSkeleton /> : null}
+              {!dir.loading && featured.length === 0 ? <ErrorNote className="sm:col-span-2" message="Hyperliquid's leaderboard is unavailable right now." /> : null}
             </div>
           </section>
         </div>
@@ -100,11 +102,11 @@ export default function CopyPage() {
               <ol className="mt-3 flex flex-col gap-3 text-[13px] leading-5 text-text-2">
                 <li className="flex gap-3">
                   <Step n={1} />
-                  Autopilot keeps checking the leader&rsquo;s asset perp positions. Positions opened before you followed are not copied.
+                  Autopilot keeps checking the leader&rsquo;s Hyperliquid positions. Positions opened before you followed are not copied.
                 </li>
                 <li className="flex gap-3">
                   <Step n={2} />
-                  Each change becomes an order on your account, sized by your settings, cut to your caps and never filled far from their price.
+                  Each change becomes an order from your account&rsquo;s Hyperliquid address, sized by your settings, cut to your caps, within 2% of the oracle&rsquo;s mark.
                 </li>
                 <li className="flex gap-3">
                   <Step n={3} />
@@ -124,9 +126,9 @@ function Step({ n }: { n: number }) {
   return <span className="num flex size-5 shrink-0 items-center justify-center rounded-full bg-primary-soft font-strong text-[11px] text-primary">{n}</span>;
 }
 
-function FollowRow({ follow: f, name, href, onEdit }: { follow: Follow; name: string; href: string; onEdit: () => void }) {
+function FollowRow({ follow: f, name, href, bot, monthPnl, onEdit }: { follow: Follow; name: string; href: string; bot: boolean; monthPnl: number | null; onEdit: () => void }) {
   const account = useAccount();
-  const perf = usePerformance(f.leader);
+  const perf = usePerformance(bot ? BOT_ACCOUNT : null);
   const grant = useGrant();
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -140,7 +142,7 @@ function FollowRow({ follow: f, name, href, onEdit }: { follow: Follow; name: st
   });
   const s = f.settings;
   const active = f.status === "active";
-  const pnl = perf.data?.stats.pnlUsdc;
+  const pnl = bot ? perf.data?.stats.pnlUsdc : monthPnl;
   const chips = [
     s.mode === "ratio" ? `${s.ratio}x their size` : `${usdc(s.fixedMarginUsdc)} USDC per trade`,
     `max ${usdc(s.maxMarginUsdc)} USDC margin`,
@@ -153,7 +155,7 @@ function FollowRow({ follow: f, name, href, onEdit }: { follow: Follow; name: st
     <article className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-card sm:p-5" data-testid="follow-row" data-leader={f.leader} data-status={f.status}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          {isBot(f.leader) ? (
+          {bot ? (
             <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary">
               <Bot className="size-5" aria-hidden />
             </span>
@@ -162,9 +164,9 @@ function FollowRow({ follow: f, name, href, onEdit }: { follow: Follow; name: st
           )}
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <Link href={href} className="truncate font-strong text-[15px] leading-6 text-text hover:underline hover:underline-offset-4">
+              <a href={href} target="_blank" rel="noreferrer" className="truncate font-strong text-[15px] leading-6 text-text hover:underline hover:underline-offset-4">
                 {name}
-              </Link>
+              </a>
               <Badge tone={active ? "up" : "warn"} icon={active ? <span className="live-dot size-1.5 rounded-full bg-up" aria-hidden /> : undefined}>
                 {active ? "Copying" : "Paused"}
               </Badge>
@@ -173,8 +175,8 @@ function FollowRow({ follow: f, name, href, onEdit }: { follow: Follow; name: st
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-[11.5px] uppercase tracking-[0.08em] text-text-3">Their PnL</p>
-          <p className={cn("num mt-0.5 font-strong text-[16px]", !pnl ? "text-text" : pnl > 0 ? "text-up" : "text-down")}>{perf.data ? usdc(pnl, { sign: true }) : "-"}</p>
+          <p className="text-[11.5px] uppercase tracking-[0.08em] text-text-3">{bot ? "Their PnL" : "Their month"}</p>
+          <p className={cn("num mt-0.5 font-strong text-[16px]", !pnl ? "text-text" : pnl > 0 ? "text-up" : "text-down")}>{pnl === null || pnl === undefined ? "-" : bot ? usdc(pnl, { sign: true }) : `${pnl >= 0 ? "+" : "-"}$${compact(Math.abs(pnl))}`}</p>
         </div>
       </div>
       <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Your caps">
@@ -228,7 +230,7 @@ function FollowRow({ follow: f, name, href, onEdit }: { follow: Follow; name: st
       <GrantSheet
         open={grantOpen}
         onOpenChange={setGrantOpen}
-        reason="Copies trade through Autopilot's asset-perps-only access. Approve it with your passkey, then approve resuming."
+        reason="Copies trade through Autopilot's Hyperliquid-only access. Approve it with your passkey, then approve resuming."
         onGranted={() => {
           setGrantOpen(false);
           set.mutate("active");

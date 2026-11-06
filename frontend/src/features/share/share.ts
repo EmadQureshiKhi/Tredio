@@ -60,8 +60,9 @@ export interface PnlShare {
   entry: number | null;
   exit: number | null;
   leverage: number | null;
-  /** The closing transaction, when there is one. */
+  /** The closing transaction, when there is one, and the account that sent it (NEAR looks a transaction up by both). */
   tx: string | null;
+  account: string | null;
   /** The trend identifier, so the page can link to the market. */
   identifier: string | null;
 }
@@ -79,6 +80,7 @@ export function pnlSharePath(p: PnlShare): string {
   if (p.leverage !== null) q.set("l", String(round(p.leverage, 2)));
   if (p.identifier) q.set("t", p.identifier);
   if (p.tx) q.set("tx", p.tx);
+  if (p.tx && p.account) q.set("a", p.account);
   return `/share/pnl?${q.toString()}`;
 }
 
@@ -112,6 +114,7 @@ export function parsePnlShare(params: Params): PnlShare | null {
   const pnl = num(get(params, "p"), -1e9, 1e9);
   if (!kind || !KINDS.includes(kind) || !side || !SIDES.includes(side) || !market || pnl === null) return null;
   const tx = get(params, "tx");
+  const account = get(params, "a");
   const identifier = clean(get(params, "t"), 80);
   return {
     kind,
@@ -122,7 +125,8 @@ export function parsePnlShare(params: Params): PnlShare | null {
     entry: num(get(params, "e"), 0, 1e12),
     exit: num(get(params, "x"), 0, 1e12),
     leverage: num(get(params, "l"), 0, 1000),
-    tx: tx && /^[0-9A-Za-z]{32,100}$/.test(tx) ? tx : null,
+    tx: tx && /^[1-9A-HJ-NP-Za-km-z]{32,50}$/.test(tx) ? tx : null,
+    account: account && /^[a-z0-9._-]{2,64}$/.test(account) ? account : null,
     identifier: identifier && /^[a-z0-9:._-]+$/.test(identifier) ? identifier : null,
   };
 }

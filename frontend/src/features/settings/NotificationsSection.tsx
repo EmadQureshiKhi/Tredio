@@ -4,6 +4,7 @@ import { BellOff, BellRing, Fingerprint, Smartphone } from "lucide-react";
 import { useState } from "react";
 import { Badge, Button, ErrorNote, Skeleton, Switch } from "@/components/ui";
 import { useAccount } from "@/lib/account/AccountProvider";
+import { ApiSignIn } from "@/lib/account/ApiSignIn";
 import { currentSubscription, disablePush, enablePush, PUSH_TOPICS, type PushTopic, pushSupport, setPushTopics, storedTopics } from "@/lib/push";
 import { notify } from "@/lib/toast";
 import { Section } from "./Section";
@@ -66,6 +67,7 @@ function Push() {
   const error = enable.error ?? disable.error ?? change.error;
   return (
     <div className="flex flex-col gap-4" data-testid="push" data-on={on}>
+      {account.kind === "wallet" ? <ApiSignIn purpose="so alerts reach this device" /> : null}
       <div className="flex flex-col gap-3 rounded-2xl border border-line p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           {on ? <BellRing className="mt-0.5 size-[18px] shrink-0 text-up" aria-hidden /> : <BellOff className="mt-0.5 size-[18px] shrink-0 text-text-3" aria-hidden />}

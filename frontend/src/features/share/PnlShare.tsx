@@ -1,6 +1,7 @@
 import { BadgeCheck, TrendingUp } from "lucide-react";
 import { Badge, ButtonLink, Card, cn, Delta, Empty, ExplorerLink } from "@/components/ui";
 import { explorerTx } from "@/lib/config";
+import { shortAddress } from "@/lib/format";
 import { usdc } from "@/lib/format";
 import { ShareActions } from "./ShareActions";
 import { type PnlShare, pnlHeadline, pnlSharePath, trimZeros } from "./share";
@@ -60,7 +61,7 @@ export default function PnlShareView({ share, verified, owner = null }: { share:
               <Badge tone="up" icon={<BadgeCheck className="size-3.5" aria-hidden />}>
                 Verified
               </Badge>
-              {owner ? <span className="num font-mono text-[12px] text-text-3">by {owner.slice(0, 6)}...{owner.slice(-4)}</span> : null}
+              {owner ? <span className="num font-mono text-[12px] text-text-3">by {shortAddress(owner)}</span> : null}
             </span>
           ) : (
             <span className="text-text-3">Shared by the trader; not verified.</span>

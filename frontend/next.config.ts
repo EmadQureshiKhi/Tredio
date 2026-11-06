@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
   headers: async () => [{ source: "/:path*", headers: SECURITY_HEADERS }],
   // The shared packages live in ../packages, so Turbopack resolves from the repo root.
   turbopack: { root: path.join(__dirname, "..") },
-  transpilePackages: ["lightweight-charts", "fancy-canvas", "@tredio/autopilot"],
+  transpilePackages: ["lightweight-charts", "fancy-canvas", "@tredio/autopilot", "@tredio/contracts", "@tredio/hyperliquid"],
   // Keeps `next dev` from writing its own instruction files into the project.
   agentRules: false,
   poweredByHeader: false,

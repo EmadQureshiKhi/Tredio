@@ -166,10 +166,10 @@ function MobileStatus() {
 }
 
 function AccountButton() {
-  const { status, session, login, upgradeRequired } = useAccount();
+  const { status, session, login } = useAccount();
   if (status === "active" && session) {
     return (
-      <button type="button" onClick={login} className="flex h-9 items-center gap-2 rounded-xl border border-line bg-surface pl-1.5 pr-3 transition-colors hover:border-line-strong">
+      <button type="button" onClick={login} className="flex h-9 min-w-0 items-center gap-2 rounded-xl border border-line bg-surface pl-1.5 pr-3 transition-colors hover:border-line-strong" data-testid="account-button">
         <Avatar address={session.address} />
         <span className="num hidden font-mono text-[12.5px] text-text-2 sm:inline">{shortAddress(session.address)}</span>
         <span className="sr-only sm:hidden">{shortAddress(session.address)}</span>
@@ -179,7 +179,7 @@ function AccountButton() {
   if (status === "session-expired") {
     return (
       <Button tone="secondary" size="sm" onClick={login}>
-        {upgradeRequired ? "Upgrade account" : "Renew session"}
+        Renew session
       </Button>
     );
   }

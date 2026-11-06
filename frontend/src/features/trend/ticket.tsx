@@ -5,7 +5,7 @@ import { Button, cn, Field } from "@/components/ui";
 import type { ButtonTone } from "@/components/ui/Button";
 import { useAccount } from "@/lib/account/AccountProvider";
 import { tokenAmount } from "@/lib/format";
-import { formatAmount } from "./math";
+import { formatAmount } from "@/lib/amount";
 
 /** Building blocks shared by the trend page's tickets. */
 
@@ -67,7 +67,7 @@ export function AmountField({
   );
 }
 
-/** The ticket's main button, or Sign in when signed out. `passkey` marks a trade the passkey confirms. */
+/** The ticket's main button, or Sign in when signed out. `passkey` marks a trade the passkey (or the wallet) confirms. */
 export function SubmitButton({ children, tone = "primary", disabled, loading, onClick, testId, passkey }: { children: ReactNode; tone?: ButtonTone; disabled?: boolean; loading?: boolean; onClick: () => void; testId?: string; passkey?: boolean }) {
   const account = useAccount();
   // Restoring the session: a neutral placeholder, never a "Sign in" that turns into the trade.
@@ -75,12 +75,12 @@ export function SubmitButton({ children, tone = "primary", disabled, loading, on
   if (!account.authenticated) {
     return (
       <Button block size="lg" icon={<Fingerprint className="size-[18px]" aria-hidden />} onClick={account.login}>
-        {account.status === "session-expired" ? (account.upgradeRequired ? "Upgrade account to trade" : "Renew session to trade") : "Sign in to trade"}
+        {account.status === "session-expired" ? "Renew session to trade" : "Sign in to trade"}
       </Button>
     );
   }
   return (
-    <Button block size="lg" tone={tone} disabled={disabled} loading={loading} onClick={onClick} data-testid={testId} icon={passkey ? <Fingerprint className="size-[18px]" aria-hidden /> : undefined}>
+    <Button block size="lg" tone={tone} disabled={disabled} loading={loading} onClick={onClick} data-testid={testId} icon={passkey && account.kind === "passkey" ? <Fingerprint className="size-[18px]" aria-hidden /> : undefined}>
       {children}
     </Button>
   );
@@ -102,4 +102,15 @@ export function Section({ title, action, children, className, ref }: { title: Re
       {children}
     </section>
   );
+}
+
+/** How a trade asks for confirmation, for its pending toast: the session sends at once, the passkey or wallet confirms first. */
+export function confirmNote(kind: "passkey" | "wallet" | null, viaPasskey: boolean): string {
+  if (kind === "wallet") return "Confirm in your wallet";
+  return viaPasskey ? "Confirm with your passkey" : "Sending to NEAR";
+}
+
+/** Shown in place of a ticket a NEAR wallet cannot use. */
+export function PasskeyOnly({ children }: { children: ReactNode }) {
+  return <Note>{children}</Note>;
 }

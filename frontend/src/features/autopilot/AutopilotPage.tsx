@@ -13,7 +13,8 @@ import { useTrends } from "@/lib/hooks/queries";
 import { GrantCard } from "./grant/GrantCard";
 import { GrantSheet } from "./grant/GrantSheet";
 import { FollowSheet } from "@/features/copy/FollowSheet";
-import { BOT_ADDRESS, grantUsable, useFollows, useGrant, useRuleDetails, useRules } from "./shared/data";
+import { useLeaderDirectory } from "@/features/copy/leaders";
+import { grantUsable, useFollows, useGrant, useRuleDetails, useRules } from "./shared/data";
 import { PageHeader, SectionTitle, StaleNote, useConfirm } from "./shared/kit";
 import { LeaderCard } from "./shared/LeaderCard";
 import { RiskNotes } from "./shared/RiskNotes";
@@ -37,6 +38,7 @@ function SignedIn() {
   const running = list.filter((r) => r.status === "enabled");
   const follows = useFollows();
   const [followBot, setFollowBot] = useState(false);
+  const dir = useLeaderDirectory();
   const qc = useQueryClient();
   const confirm = useConfirm();
   const pauseAll = useMutation({
@@ -50,7 +52,7 @@ function SignedIn() {
     <div className="flex flex-col gap-8 [font-feature-settings:'calt'_0]">
       <PageHeader
         title="Autopilot"
-        description="Rules that trade asset perps when attention moves. Each one is backtested before it runs, trades inside your caps, and stops the moment you say so."
+        description="Rules that trade Hyperliquid perps when attention moves. Each one is backtested before it runs, trades inside your caps, and stops the moment you say so."
         action={
           <ButtonLink href="/autopilot/new" size="lg" data-testid="new-rule">
             <Plus className="size-[18px]" aria-hidden />
@@ -115,15 +117,18 @@ function SignedIn() {
         </section>
         <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-24 lg:-m-1 lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto lg:overscroll-contain lg:p-1">
           <GrantCard />
-          <LeaderCard
-            account={BOT_ADDRESS}
-            href={`/c/${BOT_ADDRESS}`}
-            featured
-            subtitle="Public Autopilot rules on asset perps"
-            following={(follows.data?.follows ?? []).some((f) => f.leader === BOT_ADDRESS)}
-            onFollow={() => setFollowBot(true)}
-          />
-          <FollowSheet leader={BOT_ADDRESS} open={followBot} onOpenChange={setFollowBot} />
+          {dir.botAddress ? (
+            <>
+              <LeaderCard
+                address={dir.botAddress}
+                bot
+                href={dir.href(dir.botAddress)}
+                following={(follows.data?.follows ?? []).some((f) => f.leader.toLowerCase() === dir.botAddress)}
+                onFollow={() => setFollowBot(true)}
+              />
+              <FollowSheet leader={dir.botAddress} open={followBot} onOpenChange={setFollowBot} />
+            </>
+          ) : null}
           <Link href="/copy" className="group flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3 text-[13.5px] text-text-2 transition-colors hover:border-line-strong hover:text-text">
             Rather follow a trader than write rules?
             <span className="flex items-center gap-1 font-strong text-text">
@@ -339,7 +344,7 @@ const STEPS = [
   {
     icon: FlaskConical,
     title: "Replay it on real history",
-    body: "Up to 30 days of the trend's attention and asset perp prices, with fees and slippage, before it can run.",
+    body: "Up to 30 days of the trend's attention and Hyperliquid prices, with fees and slippage, before it can run.",
   },
   {
     icon: ShieldCheck,
@@ -350,6 +355,7 @@ const STEPS = [
 
 function SignedOut() {
   const account = useAccount();
+  const { botAddress: bot, href } = useLeaderDirectory();
   return (
     <div className="flex flex-col gap-8">
       <section className="relative overflow-hidden rounded-[24px] border border-line bg-surface px-6 py-8 sm:px-10 sm:py-10">
@@ -360,14 +366,14 @@ function SignedOut() {
         </p>
         <h1 className="mt-3 max-w-xl font-display text-[34px] leading-[1.08] text-text sm:text-[44px]">Let attention trade for you.</h1>
         <p className="mt-3 max-w-xl text-[15px] leading-6 text-text-2">
-          Turn a hunch about the narrative into a rule that trades asset perps on its own: when a trend&rsquo;s attention moves, Autopilot opens the position and manages its exit.
+          Turn a hunch about the narrative into a rule that trades Hyperliquid perps on its own: when a trend&rsquo;s attention moves, Autopilot opens the position and manages its exit.
         </p>
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button size="lg" icon={<Fingerprint className="size-[18px]" aria-hidden />} onClick={account.login}>
             Sign in to build a rule
           </Button>
-          <ButtonLink size="lg" tone="secondary" href={`/c/${BOT_ADDRESS}`}>
-            See the Tredio bot
+          <ButtonLink size="lg" tone="secondary" href="/copy">
+            See who to copy
           </ButtonLink>
         </div>
       </section>
@@ -390,7 +396,7 @@ function SignedOut() {
           <SectionTitle title="Before you switch anything on" />
           <RiskNotes className="mt-3" />
         </Card>
-        <LeaderCard account={BOT_ADDRESS} href={`/c/${BOT_ADDRESS}`} featured subtitle="Public Autopilot rules on asset perps" className="order-1 lg:order-2" />
+        {bot ? <LeaderCard address={bot} bot href={href(bot)} className="order-1 lg:order-2" /> : null}
       </div>
     </div>
   );

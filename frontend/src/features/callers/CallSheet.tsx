@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowDownRight, ArrowUpRight, Check, Fingerprint, KeyRound } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Button, ErrorNote, Segmented, Sheet, Skeleton } from "@/components/ui";
+import { Button, ErrorNote, Segmented, Sheet } from "@/components/ui";
 import { useAccount } from "@/lib/account/AccountProvider";
 import { ApiError, social, type Trend } from "@/lib/api";
 import { useTrends } from "@/lib/hooks/queries";
@@ -58,7 +58,6 @@ function CallForm({ initialTrend, onAnother }: { initialTrend?: string; onAnothe
       return social.call({ caller: signed.caller, identifier, direction, horizonSec, note: body, issuedAt: signed.issuedAt, signature: signed.signature });
     },
     onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: ["caller"] }), qc.invalidateQueries({ queryKey: ["callers-leaderboard"] })]),
-    onError: (e) => me.failed(e),
   });
 
   if (!account.authenticated) {
@@ -68,7 +67,9 @@ function CallForm({ initialTrend, onAnother }: { initialTrend?: string; onAnothe
       </Button>
     );
   }
-  if (me.checking) return <Skeleton className="h-64 rounded-2xl" />;
+  if (!me.available) {
+    return <p className="rounded-2xl border border-line p-4 text-[13.5px] leading-5 text-text-2">Calls are signed by a caller identity a passkey derives, apart from the trading account. A NEAR wallet cannot hold one, so make calls from a passkey account.</p>;
+  }
   if (!me.identity) {
     return (
       <div className="flex flex-col gap-4">

@@ -7,11 +7,11 @@ import { useState } from "react";
 import { Avatar } from "@/components/shell/AppShell";
 import { Badge, Button, ButtonLink, Card, cn, Empty, ErrorNote, listItem, Reveal, Segmented, Skeleton } from "@/components/ui";
 import { useAccount } from "@/lib/account/AccountProvider";
-import { ApiError, type CallerRow } from "@/lib/api";
+import { ApiError, type CallerRow, hyperliquid } from "@/lib/api";
 import { usdc, compact, shortAddress } from "@/lib/format";
-import { BOT_ADDRESS, isBot, useFollows, useLeaderboard, usePerformance, useTraders } from "@/features/autopilot/shared/data";
+import { BOT_ACCOUNT, isBot, useLeaderboard, usePerformance, useTraders } from "@/features/autopilot/shared/data";
 import { FollowSheet } from "@/features/copy/FollowSheet";
-import { useLeaderDirectory } from "@/features/copy/leaders";
+import { notify } from "@/lib/toast";
 import { PageHeader, StaleNote } from "@/features/autopilot/shared/kit";
 import { CallSheet } from "@/features/callers/CallSheet";
 import { useCallerIdentity } from "@/features/callers/identity";
@@ -142,7 +142,7 @@ function CallerLine({ c, rank, mine }: { c: CallerRow; rank: number; mine: boole
 
 function AutopilotTraders() {
   const board = useLeaderboard();
-  const accounts = [{ account: BOT_ADDRESS, caller: null as CallerRow | null }, ...(board.data?.callers ?? []).filter((c) => c.linked_account && !isBot(c.linked_account)).map((c) => ({ account: c.linked_account!.toLowerCase(), caller: c }))];
+  const accounts = [...(BOT_ACCOUNT ? [{ account: BOT_ACCOUNT, caller: null as CallerRow | null }] : []), ...(board.data?.callers ?? []).filter((c) => c.linked_account && !isBot(c.linked_account)).map((c) => ({ account: c.linked_account!.toLowerCase(), caller: c }))];
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-card">
@@ -160,7 +160,8 @@ function AutopilotTraders() {
           ))}
         </ul>
       </div>
-      <p className="text-[12.5px] leading-5 text-text-3">The Tredio bot and every caller who linked a trading account. PnL is realized on closed Autopilot and copied positions, after trading fees.</p>
+      {accounts.length === 0 ? <Empty icon={<Bot className="size-6" />} title="No Autopilot records yet" body="Callers who link their trading account show their Autopilot record here." /> : null}
+      <p className="text-[12.5px] leading-5 text-text-3">{BOT_ACCOUNT ? "The Tredio bot and every caller" : "Every caller"} who linked a trading account. PnL is realized on closed Autopilot and copied Hyperliquid positions, after trading fees.</p>
     </div>
   );
 }
@@ -205,14 +206,30 @@ function TraderLine({ account, caller }: { account: string; caller: CallerRow | 
   );
 }
 
-/** Everyone who traded, by realized PnL across outcome markets, attention perps, coins and asset perps. */
+/** Everyone who traded, by realized PnL across outcome markets, attention perps, coins and Hyperliquid perps. */
 function AllTraders() {
   const traders = useTraders();
-  const dir = useLeaderDirectory();
+  const board = useLeaderboard();
   const account = useAccount();
-  const follows = useFollows();
   const [follow, setFollow] = useState<{ leader: string; name: string } | null>(null);
   const [open, setOpen] = useState(false);
+  const [resolving, setResolving] = useState<string | null>(null);
+  const handles = new Map((board.data?.callers ?? []).filter((c) => c.linked_account && c.handle).map((c) => [c.linked_account!.toLowerCase(), `@${c.handle}`]));
+  const nameOf = (a: string) => (isBot(a) ? "Tredio bot" : (handles.get(a) ?? shortAddress(a)));
+  // Copies follow the trader's Hyperliquid address: their account's own Chain Signatures key.
+  const copy = async (a: string, name: string) => {
+    if (!account.authenticated) return account.login();
+    setResolving(a);
+    try {
+      const { address } = await hyperliquid.account(a);
+      setFollow({ leader: address.toLowerCase(), name });
+      setOpen(true);
+    } catch (e) {
+      notify.error(`Could not find ${name}'s Hyperliquid address`, e instanceof ApiError ? e.message : "Try again.");
+    } finally {
+      setResolving(null);
+    }
+  };
   const unavailable = !traders.data && traders.error instanceof ApiError && traders.error.status === 503;
   if (!traders.data && !traders.error) return <TableSkeleton />;
   if (unavailable)
@@ -230,7 +247,6 @@ function AllTraders() {
       </Card>
     );
   const me = account.address?.toLowerCase();
-  const followed = new Set((follows.data?.follows ?? []).map((f) => f.leader));
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-card">
@@ -246,14 +262,14 @@ function AllTraders() {
         <ol className="relative" data-testid="all-traders">
           <AnimatePresence initial={false} mode="popLayout">
             {rows.map((t, i) => {
-              const a = t.address.toLowerCase();
+              const a = t.account.toLowerCase();
               const self = a === me;
-              const name = dir.name(a);
+              const name = nameOf(a);
               const pnl = t.realizedPnlUsdc;
               return (
                 <m.li key={a} {...listItem} className={cn("grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 border-b border-line px-4 py-3 last:border-b-0 md:grid-cols-[48px_minmax(0,1fr)_120px_120px_90px_80px_96px] md:px-5", self ? "bg-primary-soft" : "")} data-testid="trader-row" data-account={a}>
                   <span className={cn("num font-strong text-[14px]", i < 3 ? "text-primary" : "text-text-3")}>{i + 1}</span>
-                  <Link href={dir.href(a)} className="flex min-w-0 items-center gap-3 rounded-lg hover:underline hover:underline-offset-4">
+                  <Link href={`/c/${a}`} className="flex min-w-0 items-center gap-3 rounded-lg hover:underline hover:underline-offset-4">
                     {isBot(a) ? (
                       <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary">
                         <Bot className="size-4" aria-hidden />
@@ -276,19 +292,9 @@ function AllTraders() {
                   <span className="num hidden text-right text-[14px] text-text-2 md:block">{t.closedTrades ? `${Math.round(t.winRate * 100)}%` : "-"}</span>
                   <span className="num hidden text-right text-[14px] text-text-2 md:block">{t.closedTrades}</span>
                   <span className="hidden justify-end md:flex">
-                    {self ? null : (
-                      <Button
-                        size="sm"
-                        tone={followed.has(a) ? "secondary" : "ghost"}
-                        className="-my-1"
-                        onClick={() => {
-                          if (!account.authenticated) return account.login();
-                          setFollow({ leader: a, name });
-                          setOpen(true);
-                        }}
-                        data-testid="trader-copy"
-                      >
-                        {followed.has(a) ? "Copying" : "Copy"}
+                    {self || account.kind === "wallet" ? null : (
+                      <Button size="sm" tone="ghost" className="-my-1" loading={resolving === a} disabled={resolving !== null} onClick={() => void copy(a, name)} data-testid="trader-copy">
+                        Copy
                       </Button>
                     )}
                   </span>
@@ -299,7 +305,7 @@ function AllTraders() {
         </ol>
       </div>
       {traders.isRefetchError ? <StaleNote onRetry={() => void traders.refetch()} what="the rankings" /> : null}
-      <p className="text-[12.5px] leading-5 text-text-3">Realized PnL on closed positions across outcome markets, attention perps, trend coins and asset perps, after fees. Copying mirrors a trader&rsquo;s asset perp positions only, inside your caps.</p>
+      <p className="text-[12.5px] leading-5 text-text-3">Realized PnL on closed positions across outcome markets, attention perps, trend coins and Hyperliquid perps, after fees. Copying mirrors a trader&rsquo;s Hyperliquid positions only, inside your caps.</p>
       <FollowSheet leader={follow?.leader ?? null} name={follow?.name} open={open} onOpenChange={setOpen} />
     </div>
   );

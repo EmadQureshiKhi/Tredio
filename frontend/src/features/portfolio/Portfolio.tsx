@@ -29,7 +29,7 @@ export default function Portfolio() {
         </div>
         {account.authenticated ? <LivePill stale={[data.outcomes, data.perps, data.assetPerps].some((q) => q.isError && q.data !== undefined)} /> : null}
       </header>
-      {!account.ready ? <SummarySkeleton /> : !account.authenticated ? <SignedOut status={account.status} upgrade={account.upgradeRequired} login={account.login} /> : <Holdings data={data} />}
+      {!account.ready ? <SummarySkeleton /> : !account.authenticated ? <SignedOut status={account.status} login={account.login} /> : <Holdings data={data} />}
     </div>
   );
 }
@@ -43,17 +43,17 @@ function LivePill({ stale }: { stale: boolean }) {
   );
 }
 
-function SignedOut({ status, upgrade, login }: { status: string; upgrade: boolean; login: () => void }) {
+function SignedOut({ status, login }: { status: string; login: () => void }) {
   const expired = status === "session-expired";
   return (
     <Card className="flex flex-col items-center gap-3 px-6 py-14 text-center sm:py-20">
       <div className="mb-1 flex size-12 items-center justify-center rounded-full bg-primary-soft text-primary">
         <Wallet className="size-6" aria-hidden />
       </div>
-      <p className="font-strong text-[16px] text-text">{expired ? (upgrade ? "Upgrade your account to see your portfolio" : "Renew your session to see your portfolio") : "Sign in to see your portfolio"}</p>
-      <p className="max-w-md text-[14px] leading-[22px] text-text-2">Your UP and DOWN tokens, attention perps, asset perps, trend coins and curation earnings, valued live, in one place.</p>
+      <p className="font-strong text-[16px] text-text">{expired ? "Renew your session to see your portfolio" : "Sign in to see your portfolio"}</p>
+      <p className="max-w-md text-[14px] leading-[22px] text-text-2">Your UP and DOWN tokens, attention perps, Hyperliquid perps, trend coins and curation earnings, valued live, in one place.</p>
       <Button size="lg" className="mt-3" icon={<Fingerprint className="size-[18px]" aria-hidden />} onClick={login}>
-        {expired ? (upgrade ? "Upgrade with passkey" : "Renew with passkey") : "Sign in with passkey"}
+        {expired ? "Renew with passkey" : "Sign in"}
       </Button>
     </Card>
   );
@@ -104,7 +104,8 @@ function Holdings({ data }: { data: Data }) {
     const claimable = curation.data ? toUsdc(curation.data.claimable) : 0;
     // Cash from the same read as the outcome tokens when there is one, so totals match.
     const cashValue = outcomes.data ? toUsdc(outcomes.data.cash) : (cash.data?.value ?? 0);
-    const unrealized = (perps.data ?? []).reduce((a, p) => a + p.pnl, 0) + (assetPerps.data?.positions ?? []).reduce((a, p) => a + p.pnl, 0);
+    // Attention perps: equity over margin, funding included.
+    const unrealized = (perps.data ?? []).reduce((a, p) => a + toUsdc(p.equity - p.margin), 0) + (assetPerps.data?.positions ?? []).reduce((a, p) => a + p.pnl, 0);
     const openPerps = (perps.data?.length ?? 0) + (assetPerps.data?.positions.length ?? 0);
     return { outcomeTotal, outcomePriced, perpEquity, coinTotal, assetPerpTotal, claimable, cashValue, unrealized, openPerps, total: cashValue + outcomeTotal + perpEquity + coinTotal + assetPerpTotal + claimable };
   }, [outcomes.data, perps.data, coins.data, assetPerps.data, curation.data, cash.data]);
@@ -128,7 +129,7 @@ function Holdings({ data }: { data: Data }) {
     outcomes.error && !outcomes.data ? { message: "Outcome tokens could not be read.", retry: () => void outcomes.refetch() } : null,
     perps.error && !perps.data ? { message: "Attention perps could not be read.", retry: () => void perps.refetch() } : null,
     coins.error && !coins.data ? { message: "Trend coins could not be read.", retry: () => void coins.refetch() } : null,
-    (assetPerps.error && !assetPerps.data) || (assetPerpMarkets.error && !assetPerpMarkets.data) ? { message: "Asset perp positions could not be read.", retry: () => void (assetPerpMarkets.error ? assetPerpMarkets.refetch() : assetPerps.refetch()) } : null,
+    (assetPerps.error && !assetPerps.data) || (assetPerpMarkets.error && !assetPerpMarkets.data) ? { message: "Hyperliquid positions could not be read.", retry: () => void (assetPerpMarkets.error ? assetPerpMarkets.refetch() : assetPerps.refetch()) } : null,
   ].filter((e) => e !== null);
 
   const outcomeRows = outcomes.data?.holdings ?? [];
@@ -172,7 +173,7 @@ function Holdings({ data }: { data: Data }) {
           <Total label="Cash" value={outcomes.data ? tokenNumber(outcomes.data.cash, 6) : cash.data ? tokenNumber(cash.data.raw, 6) : null} testId="total-cash" />
           <Total label="Up or down" value={totals.outcomeTotal} testId="total-outcomes" />
           <Total label="Attention perps" value={totals.perpEquity} testId="total-perps" />
-          <Total label="Asset perps" value={totals.assetPerpTotal} />
+          <Total label="Hyperliquid" value={totals.assetPerpTotal} />
           <Total label="Trend coins" value={totals.coinTotal} />
           <Total label="Curation" value={totals.claimable} hint="to claim" />
         </dl>
@@ -186,7 +187,7 @@ function Holdings({ data }: { data: Data }) {
         <Card className="flex flex-col items-center gap-2 px-6 py-12 text-center" data-testid="portfolio-empty">
           <Radar className="mb-1 size-6 text-text-3" aria-hidden />
           <p className="font-strong text-[15px] text-text">No positions yet</p>
-          <p className="max-w-md text-[13.5px] leading-5 text-text-2">Buy UP or DOWN on a trend&rsquo;s attention, go long or short it with an attention perp, or let Autopilot trade asset perps for you. Every position shows up here.</p>
+          <p className="max-w-md text-[13.5px] leading-5 text-text-2">Buy UP or DOWN on a trend&rsquo;s attention, go long or short it with an attention perp, or let Autopilot trade Hyperliquid perps for you. Every position shows up here.</p>
           <div className="mt-3 flex flex-wrap justify-center gap-2">
             <ButtonLink href="/">Explore markets</ButtonLink>
             {totals.cashValue < 1 ? (

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { Time } from "lightweight-charts";
 import { extendsSeries, fitRange, withAlpha } from "../src/components/ui/Chart";
 import { liveDefault, readableWarning } from "../src/features/autopilot/builder/rule-form";
-import { CLAIM_EVERY_MS, faucetState, isAlreadyClaimed, RETRY_AFTER_REFUSAL_MS, untilText } from "../src/features/global/faucet-claims";
+import { faucetButton, faucetState, isCooldown, untilText } from "../src/features/global/faucet-claims";
 import { tokens } from "../src/features/portfolio/format";
 import type { Trend } from "../src/lib/api";
 import { tokenAmount } from "../src/lib/format";
@@ -26,23 +26,24 @@ describe("token amounts", () => {
   });
 });
 
-describe("faucet claims", () => {
+describe("faucet", () => {
   const now = 1_000_000_000_000;
-  test("a claim made here counts down to the next one", () => {
+  test("the API's next draw time counts down, and a passed one is ready", () => {
     expect(faucetState(null, now)).toEqual({ kind: "ready" });
-    expect(faucetState({ at: now - 3_600_000, known: true }, now)).toEqual({ kind: "claimed", nextAt: now - 3_600_000 + CLAIM_EVERY_MS });
-    expect(faucetState({ at: now - CLAIM_EVERY_MS - 1, known: true }, now)).toEqual({ kind: "ready" });
+    expect(faucetState(now / 1000 + 3600, now)).toEqual({ kind: "waiting", nextAt: now + 3_600_000 });
+    expect(faucetState(now / 1000 - 1, now)).toEqual({ kind: "ready" });
   });
 
-  test("a refusal (claimed elsewhere) waits an hour before offering a retry", () => {
-    expect(faucetState({ at: now, known: false }, now)).toEqual({ kind: "refused", retryAt: now + RETRY_AFTER_REFUSAL_MS });
-    expect(faucetState({ at: now - RETRY_AFTER_REFUSAL_MS, known: false }, now)).toEqual({ kind: "ready" });
+  test("the button says what happened and what comes next", () => {
+    expect(faucetButton({ kind: "ready" }, now, null)).toEqual({ label: "Get test USDC", tone: "ready" });
+    expect(faucetButton({ kind: "ready" }, now, "1,000.00")).toEqual({ label: "Claimed 1,000.00 USDC", tone: "success" });
+    expect(faucetButton({ kind: "waiting", nextAt: now + 45 * 60_000 }, now, null)).toEqual({ label: "Claimed, next in 45m", tone: "waiting" });
   });
 
-  test("only the faucet's already-claimed refusal counts as a claim", () => {
-    expect(isAlreadyClaimed(429, "This account already received test USDC today.")).toBe(true);
-    expect(isAlreadyClaimed(429, "The faucet has paid out today's test USDC. Try again tomorrow.")).toBe(false);
-    expect(isAlreadyClaimed(503, "This account already received test USDC today.")).toBe(false);
+  test("only the contract's cooldown refusal counts as already claimed", () => {
+    expect(isCooldown("faucet cooldown")).toBe(true);
+    expect(isCooldown("This account drew test USDC a short while ago. The faucet pays once per cooldown.")).toBe(true);
+    expect(isCooldown("the faucet is testnet only")).toBe(false);
   });
 
   test("the wait reads in hours and minutes", () => {

@@ -2,17 +2,24 @@
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
-import { EXPLORER_NAME } from "@/lib/config";
+import { EXPLORER_NAME, explorerTx } from "@/lib/config";
 
-/** Every toast the app shows, so they read alike: short confirmations and backend errors. */
+/**
+ * Every toast the app shows, so they read alike: short confirmations, backend errors, and one
+ * toast per transaction that moves through pending, filled and final (or failed) in place.
+ */
 
 const INFO_MS = 4_000;
 const ERROR_MS = 8_000;
 const COPIED_MS = 1_800;
+const TX_MS = 4_000;
+/** The final update restarts the timer, so it stays only briefly: the fill was already shown. */
+const FINAL_MS = 2_500;
+const CANCELLED_MS = 3_000;
 
 /**
  * The glowing bar along a toast's foot: it fills from edge to edge over the toast's life (`ms`), so it
- * reaches the far edge as the toast closes, or sweeps back and forth while it waits.
+ * reaches the far edge as the toast closes, or sweeps back and forth while a transaction is pending.
  * A fresh key restarts it whenever the toast is updated in place, as the timer restarts too.
  */
 let barKey = 0;
@@ -68,3 +75,42 @@ export async function copyText(text: string, title = "Copied"): Promise<boolean>
     return false;
   }
 }
+
+/** Toasts still on screen: a finality update never brings back one the user dismissed. */
+const open = new Set<string>();
+const track = { onDismiss: (t: { id: string | number }) => open.delete(String(t.id)), onAutoClose: (t: { id: string | number }) => open.delete(String(t.id)) };
+
+const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+
+/** One transaction's toast, updated in place by its id. */
+export const txToast = {
+  pending(id: string, action: string, note = "Sending to NEAR") {
+    open.add(id);
+    toast.loading(action, { id, description: body(note, null), duration: Number.POSITIVE_INFINITY, ...track });
+  },
+  filled(id: string, { done, fillMs, hash, final }: { done: string; fillMs: number | null; hash: string; final: boolean }) {
+    // A finality update only refreshes a toast that is still showing.
+    if (final && !open.has(id)) return;
+    open.add(id);
+    const ms = final ? FINAL_MS : TX_MS;
+    toast.success(done, {
+      id,
+      description: body(`Filled${fillMs === null ? "" : ` in ${seconds(fillMs)}`}, ${final ? "final" : "finalizing"}`, ms),
+      action: hash ? <ToastLink href={explorerTx(hash)} /> : undefined,
+      duration: ms,
+      ...track,
+    });
+  },
+  failed(id: string, { action, reason, hash }: { action: string; reason: string; hash: string | null }) {
+    open.delete(id);
+    toast.error(`${action} failed`, { id, description: body(reason, ERROR_MS), action: hash ? <ToastLink href={explorerTx(hash)} /> : undefined, duration: ERROR_MS });
+  },
+  cancelled(id: string, action: string) {
+    open.delete(id);
+    toast(`${action} cancelled`, { id, description: body("Nothing was sent.", CANCELLED_MS), duration: CANCELLED_MS });
+  },
+  dismiss(id: string) {
+    open.delete(id);
+    toast.dismiss(id);
+  },
+};

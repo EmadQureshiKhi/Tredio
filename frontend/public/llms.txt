@@ -1,0 +1,45 @@
+# Tredio app
+
+> The Tredio web app: trade the attention on what the internet is talking about, on NEAR.
+> Each listed trend has an attention index from 0 to 100 that an oracle records on NEAR.
+> People trade it through Up/Down outcome series settled in USDC, attention perps up to 3x and trend coins on bonding curves, and trade Hyperliquid perps on the asset behind a trend from the same account.
+> The app runs on NEAR testnet; every balance there is a test asset with no monetary value.
+
+## Pages
+
+- `/`: live trends and their attention index.
+- `/t/{identifier}`: one trend (for example `/t/topic:world-cup`), with its index history, trading and the calls people made on it.
+- `/portfolio`: what the signed-in account holds, valued live.
+- `/autopilot`: rules that trade Hyperliquid perps when a trend's attention moves.
+- `/copy`: follow a Hyperliquid trader's positions from your own account.
+- `/leaders`: callers, traders and Autopilot rules ranked by settled results.
+- `/c/{account}`: a NEAR account's trading record, or a caller's public record.
+- `/radar`: approved topics waiting for a live market.
+- `/deposit`: move funds in and out through NEAR Intents (mainnet only; testnet shows previews).
+- `/status`: health of the oracle, NEAR, every service and the accounts they send from.
+
+## Accounts
+
+- A passkey (Face ID, a fingerprint or a security key) owns a NEAR account made by `accounts.tredio.testnet`; there is no seed phrase.
+- The passkey approves a session key that lasts 7 days and spends at most 500 USDC a day; trades sign with it and need no prompt.
+- A relayer pays the network fees, so a new account needs no NEAR.
+- NEAR wallets (HOT, Meteor, Intear) can also sign in; they approve each transaction themselves.
+- Test USDC comes from the faucet on `usdc.tredio.testnet`.
+
+## Contracts on NEAR testnet
+
+- `registry.tredio.testnet`: each trend's attention index (`index_of`), written only by the oracle's signed reports.
+- `outcomes.tredio.testnet`: Up and Down tokens of each series; a winning token pays 1 USDC.
+- `book.tredio.testnet`: the order book where Up and Down trade against USDC.
+- `perps.tredio.testnet`: attention perps, up to 3x.
+- `coins.tredio.testnet`: trend coins on bonding curves.
+- `curation.tredio.testnet`: fees owed to whoever surfaced a trend.
+- `usdc.tredio.testnet`: test USDC (6 decimals) with a faucet.
+
+Index values on NEAR have 6 decimals (1000000 is one point), and so do USDC amounts.
+Every contract and account can be read on NearBlocks (testnet.nearblocks.io).
+
+## API
+
+The app reads Tredio's API for trends, history, calls and leaderboards; `GET /v1/status` reports its health and `GET /v1/trends` lists live trends.
+The website's llms.txt (https://tredio.bid/llms.txt) describes the API and the agent integrations.

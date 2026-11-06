@@ -15,12 +15,12 @@ const BLURB: Record<Tab, string> = {
   outcome: "Up or down on attention by a deadline. Each token pays 1 USDC if you are right.",
   perp: "Long or short the index itself, up to 3x, open as long as you like.",
   coin: "This trend's coin on a bonding curve, graduating to its own pool.",
-  assetPerp: "Perpetuals on the asset's own market price.",
+  assetPerp: "Hyperliquid perpetuals on the asset's own market price, signed by your account through NEAR Chain Signatures.",
 };
 
 /** Every way to trade a trend, one ticket at a time. */
 export default function TradePanel({ trend, className }: { trend: Trend; className?: string }) {
-  const { market } = useAssetPerpMarket(trend.ticker);
+  const { market } = useAssetPerpMarket(trend.asset ?? trend.ticker);
   const [tab, setTab] = useState<Tab>("outcome");
   const options = [
     { value: "outcome" as const, label: "Up/Down" },

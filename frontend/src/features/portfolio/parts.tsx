@@ -4,7 +4,7 @@ import { Card, cn, Num } from "@/components/ui";
 
 /** Small building blocks of the portfolio screen. */
 
-export { amountText, parseAmount, signedUsdc, signedPct, tokens, toneOf, windowShort } from "./format";
+export { amountText, coinPrice, parseAmount, signedUsdc, signedPct, tokens, toneOf, windowShort } from "./format";
 
 const SIGNED = { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: "exceptZero" } as const;
 const SIGNED_PCT = { minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: "exceptZero" } as const;

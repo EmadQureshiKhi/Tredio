@@ -155,7 +155,7 @@ function SignedOutHero({ className }: { className?: string }) {
       <p className="font-strong text-[11.5px] uppercase tracking-[0.14em] text-primary sm:text-[12px]">Attention markets</p>
       <h2 className="mt-2.5 max-w-xl font-display text-[30px] leading-[1.08] text-text sm:mt-3 sm:text-[44px]">Trade the narrative itself.</h2>
       <p className="mt-2.5 max-w-xl text-[14px] leading-[22px] text-text-2 sm:mt-3 sm:text-[15px] sm:leading-6">
-        Up or down on any trend&rsquo;s attention, attention perps up to 3x, and asset perps on the assets behind the noise.<span className="hidden sm:inline"> One passkey, no gas, settled in USDC.</span>
+        Up or down on any trend&rsquo;s attention, attention perps up to 3x, and Hyperliquid perps on the assets behind the noise.<span className="hidden sm:inline"> One passkey, no gas, settled in USDC.</span>
       </p>
       <div className="mt-5 grid grid-cols-2 gap-2 sm:mt-6 sm:flex sm:flex-wrap">
         <Button size="lg" className="px-3 sm:px-5" icon={<Fingerprint className="size-[18px]" aria-hidden />} onClick={account.login}>
@@ -257,7 +257,7 @@ function AccountHero({ className }: { className?: string }) {
             items.map((item, i) => {
               const name = item.kind === "assetPerp" ? item.label : item.identifier ? (names.get(item.identifier) ?? baseIdentifier(item.identifier)) : item.label;
               return (
-                <li key={`${item.tx ?? i}-${item.at}`} className="flex h-10 items-center justify-between gap-3 text-[13px]">
+                <li key={`${item.receipt ?? i}-${item.at}`} className="flex h-10 items-center justify-between gap-3 text-[13px]">
                   <span className="min-w-0 truncate">
                     <span className="text-text-2">{action(item)}</span> <span className="font-strong text-text">{name}</span>
                   </span>
