@@ -76,27 +76,34 @@ export function rest(url: string) {
   p.restUntil = Date.now() + Math.min(MAX_REST_MS, REST_MS * 2 ** (p.strikes - 1));
 }
 
+/** Passes over every provider before giving up, with a short pause between passes so a burst limit can clear. */
+const ROUNDS = 2;
+const ROUND_PAUSE_MS = 800;
+
 async function send<T>(body: string, timeoutMs: number): Promise<T> {
   let last: unknown;
-  for (const p of order()) {
-    try {
-      const res = await fetch(p.url, { method: "POST", headers: { "content-type": "application/json" }, body, signal: AbortSignal.timeout(timeoutMs) });
-      if (!res.ok) throw new RpcError(`rpc ${res.status}`);
-      const answer = (await res.json()) as { result?: T; error?: { cause?: { name?: string; info?: unknown }; message?: string; data?: unknown } };
-      p.strikes = 0;
-      p.restUntil = 0;
-      // The provider that answered leads from now on.
-      providers.splice(providers.indexOf(p), 1);
-      providers.unshift(p);
-      if (answer.error) {
-        const name = answer.error.cause?.name ?? null;
-        throw new RpcError(name ?? answer.error.message ?? "rpc error", name);
+  for (let round = 0; round < ROUNDS; round++) {
+    if (round > 0) await new Promise((resolve) => setTimeout(resolve, ROUND_PAUSE_MS * (1 + Math.random())));
+    for (const p of order()) {
+      try {
+        const res = await fetch(p.url, { method: "POST", headers: { "content-type": "application/json" }, body, signal: AbortSignal.timeout(timeoutMs) });
+        if (!res.ok) throw new RpcError(`rpc ${res.status}`);
+        const answer = (await res.json()) as { result?: T; error?: { cause?: { name?: string; info?: unknown }; message?: string; data?: unknown } };
+        p.strikes = 0;
+        p.restUntil = 0;
+        // The provider that answered leads from now on.
+        providers.splice(providers.indexOf(p), 1);
+        providers.unshift(p);
+        if (answer.error) {
+          const name = answer.error.cause?.name ?? null;
+          throw new RpcError(name ?? answer.error.message ?? "rpc error", name);
+        }
+        return answer.result as T;
+      } catch (e) {
+        if (!transient(e)) throw e;
+        last = e;
+        rest(p.url);
       }
-      return answer.result as T;
-    } catch (e) {
-      if (!transient(e)) throw e;
-      last = e;
-      rest(p.url);
     }
   }
   throw last instanceof Error ? last : new RpcError("NEAR could not be reached");
