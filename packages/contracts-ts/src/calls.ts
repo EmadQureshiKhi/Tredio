@@ -93,7 +93,8 @@ export function calls(d: Deployment) {
       close: (id: number, acceptableIndex: number) => call(c.perps, "close", { id, acceptable_index: acceptableIndex }, ZERO, 200),
       liquidate: (id: number) => call(c.perps, "liquidate", { id }, ZERO, 200),
       settleRetired: (id: number) => call(c.perps, "settle_retired", { id }, ZERO, 200),
-      poke: (trend: string) => call(c.perps, "poke", { trend }, ZERO, 60),
+      // poke reads the registry (10 Tgas) and settles in a callback that reserves 60 Tgas, so it needs well over 70.
+      poke: (trend: string) => call(c.perps, "poke", { trend }, ZERO, 120),
       sweepProtocolFees: () => call(c.perps, "sweep_protocol_fees", {}, ZERO, 60),
     },
     coins: {
