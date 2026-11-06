@@ -1,4 +1,5 @@
 import { evaluate, grossPnlUsdc, type RuleState, type Side } from "@tredio/autopilot";
+import type { AccountVersion } from "@tredio/contracts";
 import type { AccountState, PerpMarket } from "@tredio/hyperliquid";
 import type { ExecutorDb, OrderResult, OrderRow, PositionRow, RuleRow } from "./db";
 import type { Log } from "./log";
@@ -27,7 +28,7 @@ export interface AccountReader {
 }
 
 export interface ExecutorOptions {
-  /** Worst fill accepted, basis points from the mark (at most 1%: the account's guard allows 2% from a mark up to two minutes old). */
+  /** Worst fill accepted, basis points from the mark (at most 1%: the account's guard allows 2% from a mark up to two minutes old, five on v2 account code). */
   slippageBps: number;
   /** Pause a rule after this many failed orders in a row. */
   maxConsecutiveFailures: number;
@@ -81,8 +82,8 @@ export class TickContext {
     return new Map([...this.bySymbol.values()].flatMap((m) => (this.mark(m.symbol) ? [[m.symbol, m.markPx] as [string, number]] : [])));
   }
 
-  /** Why the account's order guard would refuse `price` now, or null. */
-  async guard(asset: string, price: string): Promise<string | null> {
+  /** Why the account's order guard (of the account's code `version`) would refuse an order at `price` on `assetIndex` now, or null. */
+  async guard(asset: string, price: string, order: { assetIndex: number; version: AccountVersion }): Promise<string | null> {
     let read = this.registry.get(asset);
     if (!read) {
       read = this.readMark(asset).then(
@@ -92,7 +93,7 @@ export class TickContext {
       this.registry.set(asset, read);
     }
     const r = await read;
-    return "error" in r ? `could not read Tredio's ${asset} mark: ${r.error}` : guardProblem(asset, price, r.mark, this.nowSec);
+    return "error" in r ? `could not read Tredio's ${asset} mark: ${r.error}` : guardProblem(asset, price, r.mark, this.nowSec, order);
   }
 
   async state(owner: string): Promise<AccountState> {
@@ -303,7 +304,7 @@ export class Executor {
     if ("skip" in order) return order;
     const notional = Number(order.size) * mark;
     if (notional < MIN_ORDER_USD) return { skip: `a ${money(notional)} order is below Hyperliquid's ${MIN_ORDER_USD} USDC minimum` };
-    const guard = await ctx.guard(market.symbol, order.price);
+    const guard = await ctx.guard(market.symbol, order.price, { assetIndex: order.asset_index, version: await venue.version() });
     if (guard) return { skip: guard };
     const marginUsdc = notional / leverage;
     const state = await ctx.state(venue.owner).catch(() => null);
@@ -343,7 +344,7 @@ export class Executor {
     const buy = isBuy(action, p.side);
     const order = buildOrder(market, { buy, worstPrice: worstPrice(buy, mark, this.opts.slippageBps), size, reduceOnly: true });
     if ("skip" in order) return order.skip;
-    const guard = await ctx.guard(market.symbol, order.price);
+    const guard = await ctx.guard(market.symbol, order.price, { assetIndex: order.asset_index, version: await venue.version() });
     if (guard) return guard;
     if (o.signal) await this.db.audit(o.who.owner, "exit_signal", o.signal, o.who.ruleId, o.who.followId);
     const n = await this.db.orderCount(p.id);

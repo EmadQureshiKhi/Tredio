@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { z } from "zod";
-import { DERIVED_TABLES, lockSchema, RAW_TABLES, type Sql } from "../src/db";
+import { connect, DERIVED_TABLES, lockSchema, migrate, RAW_TABLES, type Sql } from "../src/db";
 import { HANDLERS } from "../src/derive";
 import { on } from "../src/derive/context";
 import { extractEvents } from "../src/extract";
@@ -10,7 +12,7 @@ import { Neardata } from "../src/neardata";
 import { resync } from "../src/resync";
 import { commitBlock, readCursor, rebuild } from "../src/store";
 import { fakeNeardata } from "./fixtures/fake-neardata";
-import { ALICE, BTC_COIN, DEPLOYMENT, ev, EXPIRY, HEIGHTS, KEEPER, MM, OPENAI_COIN, scenario, SESSION_KEY, T } from "./fixtures/scenario";
+import { ALICE, BOB, BTC_COIN, DEPLOYMENT, ev, EXPIRY, HEIGHTS, KEEPER, KEY_2, KEY_3, KEY_4, MM, OPENAI_COIN, scenario, SESSION_KEY, T } from "./fixtures/scenario";
 import { commitAll, count, freshSchema, rows, snapshot, TEST_DATABASE_URL, tracker } from "./support";
 
 const at = (h: number) => new Date(T[h]! * 1000);
@@ -36,7 +38,7 @@ describe.skipIf(!TEST_DATABASE_URL)("derived tables", () => {
   });
 
   test("raw events and the cursor", async () => {
-    expect(EVENTS).toBe(83);
+    expect(EVENTS).toBe(103);
     expect(await count(sql, "events")).toBe(EVENTS);
     expect(await readCursor(sql, "testnet")).toEqual({ height: 1005, blockTime: at(1005) });
     const [first] = await sql`select * from events order by block_height, idx limit 1`;
@@ -86,7 +88,7 @@ describe.skipIf(!TEST_DATABASE_URL)("derived tables", () => {
       { trend: "crypto:btc", expiry: new Date((T[1003]! + 900) * 1000), value: null, missed: true, first_observation: at(1005) },
       { trend: "topic:openai", expiry: new Date(EXPIRY * 1000), value: "45000000", missed: false, first_observation: null },
     ]);
-    expect(await rows(sql`select * from marks`)).toEqual([{ asset: "BTC", price: "6512345000000", at: at(1000) }]);
+    expect(await rows(sql`select * from marks`)).toEqual([{ asset: "BTC", price: "6512345000000", at: at(1000), asset_index: 0 }]);
     expect(await rows(sql`select run_id, created, updated, marks, rejected, block_height from oracle_runs order by run_id`)).toEqual([
       { run_id: "1", created: 2, updated: 0, marks: 1, rejected: 1, block_height: "1000" },
       { run_id: "2", created: 0, updated: 2, marks: 0, rejected: 0, block_height: "1004" },
@@ -192,7 +194,7 @@ describe.skipIf(!TEST_DATABASE_URL)("derived tables", () => {
         first_seen: at(1002),
       },
     ]);
-    expect(await rows(sql`select account, public_key, label, scope, daily_limit, gas_key, added_at, revoked_at from sessions`)).toEqual([
+    expect(await rows(sql`select account, public_key, label, scope, daily_limit, gas_key, added_at, revoked_at from sessions where public_key = ${SESSION_KEY}`)).toEqual([
       {
         account: ALICE,
         public_key: SESSION_KEY,
@@ -200,11 +202,19 @@ describe.skipIf(!TEST_DATABASE_URL)("derived tables", () => {
         scope: { outcomes: true, perps: true, hyperliquid: false },
         daily_limit: "250000000",
         gas_key: true,
-        added_at: at(1002),
-        revoked_at: at(1004),
+        // Revoked at 1004 (its key kept) and added again at 1005: it starts over.
+        added_at: at(1005),
+        revoked_at: null,
       },
     ]);
-    expect(await rows(sql`select account, action, outflow, spent_today from session_actions`)).toEqual([{ account: ALICE, action: "swap", outflow: "1042080", spent_today: "1042080" }]);
+    expect(await rows(sql`select account, action, outflow, spent_today from session_actions order by receipt_id`)).toEqual([
+      { account: ALICE, action: "swap", outflow: "1042080", spent_today: "1042080" },
+      { account: ALICE, action: "top_up_gas", outflow: "0", spent_today: "1042080" },
+    ]);
+    expect(await rows(sql`select account, public_key, amount, today from gas_top_ups`)).toEqual([
+      { account: ALICE, public_key: SESSION_KEY, amount: "100000000000000000000000", today: "100000000000000000000000" },
+    ]);
+    expect(await rows(sql`select account, payer, amount, claimable from creation_refunds`)).toEqual([{ account: BOB, payer: "tredio-relayer.testnet", amount: "400000000000000000000000", claimable: false }]);
     expect(await rows(sql`select account, kind from hyperliquid_signatures`)).toEqual([{ account: ALICE, kind: "order" }]);
     expect(await rows(sql`select owner, amount, memo from usdc_mints order by owner`)).toEqual([
       { owner: ALICE, amount: "1000000000", memo: "faucet" },
@@ -215,6 +225,31 @@ describe.skipIf(!TEST_DATABASE_URL)("derived tables", () => {
       { n: 1, old_owner: C.outcomes, new_owner: ALICE, amount: "12000000", memo: "winnings" },
     ]);
     expect(await count(sql, "usdc_transfers")).toBe(4);
+  });
+
+  test("account v2 sessions: renewed in place, reactivated, kept dormant, deleted, or never added", async () => {
+    const day = (h: number, days: number) => new Date((T[h]! + days * 86_400) * 1000);
+    expect(await rows(sql`select public_key, label, expires_at, added_at, revoked_at, key_state from sessions order by public_key`)).toEqual([
+      // The account could not add the key, so it dropped the session.
+      { public_key: KEY_3, label: "autopilot", expires_at: day(1003, 1), added_at: at(1003), revoked_at: at(1003), key_state: "failed" },
+      // Renewed in place at 1003, revoked with its key kept at 1004, added again at 1005.
+      { public_key: SESSION_KEY, label: "This iPhone", expires_at: day(1005, 7), added_at: at(1005), revoked_at: null, key_state: "active" },
+      { public_key: KEY_4, label: "app", expires_at: day(1003, 1), added_at: at(1003), revoked_at: at(1004), key_state: "dormant" },
+      // Revoked with its key kept at 1004, the dormant key deleted for good at 1005.
+      { public_key: KEY_2, label: "app", expires_at: day(1003, 1), added_at: at(1003), revoked_at: at(1004), key_state: "deleted" },
+    ]);
+  });
+
+  test("a renewal keeps when the session was first added", async () => {
+    const ref = await freshSchema();
+    try {
+      await commitAll(ref.sql, blocks, [1000, 1001, 1002, 1003]);
+      expect(await rows(ref.sql`select expires_at, added_at, revoked_at, key_state from sessions where public_key = ${SESSION_KEY}`)).toEqual([
+        { expires_at: new Date((T[1003]! + 7 * 86_400) * 1000), added_at: at(1002), revoked_at: null, key_state: "active" },
+      ]);
+    } finally {
+      await ref.drop();
+    }
   });
 
   test("replaying blocks stores and applies nothing twice", async () => {
@@ -230,6 +265,29 @@ describe.skipIf(!TEST_DATABASE_URL)("derived tables", () => {
     const r = await rebuild(sql, tracker, silentLog, 2);
     expect(r).toEqual({ events: EVENTS, skipped: 0 });
     expect(await snapshot(sql)).toEqual(before);
+  });
+});
+
+describe.skipIf(!TEST_DATABASE_URL)("migrations", () => {
+  test("a database from before account v2 gets key states: a revoke always deleted the key then", async () => {
+    const schema = `indexer_test_${process.pid}_m${Math.random().toString(36).slice(2, 8)}`;
+    const sql = connect(TEST_DATABASE_URL!, schema);
+    try {
+      await sql.unsafe(`create schema if not exists "${schema}"`);
+      await sql.unsafe(readFileSync(join(import.meta.dir, "../src/migrations/001_schema.sql"), "utf8"));
+      const session = (key: string, revoked: Date | null) => ({ account: ALICE, public_key: key, label: "app", scope: sql.json({ outcomes: true, perps: true, hyperliquid: true }), expires_at: at(1005), daily_limit: "1", gas_key: true, added_at: at(1002), revoked_at: revoked });
+      await sql`insert into sessions ${sql([session(KEY_2, at(1004)), session(KEY_4, null)])}`;
+      await sql`insert into marks (asset, price, at) values ('BTC', 1, ${at(1000)})`;
+      for (let i = 0; i < 2; i++) await migrate(sql, schema);
+      expect(await rows(sql`select public_key, key_state from sessions order by public_key`)).toEqual([
+        { public_key: KEY_4, key_state: "active" },
+        { public_key: KEY_2, key_state: "deleted" },
+      ]);
+      expect(await rows(sql`select asset, asset_index from marks`)).toEqual([{ asset: "BTC", asset_index: null }]);
+    } finally {
+      await sql.unsafe(`drop schema if exists "${schema}" cascade`);
+      await sql.end({ timeout: 5 });
+    }
   });
 });
 

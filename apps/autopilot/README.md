@@ -56,6 +56,7 @@ To check a deployment end to end, `bun run order` sends one order through a sess
 
 ## Limits worth knowing
 
-- The account guard needs a Tredio mark for the asset no older than two minutes, so Autopilot trades only assets the oracle reports marks for (BTC, ETH, SOL, NEAR, HYPE and live trends' assets).
+- The account guard needs a Tredio mark for the asset no older than two minutes (five on v2 account code), so Autopilot trades only assets the oracle reports marks for (BTC, ETH, SOL, NEAR, HYPE and live trends' assets).
+  On v2 the mark must also name the asset index the order signs, so Autopilot waits while the oracle has not reported it.
 - Leaders trade mainnet and followers copy into their testnet accounts; testnet marks drift from mainnet's by a few tenths of a percent, so a tight slippage setting skips copies that would chase the leader's fill.
 - Fresh Hyperliquid testnet accounts hold no USDC (its faucet needs a mainnet history), so openings wait for margin until an account is funded.

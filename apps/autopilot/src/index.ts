@@ -1,5 +1,5 @@
 import { Viewer, walletWatch } from "@tredio/chain";
-import { calls } from "@tredio/contracts";
+import { AccountVersions } from "@tredio/contracts";
 import { type HlNetwork, HyperliquidInfo, hyperliquidAddressOf } from "@tredio/hyperliquid";
 import { loadConfig } from "./config";
 import { Copier, mainnetLeaders } from "./copier";
@@ -22,8 +22,9 @@ const info = new HyperliquidInfo(network);
 const hyperliquid = hyperliquidApi(info, network);
 const db = new ExecutorDb(connect(cfg.DATABASE_URL));
 const nonces = new Nonces();
-// A session call attaches the descriptor's gas, which a gas key prepays at 1e9 yocto per gas unit.
-const gasNeeded = BigInt(calls(cfg.deployment).account.sessionCall(cfg.deployment.root, "faucet").gas) * 10n ** 9n;
+// Each account's code version (v1 or v2), read once and re-read every ten minutes, so an upgrade
+// shows: it sets a session call's gas and the order guard's rules.
+const versions = new AccountVersions((account) => viewer.view<number>(account, "version"));
 
 const addresses = new Map<string, Promise<string>>();
 /** An account's Hyperliquid address (its Chain Signatures key for path `hyperliquid`); it never changes. */
@@ -44,13 +45,12 @@ const makeVenue = (r: VenueRequest) =>
     sessionKey: r.sessionKey,
     network,
     policy: AUTOPILOT_POLICY,
-    chain: nearSessionChain(viewer, cfg.deployment, r.owner, r.secretKey, cfg.rpcUrls),
+    chain: nearSessionChain(viewer, cfg.deployment, r.owner, r.secretKey, cfg.rpcUrls, versions),
     hyperliquid,
     addressOf: () => addressOf(r.owner),
     nonces,
     fund: relayerFunding(cfg.RELAYER_URL, r.owner, r.sessionKey),
     gasMin: cfg.SESSION_GAS_MIN_NEAR,
-    gasNeeded,
   });
 const venues = new Venues(db, nearGrantChain(viewer), makeVenue, { sealPrivateKey: cfg.AUTOPILOT_SEAL_PRIVATE_KEY ?? null, bot: cfg.bot }, log);
 const reader: AccountReader = { addressOf, state: (a) => hyperliquid.accountState(a), fills: (a) => hyperliquid.fills(a) };

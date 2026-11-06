@@ -10,7 +10,18 @@ export interface Action {
   kind: ActionKind;
   call: Call;
   reason: string;
+  /**
+   * Refusals that mean the work is already under way, not that it failed: the action is tried
+   * again on the next scan instead of backing off.
+   */
+  waitsOn?: RegExp;
 }
+
+/**
+ * The coins factory runs one graduation step at a time per curve and refuses `graduate` while a
+ * step's callback is pending (a block or two; a lost one expires after ten minutes).
+ */
+export const GRADUATION_IN_FLIGHT = /a graduation step is in flight/;
 
 export interface PlanConfig {
   /** Windows the keeper opens series for (seconds). */
@@ -46,7 +57,7 @@ export function plan(s: Snapshot, d: Deployment, cfg: PlanConfig): Action[] {
   }
 
   for (const c of s.curves) {
-    if (c.stage === "ready" || c.stage === "pooled") actions.push({ key: `graduate:${c.trend}:${c.stage}`, kind: "graduate", call: C.coins.graduate(c.trend), reason: `curve ${c.stage}` });
+    if (c.stage === "ready" || c.stage === "pooled") actions.push({ key: `graduate:${c.trend}:${c.stage}`, kind: "graduate", call: C.coins.graduate(c.trend), reason: `curve ${c.stage}`, waitsOn: GRADUATION_IN_FLIGHT });
   }
 
   for (const l of s.latest) {

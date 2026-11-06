@@ -1,9 +1,25 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
-import { type Call, type OwnerAction, type OwnerApproval, type OwnerApprovalRequest, ownerApprovalDigest, ownerRequest, requestChallenge, requestJson, type Session, type SessionAction } from "@tredio/contracts";
+import {
+  type AccountVersion,
+  type Call,
+  keepsGasKeys,
+  type OwnerAction,
+  type OwnerApproval,
+  type OwnerApprovalRequest,
+  ownerApprovalDigest,
+  ownerRequest,
+  requestChallenge,
+  requestJson,
+  type Session,
+  type SessionAction,
+  sessionCallPrepaid,
+  sessionCallTgas,
+  upgradeToV2,
+} from "@tredio/contracts";
 import { activation, ownerApprovals } from "@/lib/api";
 import { accessKey, accountState, view } from "@/lib/chain/client";
 import { base64Encode, hexEncode, randomBytes, utf8 } from "@/lib/chain/encoding";
-import { newKeyPair, signNep413 } from "@/lib/chain/keys";
+import { newKeyPair, publicKeyOf, signNep413 } from "@/lib/chain/keys";
 import { type Outcome, refusalOf, TxFailed } from "@/lib/chain/outcome";
 import { follow, GasKeySender, type Sent } from "@/lib/chain/sender";
 import { DEPLOYMENT, NETWORK, SIGN_IN_RECIPIENT } from "@/lib/config";
@@ -24,6 +40,7 @@ import {
   type StoredSession,
   storedSessionMeta,
 } from "./store";
+import { accountVersion, accountVersions } from "./version";
 import { connectWallet, disconnectWallet, restoreWallet, type WalletAccount, walletSend, walletSignMessage } from "./wallet";
 import { assert, type Assertion, candidateOwnerKeys, createPasskey, type PrfOutputs } from "./webauthn";
 
@@ -84,10 +101,18 @@ export const SESSION_DAYS = 7;
 export const SESSION_DAILY_LIMIT = 500_000_000n;
 export const SESSION_LABEL = "app";
 export const SESSION_SCOPE = { outcomes: true, perps: true, hyperliquid: true } as const;
-/** NEAR a new account moves into its first session's gas key (prepaid gas is bought at 1e9 yocto a gas unit). */
+/**
+ * NEAR a new account moves into its first session's gas key (prepaid gas is bought at 1e9 yocto a
+ * gas unit): enough for a v1 account's 300 Tgas calls, so it suits accounts born on either code.
+ */
 export const FIRST_SESSION_GAS = 320_000_000_000_000_000_000_000n;
-/** Below this the relayer refills a session gas key (a 300 Tgas transaction needs 0.3 NEAR in the key). */
-export const GAS_KEY_MIN = 310_000_000_000_000_000_000_000n;
+/**
+ * Below this the app asks the relayer to refill a session gas key: what one session call prepays
+ * for the gas it attaches (0.001 NEAR per Tgas: 0.3 NEAR for v1's 300 Tgas, 0.15 for v2's 150)
+ * and 0.01 NEAR for the gas it burns.
+ */
+export const gasKeyMin = (version: AccountVersion) => sessionCallPrepaid(version) + 10n ** 22n;
+export const GAS_KEY_MIN = gasKeyMin(1);
 const LANES = 4;
 
 const WALLET_KEY = "tredio.wallet";
@@ -220,9 +245,11 @@ export class AccountService {
     ticketing.catch(() => undefined);
     const key = newKeyPair();
     const expiresAt = nowSec() + SESSION_DAYS * 86_400;
-    const request = requestJson(
-      ownerRequest(account, NETWORK, [ownerActions.addSession({ publicKey: key.publicKey, label: SESSION_LABEL, scope: SESSION_SCOPE, expiresAt, dailyLimit: SESSION_DAILY_LIMIT, gasFunding: FIRST_SESSION_GAS })]),
-    );
+    // Once v2 account code is published, the first request also moves the account onto it: still
+    // one prompt, and the account never trades on v1. Until then deployments names no v2 code.
+    const upgrade = upgradeToV2(DEPLOYMENT);
+    const first = ownerActions.addSession({ publicKey: key.publicKey, label: SESSION_LABEL, scope: SESSION_SCOPE, expiresAt, dailyLimit: SESSION_DAILY_LIMIT, gasFunding: FIRST_SESSION_GAS });
+    const request = requestJson(ownerRequest(account, NETWORK, upgrade ? [first, upgrade] : [first]));
     progress({ flow: "sign-up", step: "confirm" });
     const a = await assert(rpId(), await requestChallenge(request), credentialId);
     progress({ flow: "sign-up", step: "account" });
@@ -234,7 +261,7 @@ export class AccountService {
         rememberPasskey(credentialId, ownerKey, false);
         throw new Error("This passkey already has a Tredio account. Sign in with it instead.");
       }
-      if (!(await this.sessionLanded(e, account, key.publicKey))) {
+      if (!(await this.sessionLanded(e, account, key.publicKey, expiresAt))) {
         if (e instanceof RelayerError && e.status >= 500) throw new Error("Tredio's relayer did not confirm the new account. Your passkey is saved: choose \u201cI already have a passkey\u201d to finish setting it up.");
         throw e;
       }
@@ -273,7 +300,20 @@ export class AccountService {
   async renewSession(progress: Progress): Promise<ActiveAccount> {
     const meta = this.passkey?.meta ?? this.ended ?? (await storedSessionMeta());
     if (!meta) return this.signIn(progress);
-    return this.startSession(meta.account, meta.ownerKey, meta.credentialId, null, "renew", progress);
+    return this.startSession(meta.account, meta.ownerKey, meta.credentialId, null, "renew", progress, meta);
+  }
+
+  /** This device's session key for `meta`, when the stored copy still opens; null otherwise. */
+  private async storedKey(meta: StoredSession): Promise<{ publicKey: string; secretKey: string } | null> {
+    const p = this.passkey;
+    if (p && p.meta.account === meta.account && p.meta.publicKey === meta.publicKey) return { publicKey: meta.publicKey, secretKey: p.secretKey };
+    const stored = await loadSession();
+    if (!stored || stored.meta.account !== meta.account || stored.meta.publicKey !== meta.publicKey) return null;
+    try {
+      return publicKeyOf(stored.secretKey) === meta.publicKey ? { publicKey: meta.publicKey, secretKey: stored.secretKey } : null;
+    } catch {
+      return null;
+    }
   }
 
   /** The Tredio account a passkey assertion belongs to, if one exists. */
@@ -293,12 +333,23 @@ export class AccountService {
   }
 
   /**
-   * Adds a new session key to the account (one prompt) and asks the relayer to fill its gas. A new
-   * key each time: the account keeps any earlier sessions, so other devices stay signed in.
+   * Adds a session to the account (one prompt) and asks the relayer to fill its gas. Signing in
+   * makes a new key: the account keeps any earlier sessions, so other devices stay signed in.
+   * Renewing on v2 account code renews this device's own key in place (`renewing`), so its gas key
+   * keeps the gas it holds; v1 cannot add a key it already has, so there renewal takes a new key.
    */
-  private async startSession(account: string, ownerKey: string, credentialId: string, prfSession: Uint8Array | null, flow: "sign-in" | "renew", progress: Progress): Promise<ActiveAccount> {
+  private async startSession(
+    account: string,
+    ownerKey: string,
+    credentialId: string,
+    prfSession: Uint8Array | null,
+    flow: "sign-in" | "renew",
+    progress: Progress,
+    renewing: StoredSession | null = null,
+  ): Promise<ActiveAccount> {
     progress({ flow, step: "confirm" });
-    const key = newKeyPair();
+    const version = await accountVersion(account);
+    const key = (renewing && keepsGasKeys(version) ? await this.storedKey(renewing) : null) ?? newKeyPair();
     const expiresAt = nowSec() + SESSION_DAYS * 86_400;
     const request = requestJson(
       ownerRequest(account, NETWORK, [ownerActions.addSession({ publicKey: key.publicKey, label: SESSION_LABEL, scope: SESSION_SCOPE, expiresAt, dailyLimit: SESSION_DAILY_LIMIT, gasFunding: 0n })]),
@@ -307,10 +358,10 @@ export class AccountService {
     try {
       await relayer.ownerExecute({ account, request, proof: a.proof });
     } catch (e) {
-      if (!(await this.sessionLanded(e, account, key.publicKey))) throw e;
+      if (!(await this.sessionLanded(e, account, key.publicKey, expiresAt))) throw e;
     }
     progress({ flow, step: "gas" });
-    await this.fundGas(account, key.publicKey, true);
+    await this.fundGas(account, key.publicKey, true, version);
     const meta: StoredSession = { kind: "passkey", account, ownerKey, credentialId, publicKey: key.publicKey, expiresAt, dailyLimit: SESSION_DAILY_LIMIT.toString() };
     await saveSession(meta, key.secretKey, prfSession ?? a.prf.session);
     this.usePasskeySession(meta, key.secretKey);
@@ -322,26 +373,27 @@ export class AccountService {
   /**
    * After the relayer answered with an error that is not a refusal (it went down, or lost track of
    * a transaction it had sent while waiting on its RPC), whether the session landed on the account
-   * anyway: then the sign-up or sign-in carries on instead of stranding a created account.
+   * anyway: then the sign-up or sign-in carries on instead of stranding a created account. The
+   * expiry tells this request's session from the one a renewal replaces.
    */
-  private async sessionLanded(e: unknown, account: string, publicKey: string): Promise<boolean> {
+  private async sessionLanded(e: unknown, account: string, publicKey: string, expiresAt: number): Promise<boolean> {
     if (e instanceof RelayerError && e.status < 500) return false;
     for (let i = 0; i < 10; i++) {
-      if (await view<unknown>(account, "session", { public_key: publicKey }).catch(() => null)) return true;
+      if ((await this.readSession(account, publicKey).catch(() => null))?.expires_at === expiresAt) return true;
       await sleep(2_000);
     }
     return false;
   }
 
   /**
-   * Makes sure a session gas key can pay for a transaction, asking the relayer to refill it when it
-   * runs low. Right after a key is added the relayer may not see it for a block or two, so a fresh
-   * key is retried briefly.
+   * Makes sure a session gas key can pay for a transaction on an account of `version`, asking the
+   * relayer to refill it when it runs low. Right after a key is added the relayer may not see it
+   * for a block or two, so a fresh key is retried briefly.
    */
-  private async fundGas(account: string, publicKey: string, fresh = false): Promise<void> {
+  private async fundGas(account: string, publicKey: string, fresh: boolean, version: AccountVersion): Promise<void> {
     for (let attempt = 0; ; attempt++) {
       const key = await accessKey(account, publicKey).catch(() => null);
-      if (key?.gasKey && key.gasKey.balance >= GAS_KEY_MIN) return;
+      if (key?.gasKey && key.gasKey.balance >= gasKeyMin(version)) return;
       try {
         await relayer.fundSession({ account, publicKey });
         return;
@@ -387,8 +439,9 @@ export class AccountService {
       this.passkey = null;
       throw new SessionExpiredError("Your trading session ended.");
     }
-    await this.fundGas(p.meta.account, p.meta.publicKey);
-    const sent: Sent<T> = await p.sender.send<T>(C.account.sessionCall(p.meta.account, action));
+    const version = await accountVersion(p.meta.account);
+    await this.fundGas(p.meta.account, p.meta.publicKey, false, version);
+    const sent: Sent<T> = await p.sender.send<T>(C.account.sessionCall(p.meta.account, action, sessionCallTgas(version)));
     return { hash: sent.hash, value: sent.value, sender: p.meta.account, outcome: sent.outcome };
   }
 
@@ -428,6 +481,8 @@ export class AccountService {
       }
       throw e;
     }
+    // An upgrade changes the account's code version: read it again next time.
+    if (actions.some((x) => "upgrade" in x)) accountVersions.forget(a.address);
     // The receipts' logs say what the calls did (an order's id, or a refusal that returned the funds).
     // The relayer sends them with its answer; an older relayer does not, so then the app follows the transaction.
     const by = await relayer.account();
@@ -442,7 +497,7 @@ export class AccountService {
     const a = this.active;
     if (!a || a.kind !== "passkey") throw new PasskeyOnlyError("Autopilot trades through a passkey account's own session.");
     const r = await this.ownerExecute([ownerActions.addSession({ ...session, gasFunding: 0n })]);
-    await this.fundGas(a.address, session.publicKey, true);
+    await this.fundGas(a.address, session.publicKey, true, await accountVersion(a.address));
     return r;
   }
 

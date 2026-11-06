@@ -96,15 +96,58 @@ pub fn trends(rpc: &str, registry: &str) -> Result<Vec<Trend>> {
     }
 }
 
-/// Hyperliquid perps listed on the network: symbol to mark price.
-pub fn marks(hyperliquid: &str) -> Result<Vec<(String, f64)>> {
+/// A listed Hyperliquid perp: its symbol (upper case), mark price, and asset index, the `a` an
+/// order on it signs, which account v2's guard checks against the mark.
+#[derive(Clone, Debug, PartialEq)]
+pub struct HlMark {
+    pub asset: String,
+    pub price: f64,
+    pub asset_index: u32,
+}
+
+/// Hyperliquid perps listed on the network, with their marks and asset indexes.
+pub fn marks(hyperliquid: &str) -> Result<Vec<HlMark>> {
     let v: Value = serde_json::from_slice(&post(&format!("{hyperliquid}/info"), &json!({ "type": "metaAndAssetCtxs" }))?).map_err(|e| e.to_string())?;
+    parse_marks(&v)
+}
+
+/// The listed perps of a `metaAndAssetCtxs` answer. An asset's index is its position in the
+/// universe, counted before delisted markets are left out, as Hyperliquid numbers them.
+pub fn parse_marks(v: &Value) -> Result<Vec<HlMark>> {
     let universe = v.pointer("/0/universe").and_then(Value::as_array).ok_or("no universe")?;
     let ctxs = v.pointer("/1").and_then(Value::as_array).ok_or("no contexts")?;
     Ok(universe
         .iter()
         .zip(ctxs)
-        .filter(|(u, _)| u.get("isDelisted").and_then(Value::as_bool) != Some(true))
-        .filter_map(|(u, c)| Some((u.get("name")?.as_str()?.to_uppercase(), c.get("markPx")?.as_str()?.parse::<f64>().ok()?)))
+        .enumerate()
+        .filter(|(_, (u, _))| u.get("isDelisted").and_then(Value::as_bool) != Some(true))
+        .filter_map(|(i, (u, c))| {
+            Some(HlMark {
+                asset: u.get("name")?.as_str()?.to_uppercase(),
+                price: c.get("markPx")?.as_str()?.parse::<f64>().ok()?,
+                asset_index: u32::try_from(i).ok()?,
+            })
+        })
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn asset_indexes_count_delisted_markets() {
+        let v = json!([
+            { "universe": [{ "name": "BTC" }, { "name": "OLD", "isDelisted": true }, { "name": "eth" }, { "name": "SOL" }] },
+            [{ "markPx": "65000.5" }, { "markPx": "1.0" }, { "markPx": "3000" }, { "markPx": null }]
+        ]);
+        let m = parse_marks(&v).unwrap();
+        assert_eq!(
+            m,
+            vec![
+                HlMark { asset: "BTC".into(), price: 65000.5, asset_index: 0 },
+                HlMark { asset: "ETH".into(), price: 3000.0, asset_index: 2 },
+            ]
+        );
+    }
 }

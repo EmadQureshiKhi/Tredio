@@ -28,14 +28,15 @@ Everything lives in schema `indexer` (`INDEXER_SCHEMA`), created by idempotent m
 Amounts are raw integers in `numeric` (USDC, outcome tokens and the index have 6 decimals, coins 18), times are `timestamptz`.
 
 - `events`: every stored event (block, time, receipt, transaction, executor, standard, event, `data` as jsonb, log index, and `idx`, its order in the block), and `cursor`: the last block processed.
-- Registry: `trends`, `index_points` (every observation), `settlements`, `marks`, `oracle_runs`.
+- Registry: `trends`, `index_points` (every observation), `settlements`, `marks` (with the Hyperliquid `asset_index` each mark vouches for, once the oracle reports it), `oracle_runs`.
 - Outcomes: `series` (with supplies and backing), `outcome_balances` (NEP-245 holdings), `outcome_flows` (USDC spent and received per account, series and side through mints, redemptions, swaps and fills, for average-cost PnL).
   Each flow row is one leg signed from the account's side (`tokens` and `usdc` positive when received); side `set` is a complete set of one UP and one DOWN per unit.
 - Book: `book_markets`, `book_orders`, `book_trades`, `book_swaps`.
 - Perps: `perp_positions`, `perp_funding`.
 - Trend coins: `curves`, `coin_trades`, `coin_balances`.
 - Curation: `curation`, `curation_claims`.
-- Accounts: `accounts`, `sessions`, `session_actions`, `hyperliquid_signatures`.
+- Accounts: `accounts`, `sessions`, `session_actions`, `hyperliquid_signatures`, `gas_top_ups`, and `creation_refunds` (deposits of failed creations the factory returned or keeps claimable).
+  A session's `key_state` says what became of its key: `active`, `dormant` (account v2 keeps a revoked gas key, unable to act), `deleted`, or `failed` (never added, so the account dropped the session); a v2 renewal updates the row in place and keeps `added_at`.
 - USDC: `usdc_transfers`, `usdc_mints`.
 
 A block's events, their derived rows and the cursor commit in one transaction, and derived rows are written only for events stored for the first time, so re-processing a block after a crash adds nothing.

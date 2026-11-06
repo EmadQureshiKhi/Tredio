@@ -1,11 +1,12 @@
 "use client";
 import { useQueryClient } from "@tanstack/react-query";
-import type { EvmSignature } from "@tredio/contracts";
+import { bindsMarkToAssetIndex, type EvmSignature, hlMarkMaxAge } from "@tredio/contracts";
 import { APP_URL as HL_APP_URL, formatPrice, formatSize, type HlOrder, orderOutcome } from "@tredio/hyperliquid";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { Badge, Button, cn, ErrorNote, Row, Segmented, TxStatus } from "@/components/ui";
 import { useAccount } from "@/lib/account/AccountProvider";
+import { useAccountVersion } from "@/lib/account/version";
 import type { HlMarket, Trend } from "@/lib/api";
 import { TxFailed } from "@/lib/chain/outcome";
 import { HL_NETWORK, IS_MAINNET } from "@/lib/config";
@@ -22,15 +23,16 @@ import { AmountField, Note, Section, SubmitButton, useNow } from "./ticket";
  * Hyperliquid perps on the asset behind a trend, traded from the account's own Hyperliquid address:
  * the EVM address of its NEAR Chain Signatures key. The session asks the account to sign each order;
  * the account contract checks it first (priced within 2% of the oracle's mark, which must be under
- * two minutes old, and leverage at most 10x), then the MPC network signs and the app posts the very
+ * two minutes old on v1 account code and five on v2, where the mark must also name the very market
+ * the order trades; leverage at most 10x), then the MPC network signs and the app posts the very
  * same action to Hyperliquid.
  */
 
 const LEVERAGES = [1, 2, 3, 5, 10] as const;
 /** The account contract's guard. */
 const GUARD_BAND = 0.02;
-const MARK_MAX_AGE = 120;
 const SESSION_MAX_LEVERAGE = 10;
+const AGE_WORDS: Record<number, string> = { 120: "two minutes", 300: "five minutes" };
 const TAKER_FEE = 0.00045;
 
 type Result = { kind: "filled"; size: number; price: number } | { kind: "resting"; oid: number | null } | { kind: "missed"; reason: string } | null;
@@ -74,6 +76,8 @@ function Ticket({ market }: { market: HlMarket }) {
   const client = useQueryClient();
   const hl = useHlAccount(account.address);
   const mark = useMark(market.symbol);
+  // Until the account's code version is known, the v1 guard applies: it is the stricter one on age.
+  const version = useAccountVersion(account.address).data ?? 1;
   const now = useNow(5_000);
   const [side, setSide] = useState<"long" | "short">("long");
   const [lev, setLev] = useState("3");
@@ -85,8 +89,11 @@ function Ticket({ market }: { market: HlMarket }) {
   const levels = [...new Set([...LEVERAGES.filter((l) => l < top), top])].map(String);
   const leverage = Number(levels.includes(lev) ? lev : levels[levels.length - 1]);
   const buy = side === "long";
+  const markMaxAge = hlMarkMaxAge(version);
   const markAge = mark.data ? Math.max(0, Math.floor(now / 1000) - mark.data.at) : null;
-  const markFresh = markAge !== null && markAge <= MARK_MAX_AGE;
+  const markFresh = markAge !== null && markAge <= markMaxAge;
+  // v2 signs only against a mark that names this very market (the order's asset index).
+  const markNamesMarket = !bindsMarkToAssetIndex(version) || mark.data?.assetIndex === market.index;
   const oracle = mark.data?.price ?? null;
   const ref = market.midPx ?? market.markPx;
   // The worst price Hyperliquid may fill at, kept inside the account's 2% band around the oracle's mark.
@@ -172,10 +179,15 @@ function Ticket({ market }: { market: HlMarket }) {
       </div>
       {!mark.isLoading && !markFresh ? (
         <Note tone="warn">
-          {oracle ? `Tredio's oracle mark for ${market.symbol} is ${markAge !== null ? `${Math.round(markAge / 60)} min` : "too"} old.` : `Tredio's oracle has no mark for ${market.symbol} yet.`} The account signs session orders only within 2% of a mark under two minutes old, so orders wait for the next oracle report.
+          {oracle ? `Tredio's oracle mark for ${market.symbol} is ${markAge !== null ? `${Math.round(markAge / 60)} min` : "too"} old.` : `Tredio's oracle has no mark for ${market.symbol} yet.`} The account signs session orders only within 2% of a mark under {AGE_WORDS[markMaxAge] ?? `${markMaxAge} seconds`} old, so orders wait for the next oracle report.
         </Note>
       ) : null}
-      <SubmitButton tone={buy ? "up" : "down"} disabled={!size || size < step || Boolean(error) || !priceText || !markFresh} loading={tx.busy} onClick={() => void submit()} testId="asset-perp-submit">
+      {!mark.isLoading && markFresh && !markNamesMarket ? (
+        <Note tone="warn">
+          Tredio&rsquo;s oracle mark for {market.symbol} {mark.data?.assetIndex == null ? "does not name its Hyperliquid market yet" : "names another Hyperliquid market"}, and your account signs session orders only against a mark for the very market they trade, so orders wait for the oracle to report it.
+        </Note>
+      ) : null}
+      <SubmitButton tone={buy ? "up" : "down"} disabled={!size || size < step || Boolean(error) || !priceText || !markFresh || !markNamesMarket} loading={tx.busy} onClick={() => void submit()} testId="asset-perp-submit">
         {`${buy ? "Long" : "Short"} ${market.symbol} ${leverage}x`}
       </SubmitButton>
       <TxStatus tx={tx} filledLabel="Signed" testId="asset-perp-tx" />

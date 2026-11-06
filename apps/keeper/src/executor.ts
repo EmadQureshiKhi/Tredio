@@ -4,7 +4,9 @@ import type { Action, ActionKind } from "./plan";
 /**
  * Sends actions, each key at most once at a time. A failed action waits before it is tried again
  * (doubling up to ten minutes), so a call that keeps reverting (a market already listed, a
- * settlement not observed yet) does not burn gas every scan.
+ * settlement not observed yet) does not burn gas every scan. A refusal the action `waitsOn` (its
+ * work already under way, such as a graduation step in flight) is no failure: it is tried again
+ * on the next scan.
  */
 export class Executor {
   private readonly inflight = new Set<string>();
@@ -41,6 +43,11 @@ export class Executor {
       this.log({ action: a.kind, key: a.key, reason: a.reason, tx: r.hash }, "action sent");
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      if (a.waitsOn?.test(message)) {
+        this.backoff.delete(a.key);
+        this.log({ action: a.kind, key: a.key, reason: message.slice(0, 200) }, "action waits for the next scan");
+        return;
+      }
       const prev = this.backoff.get(a.key)?.delayMs ?? 15_000;
       const delayMs = Math.min(prev * 2, 600_000);
       this.backoff.set(a.key, { until: this.now() + delayMs, delayMs });

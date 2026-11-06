@@ -1,6 +1,7 @@
 /**
  * End-to-end on NEAR testnet, as the app and services do it:
- *   1. a passkey's universal account is created by the relayer with a gas-key session,
+ *   1. a passkey's universal account is created by the relayer with a gas-key session (and, once
+ *      deployments names v2 account code, moved onto it in the same first request, as the app does),
  *   2. the session (gas key, nonce lane 0) draws test USDC straight from RPC, no relayer,
  *   3. the oracle lists a trend, the keeper opens a series and lists it on the book,
  *   4. the market maker quotes, and the session buys UP with an anchored swap,
@@ -9,7 +10,7 @@
  *   bun scripts/e2e-testnet.ts            (uses ~/.near-credentials/testnet service keys)
  */
 import { readFileSync } from "node:fs";
-import { calls, ownerRequest, requestJson, type Report, type Series } from "@tredio/contracts";
+import { AccountVersions, calls, type OwnerAction, ownerRequest, requestJson, type Report, type Series, sessionCallTgas, upgradeToV2 } from "@tredio/contracts";
 import { Sender } from "@tredio/chain";
 import { D, SoftPasskey, newEd25519, nowSecs, senderFor, signReport, viewer } from "./lib/testnet";
 
@@ -35,23 +36,24 @@ const account = await viewer.view<string>(D.contracts.accounts, "account_id_of",
 const session = newEd25519();
 // Kept locally (gitignored) so a failed run can be inspected with the same session key.
 await Bun.write("internal/scratch/e2e-session.json", JSON.stringify({ account, ...session }, null, 2));
-const request = requestJson(
-  ownerRequest(account, "testnet", [
-    {
-      add_session: {
-        public_key: session.publicKey,
-        label: "e2e",
-        scope: { outcomes: true, perps: true, hyperliquid: true },
-        expires_at: nowSecs() + 7 * 86_400,
-        daily_limit: (500n * USDC).toString(),
-        gas_key: true,
-        // Prepaid gas is bought at 1e9 yocto/gas, so a 300 Tgas transaction needs 0.3 NEAR of float;
-        // unused gas returns to the key, each trade burns a few thousandths.
-        gas_funding: (32n * 10n ** 22n).toString(),
-      },
+const upgrade = upgradeToV2(D);
+const first: OwnerAction[] = [
+  {
+    add_session: {
+      public_key: session.publicKey,
+      label: "e2e",
+      scope: { outcomes: true, perps: true, hyperliquid: true },
+      expires_at: nowSecs() + 7 * 86_400,
+      daily_limit: (500n * USDC).toString(),
+      gas_key: true,
+      // Prepaid gas is bought at 1e9 yocto/gas, so a 300 Tgas transaction needs 0.3 NEAR of float;
+      // unused gas returns to the key, each trade burns a few thousandths.
+      gas_funding: (32n * 10n ** 22n).toString(),
     },
-  ]),
-);
+  },
+  ...(upgrade ? [upgrade] : []),
+];
+const request = requestJson(ownerRequest(account, "testnet", first));
 const created = await relayer.send(C.accounts.create(passkey.publicKeyHex, (4n * 10n ** 23n).toString(), { request, proof: await passkey.prove(request) }));
 log("account", account, "created in", created.hash);
 const keys = await viewer.rpc<{ keys: { public_key: string; access_key: Record<string, unknown> }[] }>("query", {
@@ -61,9 +63,12 @@ const keys = await viewer.rpc<{ keys: { public_key: string; access_key: Record<s
 });
 log("keys", JSON.stringify(keys.keys));
 
-// 2. The gas key draws test USDC.
+// 2. The gas key draws test USDC, attaching the gas the account's code needs (300 Tgas on v1, 150 on v2).
+const version = await new AccountVersions((a) => viewer.view<number>(a, "version")).of(account);
+const tgas = sessionCallTgas(version);
+log("account code", `v${version}`, `${tgas} Tgas a session call`);
 const user = new Sender({ network: "testnet", accountId: account, privateKey: session.secretKey, gasKeyLanes: 4 });
-const drip = await user.send(C.account.sessionCall(account, "faucet"));
+const drip = await user.send(C.account.sessionCall(account, "faucet", tgas));
 const bal = await viewer.view<string>(D.contracts.usdc, "ft_balance_of", { account_id: account });
 log("faucet via gas key", drip.hash, "USDC", Number(bal) / 1e6);
 
@@ -90,7 +95,7 @@ for (const tick of [180, 200, 600]) {
   await mm.send(C.book.place({ series, side: "up", dir: "sell", tick, size: (20n * USDC).toString(), tif: "gtc" }));
 }
 const before = BigInt(await viewer.view<string>(D.contracts.usdc, "ft_balance_of", { account_id: account }));
-const swap = await user.send(C.account.sessionCall(account, { swap: { series, side: "up", buy: true, amount: (30n * USDC).toString(), min_out: "1" } }));
+const swap = await user.send(C.account.sessionCall(account, { swap: { series, side: "up", buy: true, amount: (30n * USDC).toString(), min_out: "1" } }, tgas));
 await new Promise((r) => setTimeout(r, 4000));
 const up = await viewer.view<string>(D.contracts.outcomes, "mt_balance_of", { account_id: account, token_id: `${series}:up` });
 const after = BigInt(await viewer.view<string>(D.contracts.usdc, "ft_balance_of", { account_id: account }));
@@ -103,13 +108,13 @@ if (pool < 1_000n * USDC) {
   await keeper.send(C.perps.depositPool((5_000n * USDC).toString()));
   log("seeded the perps pool");
 }
-const open = await user.send(C.account.sessionCall(account, { perp_open: { trend, is_long: true, margin: (20n * USDC).toString(), leverage_bps: 20_000, acceptable_index: 60_000_000 } }));
+const open = await user.send(C.account.sessionCall(account, { perp_open: { trend, is_long: true, margin: (20n * USDC).toString(), leverage_bps: 20_000, acceptable_index: 60_000_000 } }, tgas));
 await new Promise((r) => setTimeout(r, 4000));
 const positions = await viewer.view<{ id: number; qty: string; margin: string }[]>(D.contracts.perps, "positions_of", { account_id: account });
 log("perp opened", open.hash, JSON.stringify(positions));
 if (positions[0]) {
   await report({ new_trends: [], updates: [{ id: trend, index: 55_000_000 }], marks: [] });
-  const close = await user.send(C.account.sessionCall(account, { perp_close: { id: positions[0].id, acceptable_index: 0 } }));
+  const close = await user.send(C.account.sessionCall(account, { perp_close: { id: positions[0].id, acceptable_index: 0 } }, tgas));
   await new Promise((r) => setTimeout(r, 4000));
   const end = BigInt(await viewer.view<string>(D.contracts.usdc, "ft_balance_of", { account_id: account }));
   log("perp closed", close.hash, "USDC now", Number(end) / 1e6);

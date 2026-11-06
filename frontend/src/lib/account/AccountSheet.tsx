@@ -29,9 +29,9 @@ const STEPS: Record<Ceremony["flow"], Step[]> = {
     { step: "sync", title: "Sync with Tredio", note: "So Autopilot, follows and alerts know your account." },
   ],
   renew: [
-    { step: "confirm", title: "Start a new session", note: "Your passkey adds a fresh week-long session key." },
+    { step: "confirm", title: "Start a new session", note: "One passkey confirmation: another week of trades without prompts." },
     { step: "gas", title: "Fill the session's gas", note: "Tredio's relayer pays for the session's transactions." },
-    { step: "sync", title: "Sync with Tredio", note: "Signing in again with the new key." },
+    { step: "sync", title: "Sync with Tredio", note: "Signing in again with the session key." },
   ],
 };
 

@@ -86,7 +86,12 @@ export const ownerActions = {
   addSession: (a: { publicKey: string; label: string; scope: Scope; expiresAt: number; dailyLimit: bigint; gasFunding: bigint }): OwnerAction => ({
     add_session: { public_key: a.publicKey, label: a.label, scope: a.scope, expires_at: a.expiresAt, daily_limit: s(a.dailyLimit), gas_key: true, gas_funding: s(a.gasFunding) },
   }),
-  revokeSession: (publicKey: string): OwnerAction => ({ revoke_session: { public_key: publicKey } }),
+  /**
+   * Ends a session. Account v2 keeps a gas key on the account, dormant and unable to act, so its
+   * gas is not burned; `deleteKey` (v2) removes the key for good, a dormant one too, burning what
+   * it holds. v1 always deletes the key.
+   */
+  revokeSession: (publicKey: string, deleteKey = false): OwnerAction => ({ revoke_session: deleteKey ? { public_key: publicKey, delete_key: true } : { public_key: publicKey } }),
   freeze: (frozen: boolean): OwnerAction => ({ freeze: { frozen } }),
   transferNear: (receiver: string, yocto: bigint): OwnerAction => ({ transfer: { receiver_id: receiver, amount: s(yocto) } }),
 };

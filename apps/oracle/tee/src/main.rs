@@ -1,9 +1,10 @@
 //! Tredio's attention oracle inside an OutLayer TEE (Intel TDX).
 //!
 //! Each run reads the collector's readings and the candidate queue from the Tredio API, the
-//! registry's live trends through NEAR RPC and Hyperliquid's marks, applies the published index
-//! method (the same as `apps/oracle`), and signs the report with this project's enclave-held
-//! ed25519 key (`signing_keys`, caller "none": one key per project, never visible to anyone).
+//! registry's live trends through NEAR RPC and Hyperliquid's marks (each with its asset index),
+//! applies the published index method (the same as `apps/oracle`), and signs the report with
+//! this project's enclave-held ed25519 key (`signing_keys`, caller "none": one key per project,
+//! never visible to anyone).
 //! The registry trusts only that key, so it accepts only reports this code computed. The
 //! endpoints are compiled in, so the code hash pins what the enclave reads; the caller's input
 //! is ignored. Output: `{report_json, signature, public_key}` (base64 signature over
@@ -38,10 +39,14 @@ const DEVIATION_BPS: u64 = 100;
 const MIN_CREATE_POINTS: f64 = 5.0;
 const KEY_PATH: &str = "report";
 
+/// A mark as the registry reads it. `asset_index` binds the ticker to the Hyperliquid asset index
+/// orders sign (account v2's guard checks it); a registry deployed before it stored indexes
+/// ignores the field.
 #[derive(Serialize)]
 struct Mark {
     asset: String,
     price: String,
+    asset_index: u32,
 }
 
 #[derive(Serialize)]
@@ -73,7 +78,7 @@ fn base58(bytes: &[u8]) -> String {
         }
     }
     let zeros = bytes.iter().take_while(|b| **b == 0).count();
-    std::iter::repeat('1').take(zeros).chain(digits.iter().rev().map(|d| A[*d as usize] as char)).collect()
+    std::iter::repeat_n('1', zeros).chain(digits.iter().rev().map(|d| A[*d as usize] as char)).collect()
 }
 
 fn run() -> Result<serde_json::Value, String> {
@@ -121,7 +126,7 @@ fn run() -> Result<serde_json::Value, String> {
     };
     let m = |id: &str| method::measure(&readings.get(base_of(id)).cloned().unwrap_or_default(), plan::asset_class_of(id) == "crypto", observed_at);
 
-    let hl_assets: HashSet<String> = marks.iter().map(|(s, _)| s.clone()).collect();
+    let hl_assets: HashSet<String> = marks.iter().map(|m| m.asset.clone()).collect();
     let (new_trends, updates) = plan::decide(
         &sample.iter().map(|t| (t.clone(), m(&t.trend.id))).collect::<Vec<_>>(),
         &listings.iter().map(|(c, id)| (c.clone(), id.clone(), m(id))).collect::<Vec<_>>(),
@@ -133,7 +138,11 @@ fn run() -> Result<serde_json::Value, String> {
         .chain(all.iter().filter(|t| t.status != "retired").filter_map(|t| t.asset.clone()))
         .chain(new_trends.iter().filter_map(|n| n.asset.clone()))
         .collect();
-    let marks: Vec<Mark> = marks.into_iter().filter(|(s, px)| wanted.contains(s) && *px > 0.0).map(|(s, px)| Mark { asset: s, price: format!("{}", (px * 1e8).round() as u128) }).collect();
+    let marks: Vec<Mark> = marks
+        .into_iter()
+        .filter(|m| wanted.contains(&m.asset) && m.price > 0.0)
+        .map(|m| Mark { asset: m.asset, price: format!("{}", (m.price * 1e8).round() as u128), asset_index: m.asset_index })
+        .collect();
     if new_trends.is_empty() && updates.is_empty() && marks.is_empty() {
         return Ok(serde_json::json!({ "report_json": null, "observed_at": observed_at, "warnings": warnings }));
     }

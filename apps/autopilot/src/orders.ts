@@ -1,4 +1,5 @@
 import type { Side } from "@tredio/autopilot";
+import { type AccountVersion, bindsMarkToAssetIndex, hlMarkMaxAge } from "@tredio/contracts";
 import { type ExchangeResponse, formatPrice, formatSize, type HlOrder, orderOutcome, type PerpMarket } from "@tredio/hyperliquid";
 
 /**
@@ -9,19 +10,26 @@ import { type ExchangeResponse, formatPrice, formatSize, type HlOrder, orderOutc
 
 /** The account contract's cap on session leverage changes (`HL_MAX_LEVERAGE`), as the backend enforces it on rules. */
 export const SESSION_MAX_LEVERAGE = 10;
-/** The account's order guard: a session order's price is within 2% of the registry's mark (`HL_MAX_DEVIATION_BPS`)... */
+/**
+ * The account's order guard: a session order's price is within 2% of the registry's mark
+ * (`HL_MAX_DEVIATION_BPS`), a mark at most two minutes old on v1 account code and five on v2
+ * (`hlMarkMaxAge`), which on v2 must also name the very asset index the order signs.
+ */
 export const GUARD_MAX_DEVIATION_BPS = 200n;
-/** ...and that mark is at most two minutes old (`HL_MARK_MAX_AGE`). */
-export const GUARD_MARK_MAX_AGE_SEC = 120;
 /** Time an order may take from this check to the guard's own, so a mark about to age out waits for the next one. */
 export const GUARD_MARGIN_SEC = 20;
 /** Hyperliquid refuses openings below this notional. */
 export const MIN_ORDER_USD = 10;
 
-/** A mark as the registry's `mark_of` returns it: price with 8 decimals, observed at (unix seconds). */
+/**
+ * A mark as the registry's `mark_of` returns it: price with 8 decimals, observed at (unix seconds),
+ * and the Hyperliquid asset index the oracle reported with it (absent from a registry deployed
+ * before it stored one, null until the oracle reports it).
+ */
 export interface RegistryMark {
   price: string;
   at: number;
+  asset_index?: number | null;
 }
 
 /** The order's direction on the exchange: openings trade the position's side, closes and reductions the other way. */
@@ -65,14 +73,21 @@ export function toE8(s: string): bigint | null {
 }
 
 /**
- * What the account's order guard would refuse about a price, checked before paying for the
- * transaction: no mark, a mark too old to last until the order lands, or a price more than 2%
- * from the mark. Null when the guard will accept it.
+ * What the account's order guard would refuse about an order, checked before paying for the
+ * transaction: no mark; on v2 account code, a mark that does not name the asset index the order
+ * signs (v2 refuses a mark without one too); a mark too old to last until the order lands (two
+ * minutes on v1, five on v2); or a price more than 2% from the mark. Null when the guard will
+ * accept it.
  */
-export function guardProblem(asset: string, price: string, mark: RegistryMark | null, nowSec: number): string | null {
+export function guardProblem(asset: string, price: string, mark: RegistryMark | null, nowSec: number, order: { assetIndex: number; version: AccountVersion }): string | null {
   if (!mark) return `Tredio has no ${asset} mark yet, which the account's order guard needs`;
+  if (bindsMarkToAssetIndex(order.version) && mark.asset_index !== order.assetIndex) {
+    return mark.asset_index === null || mark.asset_index === undefined
+      ? `Tredio's ${asset} mark does not name its Hyperliquid asset yet, which the account's order guard needs; orders wait for the oracle to report it`
+      : `Tredio's ${asset} mark is for Hyperliquid asset ${mark.asset_index}, not the order's ${order.assetIndex}`;
+  }
   const age = nowSec - mark.at;
-  if (age > GUARD_MARK_MAX_AGE_SEC - GUARD_MARGIN_SEC) return `Tredio's ${asset} mark is ${age}s old; orders wait for the oracle's next one`;
+  if (age > hlMarkMaxAge(order.version) - GUARD_MARGIN_SEC) return `Tredio's ${asset} mark is ${age}s old; orders wait for the oracle's next one`;
   const p = toE8(price);
   const m = BigInt(mark.price);
   if (p === null || p === 0n) return `bad price ${price}`;

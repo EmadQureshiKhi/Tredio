@@ -1,11 +1,12 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { OwnerAction, Session } from "@tredio/contracts";
+import { keepsGasKeys, type OwnerAction, type Session } from "@tredio/contracts";
 import { Check, Copy, Fingerprint, LogOut, Snowflake } from "lucide-react";
 import { useState } from "react";
 import { Avatar } from "@/components/shell/AppShell";
 import { Badge, Button, ErrorNote, ExplorerLink, Field, Skeleton, Switch, TxStatus } from "@/components/ui";
 import { describeError, useAccount } from "@/lib/account/AccountProvider";
+import { useAccountVersion } from "@/lib/account/version";
 import { accountState, view } from "@/lib/chain/client";
 import { DEPLOYMENT, explorerAddress, USDC_DECIMALS } from "@/lib/config";
 import { countdown, shortAddress, tokenAmount, usdc } from "@/lib/format";
@@ -47,6 +48,7 @@ export function AccountSection() {
             <>
               <SessionRow />
               <Sessions />
+              <RevokedKeys />
               <FreezeRow />
               <Withdraw />
               <SettingRow label="Private keys" hint="Caller identity and notes key, derived from your passkey and kept wrapped on this device.">
@@ -120,6 +122,7 @@ function Sessions() {
   const qc = useQueryClient();
   const tx = useTx();
   const [revoking, setRevoking] = useState<string | null>(null);
+  const keepsKeys = keepsGasKeys(useAccountVersion(me.address).data ?? 1);
   const sessions = useQuery({ queryKey: ["sessions", me.address], queryFn: () => view<Array<[string, Session]>>(me.address, "sessions"), refetchInterval: 30_000 });
   const now = useNow(60_000) / 1000;
   const list = (sessions.data ?? []).filter(([key, s]) => key !== me.publicKey && s.expires_at > now);
@@ -127,11 +130,17 @@ function Sessions() {
   if (list.length === 0) return null;
   const revoke = async (key: string) => {
     setRevoking(key);
-    if (await tx.run(() => account.ownerExecute([ownerActions.revokeSession(key)]), { action: "Revoke session", done: "Session revoked", pending: "Confirm with your passkey" })) void qc.invalidateQueries({ queryKey: ["sessions"] });
+    if (await tx.run(() => account.ownerExecute([ownerActions.revokeSession(key)]), { action: "Revoke session", done: "Session revoked", pending: "Confirm with your passkey" })) {
+      void qc.invalidateQueries({ queryKey: ["sessions"] });
+      void qc.invalidateQueries({ queryKey: ["dormant-keys"] });
+    }
     setRevoking(null);
   };
   return (
-    <SettingRow label="Other sessions" hint="Keys this account trusts besides this device's: other devices you signed in on, and Autopilot. Revoking one removes its key from the account.">
+    <SettingRow
+      label="Other sessions"
+      hint={`Keys this account trusts besides this device's: other devices you signed in on, and Autopilot. ${keepsKeys ? "Revoking one ends its session; its key stays on the account, unable to trade, so the gas it holds is not burned." : "Revoking one removes its key from the account."}`}
+    >
       <ul className="flex w-full flex-col gap-2 sm:w-[320px]" data-testid="sessions">
         {list.map(([key, s]) => (
           <li key={key} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2">
@@ -148,6 +157,46 @@ function Sessions() {
         ))}
       </ul>
       <TxStatus tx={tx} filledLabel="Revoked" className="w-full" />
+    </SettingRow>
+  );
+}
+
+/**
+ * Account v2 keeps the gas key of a revoked session on the account, unable to act, since deleting
+ * a gas key burns the gas it holds; renewing on the device that holds it brings it back. Here the
+ * passkey can delete one for good.
+ */
+function RevokedKeys() {
+  const account = useAccount();
+  const me = account.session!;
+  const qc = useQueryClient();
+  const tx = useTx();
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const keepsKeys = keepsGasKeys(useAccountVersion(me.address).data ?? 1);
+  const keys = useQuery({ queryKey: ["dormant-keys", me.address], queryFn: () => view<string[]>(me.address, "dormant_keys"), enabled: keepsKeys, refetchInterval: 60_000 });
+  const list = keys.data ?? [];
+  if (!keepsKeys || list.length === 0) return null;
+  const remove = async (key: string) => {
+    setDeleting(key);
+    if (await tx.run(() => account.ownerExecute([ownerActions.revokeSession(key, true)]), { action: "Delete key", done: "Key deleted", pending: "Confirm with your passkey" })) void qc.invalidateQueries({ queryKey: ["dormant-keys"] });
+    setDeleting(null);
+  };
+  return (
+    <SettingRow label="Revoked keys" hint="Keys of sessions you revoked: still on the account, unable to trade, keeping the gas they hold. Renewing the session on the device that holds one brings it back. Deleting one removes it for good and burns that gas.">
+      <ul className="flex w-full flex-col gap-2 sm:w-[320px]" data-testid="revoked-keys">
+        {list.map((key) => (
+          <li key={key} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2">
+            <span className="min-w-0">
+              <span className="block truncate font-strong text-[13px] text-text">{key === me.publicKey ? "This device" : "Revoked key"}</span>
+              <span className="num block truncate text-[11.5px] text-text-3">{shortAddress(key.replace(/^ed25519:/, ""))}</span>
+            </span>
+            <Button size="sm" tone="ghost" className="-my-1 shrink-0" loading={tx.busy && deleting === key} disabled={tx.busy} onClick={() => void remove(key)}>
+              Delete
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <TxStatus tx={tx} filledLabel="Deleted" className="w-full" />
     </SettingRow>
   );
 }

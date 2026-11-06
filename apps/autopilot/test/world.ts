@@ -99,7 +99,6 @@ export async function world(db: ExecutorDb) {
         nonces,
         fund: async () => a.gas,
         gasMin: 31n * 10n ** 22n,
-        gasNeeded: 30n * 10n ** 22n,
         postRetryMs: 1,
         checkTtlMs: 0,
         now: () => T * 1000,

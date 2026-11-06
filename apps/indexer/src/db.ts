@@ -30,6 +30,8 @@ export const DERIVED_TABLES = [
   "sessions",
   "session_actions",
   "hyperliquid_signatures",
+  "gas_top_ups",
+  "creation_refunds",
   "usdc_transfers",
   "usdc_mints",
 ] as const;

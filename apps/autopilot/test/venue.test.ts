@@ -29,7 +29,6 @@ function setup(o: { funded?: boolean; label?: string } = {}) {
       return account.gas;
     },
     gasMin: 31n * 10n ** 22n,
-    gasNeeded: 30n * 10n ** 22n,
     postRetryMs: 1,
     now: () => T * 1000,
   });
@@ -137,7 +136,6 @@ describe("session venue", () => {
         throw new Error("this session was topped up enough today; try again tomorrow");
       },
       gasMin: 31n * 10n ** 22n,
-      gasNeeded: 30n * 10n ** 22n,
       now: () => T * 1000,
     });
     const e = (await venue.send(openBtc(), async () => {}).catch((x: unknown) => x)) as VenueError;
@@ -164,6 +162,39 @@ describe("session venue", () => {
     expect(((await venue.send(openBtc(T * 1000, null), async () => {}).catch((x: unknown) => x)) as VenueError).retryable).toBe(false);
     account.failures.push(new Error("fetch failed"));
     expect(((await venue.send(openBtc(T * 1000, null), async () => {}).catch((x: unknown) => x)) as VenueError).retryable).toBe(true);
+    // v2: a mark that does not name the order's asset index yet also passes with a later report.
+    account.failures.push(new Error("mark is for another asset"));
+    expect(((await venue.send(openBtc(T * 1000, null), async () => {}).catch((x: unknown) => x)) as VenueError).retryable).toBe(true);
+  });
+
+  test("a session call prepays 0.3 NEAR on a v1 account and 0.15 on v2, so a key left with 0.2 NEAR sends only on v2", async () => {
+    const send = async (codeVersion: number) => {
+      const { account, exchange } = setup();
+      account.codeVersion = codeVersion;
+      account.gas = 20n * 10n ** 22n;
+      const venue = new SessionVenue({
+        owner: account.account,
+        kind: "grant",
+        sessionKey: account.key.publicKey,
+        network: "testnet",
+        policy: AUTOPILOT_POLICY,
+        chain: account,
+        hyperliquid: exchange,
+        addressOf: async () => account.address,
+        nonces: new Nonces(),
+        fund: async () => {
+          throw new Error("the relayer is out of NEAR");
+        },
+        gasMin: 31n * 10n ** 22n,
+        now: () => T * 1000,
+      });
+      expect(await venue.version()).toBe(codeVersion);
+      return venue.send(openBtc(T * 1000, null), async () => {}).catch((x: unknown) => x as VenueError);
+    };
+    const v1 = await send(1);
+    expect(v1).toBeInstanceOf(VenueError);
+    expect((v1 as VenueError).message).toContain("holds 0.2 NEAR, below the 0.3 NEAR a session call prepays");
+    expect(await send(2)).toMatchObject({ status: "filled" });
   });
 
   test("Hyperliquid down: posts are retried, then the order waits with its signature spent", async () => {

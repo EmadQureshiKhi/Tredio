@@ -58,7 +58,7 @@ void (async () => {
       oracle.lastError = e instanceof Error ? e.message.slice(0, 300) : String(e);
       log({ err: oracle.lastError }, "run failed");
     }
-    // Runs start on the interval, not after it, so marks stay inside the guard's two minutes.
+    // Runs start on the interval, not after it, so marks stay inside the guard's limit (two minutes on v1 account code, five on v2).
     await Bun.sleep(Math.max(1000, cfg.RUN_INTERVAL_SEC * 1000 - (Date.now() - started)));
   }
 })();

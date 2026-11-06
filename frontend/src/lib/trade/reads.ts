@@ -236,8 +236,11 @@ export async function readCuration(account: string): Promise<{ claimable: bigint
   return { claimable: BigInt(claimable), earned: BigInt(earned) };
 }
 
-/** The registry's Hyperliquid mark for an asset (price with 8 decimals), which the account's guard checks orders against. */
-export async function readMark(asset: string): Promise<{ price: number; at: number } | null> {
+/**
+ * The registry's Hyperliquid mark for an asset, which the account's guard checks orders against:
+ * price, when observed, and the asset index it vouches for (null until the oracle reports it).
+ */
+export async function readMark(asset: string): Promise<{ price: number; at: number; assetIndex: number | null } | null> {
   const m = await view<Mark | null>(c.registry, "mark_of", { asset });
-  return m ? { price: Number(m.price) / 1e8, at: m.at } : null;
+  return m ? { price: Number(m.price) / 1e8, at: m.at, assetIndex: m.asset_index ?? null } : null;
 }

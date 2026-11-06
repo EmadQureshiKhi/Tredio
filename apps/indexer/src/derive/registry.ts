@@ -46,6 +46,11 @@ export const registryHandlers: Record<string, Handler> = {
       on conflict (asset) do update set price = excluded.price, at = excluded.at where marks.at <= excluded.at`;
   }),
 
+  /** Logged right after the same mark's `mark_updated`, so its row is there. */
+  asset_index_set: on(ev.asset_index_set, async ({ tx }, d) => {
+    await tx`update marks set asset_index = ${d.asset_index} where asset = ${d.asset}`;
+  }),
+
   report_processed: on(ev.report_processed, async ({ tx, e }, d) => {
     await tx`
       insert into oracle_runs (run_id, observed_at, created, updated, marks, rejected, block_height, receipt_id)

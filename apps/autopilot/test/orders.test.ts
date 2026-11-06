@@ -60,16 +60,35 @@ describe("the account's order guard", () => {
     expect(toE8("1e5")).toBeNull();
   });
 
+  const v1 = { assetIndex: 3, version: 1 };
+  const v2 = { assetIndex: 3, version: 2 };
+
   test("accepts a price within 2% of a fresh mark", () => {
-    expect(guardProblem("BTC", "77831", mark, 1_050)).toBeNull();
-    expect(guardProblem("BTC", "74779", mark, 1_050)).toBeNull();
+    expect(guardProblem("BTC", "77831", mark, 1_050, v1)).toBeNull();
+    expect(guardProblem("BTC", "74779", mark, 1_050, v1)).toBeNull();
   });
 
   test("refuses beyond 2%, a mark about to age out, or no mark at all", () => {
-    expect(guardProblem("BTC", "77832", mark, 1_050)).toContain("more than 2%");
-    expect(guardProblem("BTC", "76305", mark, 1_101)).toBe("Tredio's BTC mark is 101s old; orders wait for the oracle's next one");
-    expect(guardProblem("BTC", "76305", mark, 1_100)).toBeNull();
-    expect(guardProblem("DOGE", "0.2", null, 1_050)).toContain("no DOGE mark");
+    expect(guardProblem("BTC", "77832", mark, 1_050, v1)).toContain("more than 2%");
+    expect(guardProblem("BTC", "76305", mark, 1_101, v1)).toBe("Tredio's BTC mark is 101s old; orders wait for the oracle's next one");
+    expect(guardProblem("BTC", "76305", mark, 1_100, v1)).toBeNull();
+    expect(guardProblem("DOGE", "0.2", null, 1_050, v1)).toContain("no DOGE mark");
+  });
+
+  test("v2 accounts accept a mark up to five minutes old, less the margin for the order to land", () => {
+    const indexed = { ...mark, asset_index: 3 };
+    expect(guardProblem("BTC", "76305", indexed, 1_280, v2)).toBeNull();
+    expect(guardProblem("BTC", "76305", indexed, 1_281, v2)).toBe("Tredio's BTC mark is 281s old; orders wait for the oracle's next one");
+  });
+
+  test("v2 accounts need the mark to name the asset index the order signs; v1 accounts do not check it", () => {
+    expect(guardProblem("BTC", "76305", { ...mark, asset_index: 3 }, 1_050, v2)).toBeNull();
+    expect(guardProblem("BTC", "76305", { ...mark, asset_index: 0 }, 1_050, v2)).toBe("Tredio's BTC mark is for Hyperliquid asset 0, not the order's 3");
+    // The deployed registry returns no index at all, a new one null until the oracle reports it: v2 refuses both.
+    expect(guardProblem("BTC", "76305", mark, 1_050, v2)).toContain("does not name its Hyperliquid asset yet");
+    expect(guardProblem("BTC", "76305", { ...mark, asset_index: null }, 1_050, v2)).toContain("does not name its Hyperliquid asset yet");
+    expect(guardProblem("BTC", "76305", { ...mark, asset_index: 0 }, 1_050, v1)).toBeNull();
+    expect(guardProblem("BTC", "76305", mark, 1_050, v1)).toBeNull();
   });
 });
 

@@ -12,7 +12,8 @@ import type { Tx } from "@/lib/trade/useTx";
  * Granting and revoking Autopilot's access. The app makes a Hyperliquid-only session key on this
  * device and seals it to the executor, so the API only stores a box it cannot open; the account
  * adds the session with one passkey prompt, the relayer fills its gas, and the API confirms it on
- * chain. Revoking removes the session on chain, then pauses what it was running.
+ * chain. Revoking removes the session on chain (v1 account code deletes its key; v2 keeps the key,
+ * unable to act, so its gas is not burned), then pauses what it was running.
  *
  * The sealed plaintext is the key's NEAR secret (`ed25519:<base58 of seed || public key>`).
  */
@@ -39,6 +40,8 @@ export function useGrantActions() {
   const refresh = useCallback(async () => {
     await Promise.all([
       qc.invalidateQueries({ queryKey: ["ap-grant"] }),
+      qc.invalidateQueries({ queryKey: ["sessions"] }),
+      qc.invalidateQueries({ queryKey: ["dormant-keys"] }),
       qc.invalidateQueries({ queryKey: ["ap-rules"] }),
       qc.invalidateQueries({ queryKey: ["ap-rule"] }),
       qc.invalidateQueries({ queryKey: ["follows"] }),

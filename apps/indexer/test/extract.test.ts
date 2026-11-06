@@ -50,10 +50,11 @@ describe("extractEvents", () => {
       "status_changed",
       "item_rejected",
       "mark_updated",
+      "asset_index_set",
       "report_processed",
     ]);
     expect(new Set(events.map((e) => e.receipt_id)).size).toBe(1);
-    expect(events.map((e) => e.log_index)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(events.map((e) => e.log_index)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(events[0]!.block_time).toEqual(new Date(T[1000]! * 1000));
   });
 

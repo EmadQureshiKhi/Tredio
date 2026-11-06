@@ -130,7 +130,7 @@ export function calls(d: Deployment) {
     account: {
       ownerExecute: (account: string, request: string, proof: PasskeyProof) =>
         call(account, "owner_execute", { request, proof }, ZERO, 300),
-      /** Pass `SESSION_CALL_TGAS_V2` for accounts on v2 code; the default suits v1 and v2. */
+      /** Pass `sessionCallTgas(version)` (account-version.ts); the default (v1's 300) suits v1 and v2. */
       sessionCall: (account: string, action: SessionAction, tgas = SESSION_CALL_TGAS_V1) => call(account, "session_call", { action }, ZERO, tgas),
     },
   };

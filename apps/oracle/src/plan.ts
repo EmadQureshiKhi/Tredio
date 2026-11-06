@@ -117,3 +117,13 @@ export function decide(
   if (updates.length > 0 || newTrends.length > 0) updates.push(...riders);
   return { new_trends: newTrends, updates };
 }
+
+/**
+ * The marks a report carries: Hyperliquid's mark price (8 decimals) of every listed market the
+ * report wants, each with its asset index, the `a` an order on it signs. Account v2's order guard
+ * checks an order's index against it, so a mark cannot vouch for another asset. The index is the
+ * market's position in Hyperliquid's universe, delisted markets included (`perpMarkets` keeps it).
+ */
+export function reportMarks(markets: ReadonlyArray<{ symbol: string; index: number; markPx: number }>, wanted: ReadonlySet<string>): Report["marks"] {
+  return markets.filter((x) => wanted.has(x.symbol.toUpperCase()) && x.markPx > 0).map((x) => ({ asset: x.symbol.toUpperCase(), price: Math.round(x.markPx * 1e8).toString(), asset_index: x.index }));
+}

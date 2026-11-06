@@ -13,7 +13,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_RPCS, Viewer } from "@tredio/chain";
-import { deployment, type Network } from "@tredio/contracts";
+import { accountCodeHashes, deployment, type Network } from "@tredio/contracts";
 
 const ROOT = join(import.meta.dir, "..");
 const NETWORK = (process.env.NEAR_NETWORK ?? "testnet") as Network;
@@ -89,13 +89,16 @@ async function chain() {
   await check(S, "Account code is one global contract", async () => {
     const [, , codeHash] = await viewer.view<[string, unknown, string, number]>(D.contracts.accounts, "config");
     if (codeHash !== D.globalCode.account) return fail(`factory uses ${codeHash}, deployments say ${D.globalCode.account}`);
-    const on: string[] = [];
+    // Accounts are born on the factory's code (v1) and move to v2 with their passkey once deployments names it.
+    const allowed = accountCodeHashes(D);
+    let onV2 = 0;
     for (const account of proofs.passkeyAccounts) {
       const a = await viewAccount(account);
-      if (a.global_contract_hash !== codeHash) return fail(`${account.slice(0, 10)}... runs ${a.global_contract_hash ?? a.code_hash}`);
-      on.push(account);
+      if (!a.global_contract_hash || !allowed.includes(a.global_contract_hash)) return fail(`${account.slice(0, 10)}... runs ${a.global_contract_hash ?? a.code_hash}`);
+      if (a.global_contract_hash === D.globalCode.accountV2) onV2++;
     }
-    return ok(`${codeHash.slice(0, 10)}... on the factory and ${on.length} passkey accounts`);
+    const n = proofs.passkeyAccounts.length;
+    return ok(`${codeHash.slice(0, 10)}... on the factory and ${n - onV2} passkey accounts${D.globalCode.accountV2 ? `, v2 ${D.globalCode.accountV2.slice(0, 10)}... on ${onV2}` : ""}`);
   });
 
   await check(S, "Account ids derive from their passkeys", async () => {

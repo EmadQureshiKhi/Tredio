@@ -1,8 +1,10 @@
 "use client";
+import { keepsGasKeys } from "@tredio/contracts";
 import { Fingerprint, ShieldCheck, ShieldOff } from "lucide-react";
 import { useState } from "react";
 import { Badge, Button, Card, ErrorNote, Skeleton, TxStatus, cn } from "@/components/ui";
 import { useAccount } from "@/lib/account/AccountProvider";
+import { useAccountVersion } from "@/lib/account/version";
 import { countdown, usdc } from "@/lib/format";
 import { useTx } from "@/lib/trade/useTx";
 import { Meter, useConfirm } from "../shared/kit";
@@ -26,6 +28,7 @@ export function GrantCard({ compact, className }: { compact?: boolean; className
   const confirm = useConfirm(6000);
   const [sheet, setSheet] = useState(false);
   const g = grant.data;
+  const keepsKeys = keepsGasKeys(useAccountVersion(account.kind === "passkey" ? account.address : null).data ?? 1);
 
   if (account.kind === "wallet") {
     return (
@@ -132,7 +135,7 @@ export function GrantCard({ compact, className }: { compact?: boolean; className
       </div>
       {confirm.armed === "revoke" ? (
         <p className="mt-3 text-[12.5px] leading-5 text-warn" role="status">
-          Revoking removes the key from your account
+          {keepsKeys ? "Revoking ends Autopilot\u2019s session (its key stays on your account, unable to trade)" : "Revoking removes the key from your account"}
           {running + copying > 0 ? ` and pauses ${[running ? `${running} running rule${running === 1 ? "" : "s"}` : "", copying ? `${copying} cop${copying === 1 ? "y" : "ies"}` : ""].filter(Boolean).join(" and ")}` : ""}. Open positions stay on Hyperliquid until you close them.
         </p>
       ) : null}

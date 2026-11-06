@@ -24,7 +24,7 @@ const schema = z.object({
   TICK_SEC: z.coerce.number().int().min(5).default(15),
   /**
    * Worst fill accepted, basis points from the mark. At most 1%: the account's order guard refuses
-   * session orders more than 2% from Tredio's mark, which can be up to two minutes old.
+   * session orders more than 2% from Tredio's mark, which can be up to two minutes old (five on v2 account code).
    */
   SLIPPAGE_BPS: z.coerce.number().int().min(5).max(100).default(50),
   /** Pause a rule after this many failed orders in a row. */

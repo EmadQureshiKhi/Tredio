@@ -1,6 +1,6 @@
 import { open } from "@tredio/autopilot";
 import { publicKeyOf, Sender, type Viewer } from "@tredio/chain";
-import { calls, type Deployment, type Session } from "@tredio/contracts";
+import { type AccountVersions, calls, type Deployment, type Session, sessionCallTgas } from "@tredio/contracts";
 import type { ExecutorDb, GrantRow, Route } from "./db";
 import type { Log } from "./log";
 import { AUTOPILOT_POLICY, type SessionChain, sessionProblem, type Venue } from "./venue";
@@ -194,13 +194,18 @@ export function nearGrantChain(viewer: Viewer): GrantChain {
   };
 }
 
-/** NEAR for one session venue: views through `viewer`, `session_call` from the session key as a gas key. */
-export function nearSessionChain(viewer: Viewer, deployment: Deployment, account: string, secretKey: string, rpcUrls: string[]): SessionChain {
+/**
+ * NEAR for one session venue: views through `viewer`, `session_call` from the session key as a
+ * gas key with the gas the account's code version needs (300 Tgas on v1, 150 on v2), the version
+ * read once per account through `versions` (shared by every venue).
+ */
+export function nearSessionChain(viewer: Viewer, deployment: Deployment, account: string, secretKey: string, rpcUrls: string[], versions: AccountVersions): SessionChain {
   const sender = new Sender({ network: deployment.network, accountId: account, privateKey: secretKey, gasKeyLanes: 1, rpcUrls });
   const c = calls(deployment);
   return {
     session: (a, publicKey) => viewer.view<Session | null>(a, "session", { public_key: publicKey }),
     gasBalance: async (a, publicKey) => (await viewer.gasKey(a, publicKey))?.balance ?? null,
-    sessionCall: (action) => sender.send(c.account.sessionCall(account, action)),
+    version: (a) => versions.of(a),
+    sessionCall: async (action) => sender.send(c.account.sessionCall(account, action, sessionCallTgas(await versions.of(account)))),
   };
 }

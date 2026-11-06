@@ -1,7 +1,7 @@
 /**
  * Sends one order through an account's session exactly as the executor does, printing each step
- * and Hyperliquid's own answer: the session on chain, the gas key, Tredio's mark and the price
- * guard, the leverage change, the `session_call` that signs, the signature check and the post.
+ * and Hyperliquid's own answer: the account's code version, the session on chain, the gas key,
+ * Tredio's mark and the price guard, the leverage change, the `session_call` that signs, the signature check and the post.
  * Nothing is recorded in the database. For checking a deployment end to end.
  *
  *   ACCOUNT=<account> SESSION_KEY=ed25519:<secret> MARKET=BTC SIDE=long USD=11 LEVERAGE=2 bun run order
@@ -14,7 +14,7 @@
  * sessions). RELAYER_URL tops up the session's gas key when it runs low.
  */
 import { publicKeyOf, toNear, Viewer } from "@tredio/chain";
-import { calls, deployment as deploymentOf } from "@tredio/contracts";
+import { AccountVersions, deployment as deploymentOf, sessionCallPrepaid } from "@tredio/contracts";
 import { type HlNetwork, HyperliquidInfo, hyperliquidAddressOf } from "@tredio/hyperliquid";
 import { buildOrder, guardProblem, openingLeverage, type RegistryMark, worstPrice } from "../src/orders";
 import { AUTOPILOT_POLICY, type HyperliquidApi, hyperliquidApi, Nonces, relayerFunding, SessionVenue, sessionProblem } from "../src/venue";
@@ -38,6 +38,9 @@ const info = new HyperliquidInfo(network);
 const step = (label: string, value: unknown) => console.log(`${label}:`, typeof value === "string" ? value : JSON.stringify(value, (_, v) => (typeof v === "bigint" ? v.toString() : v)));
 
 const nowSec = Math.floor(Date.now() / 1000);
+const versions = new AccountVersions((a) => viewer.view<number>(a, "version"));
+const version = await versions.of(account);
+step("account code", `v${version}`);
 const session = await viewer.view<Parameters<typeof sessionProblem>[0]>(account, "session", { public_key: sessionKey });
 step("session", session);
 step("session check", sessionProblem(session, nowSec, policy) ?? "ok");
@@ -58,7 +61,8 @@ const order = buildOrder(market, { buy, worstPrice: worstPrice(buy, market.markP
 if ("skip" in order) throw new Error(order.skip);
 step("hyperliquid mark", market.markPx);
 step("order", order);
-step("guard check", guardProblem(symbol, order.price, mark, nowSec) ?? "ok");
+const target = { assetIndex: order.asset_index, version };
+step("guard check", guardProblem(symbol, order.price, mark, nowSec, target) ?? "ok");
 
 /** Every exchange answer, verbatim. */
 const api = hyperliquidApi(info, network);
@@ -77,13 +81,12 @@ const venue = new SessionVenue({
   sessionKey,
   network,
   policy,
-  chain: nearSessionChain(viewer, D, account, secretKey, viewer.urls),
+  chain: nearSessionChain(viewer, D, account, secretKey, viewer.urls, versions),
   hyperliquid: logged,
   addressOf: async () => address,
   nonces: new Nonces(),
   fund: env.RELAYER_URL ? relayerFunding(env.RELAYER_URL, account, sessionKey) : async () => gas?.balance ?? 0n,
-  gasMin: BigInt(calls(D).account.sessionCall(account, "faucet").gas) * 10n ** 9n + 10n ** 22n,
-  gasNeeded: BigInt(calls(D).account.sessionCall(account, "faucet").gas) * 10n ** 9n,
+  gasMin: sessionCallPrepaid(version) + 10n ** 22n,
 });
 const failed = (e: unknown) => ({ status: "refused before Hyperliquid", error: e instanceof Error ? e.message : String(e) });
 if (leverage !== null) {
@@ -91,12 +94,12 @@ if (leverage !== null) {
   step(`leverage ${leverage}x isolated`, refused ?? "set");
   if (refused) process.exit(1);
 }
-let guard = guardProblem(symbol, order.price, mark, Math.floor(Date.now() / 1000));
+let guard = guardProblem(symbol, order.price, mark, Math.floor(Date.now() / 1000), target);
 const waitUntil = Date.now() + Number(env.WAIT_MARK_SEC ?? "0") * 1000;
 while (guard && Date.now() < waitUntil) {
   await Bun.sleep(5_000);
   const fresh = await viewer.view<RegistryMark | null>(D.contracts.registry, "mark_of", { asset: symbol });
-  guard = guardProblem(symbol, order.price, fresh, Math.floor(Date.now() / 1000));
+  guard = guardProblem(symbol, order.price, fresh, Math.floor(Date.now() / 1000), target);
   if (!guard) step("tredio mark", fresh ? { price: Number(fresh.price) / 1e8, ageSec: Math.floor(Date.now() / 1000) - fresh.at } : null);
 }
 if (guard && !env.SEND_ANYWAY) {

@@ -23,7 +23,11 @@ export interface Deployment {
     accounts: string;
   };
   external: { exchange: string; chainSignatures: string };
-  globalCode: { coin: string; account: string };
+  /**
+   * Global contract code hashes. `account` is the code accounts are born on (fixed once accounts
+   * exist); `accountV2`, once published, is the code they upgrade to with their passkey.
+   */
+  globalCode: { coin: string; account: string; accountV2?: string };
   oracle: { mode: string; publicKey: string };
   params: {
     usdcDecimals: number;

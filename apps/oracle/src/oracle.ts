@@ -2,7 +2,7 @@ import type { Sender, Viewer } from "@tredio/chain";
 import { calls, type Deployment, type Report, type Trend } from "@tredio/contracts";
 import type { HyperliquidInfo } from "@tredio/hyperliquid";
 import { type Method, measure, type Readings } from "./method";
-import { allocate, assetClassOf, baseOf, type Candidate, decide, freeListing, type LiveTrend } from "./plan";
+import { allocate, assetClassOf, baseOf, type Candidate, decide, freeListing, type LiveTrend, reportMarks } from "./plan";
 import type { OutLayerRunner } from "./outlayer";
 import type { ReportSigner } from "./signer";
 
@@ -146,9 +146,10 @@ export class Oracle {
         hyperliquidAssets: new Set(hlMarkets.map((x) => x.symbol.toUpperCase())),
       },
     );
-    // Marks for the guard's assets and every live trend's own asset, from Hyperliquid's mark price.
+    // Marks for the guard's assets and every live trend's own asset, from Hyperliquid's mark price,
+    // each with its asset index (a registry deployed before it stored indexes ignores the field).
     const wanted = new Set([...this.o.markAssets, ...all.flatMap((t) => (t.status !== "retired" && t.asset ? [t.asset] : [])), ...decided.new_trends.flatMap((n) => (n.asset ? [n.asset] : []))]);
-    const marks = hlMarkets.filter((x) => wanted.has(x.symbol.toUpperCase()) && x.markPx > 0).map((x) => ({ asset: x.symbol.toUpperCase(), price: Math.round(x.markPx * 1e8).toString() }));
+    const marks = reportMarks(hlMarkets, wanted);
 
     const result: RunResult = { runId, sampled: sample.trends.length + listings.length, created: decided.new_trends.map((n) => n.identifier), updated: decided.updates.length, marks: marks.length, tx: null };
     if (decided.new_trends.length === 0 && decided.updates.length === 0 && marks.length === 0) {

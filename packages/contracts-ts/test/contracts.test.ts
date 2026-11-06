@@ -61,3 +61,84 @@ describe("session calls", () => {
     expect(c.account.sessionCall("0uabc", { top_up_gas: { amount: "1" } }, SESSION_CALL_TGAS_V2).gas).toBe((150n * 10n ** 12n).toString());
   });
 });
+
+describe("account versions", () => {
+  const missing = new Error("Contract call failed: 0uabc.version - wasm execution failed with error: MethodResolveError(MethodNotFound)");
+
+  test("pick session gas, mark age and key handling by version", async () => {
+    const { sessionCallTgas, sessionCallPrepaid, hlMarkMaxAge, keepsGasKeys, bindsMarkToAssetIndex } = await import("../src/index");
+    expect([sessionCallTgas(1), sessionCallTgas(2), sessionCallTgas(3)]).toEqual([300, 150, 150]);
+    expect([sessionCallPrepaid(1), sessionCallPrepaid(2)]).toEqual([3n * 10n ** 23n, 15n * 10n ** 22n]);
+    expect([hlMarkMaxAge(1), hlMarkMaxAge(2)]).toEqual([120, 300]);
+    expect([keepsGasKeys(1), keepsGasKeys(2), bindsMarkToAssetIndex(1), bindsMarkToAssetIndex(2)]).toEqual([false, true, false, true]);
+  });
+
+  test("a missing version view is v1 and cached; v2 answers are cached too", async () => {
+    const { AccountVersions } = await import("../src/index");
+    const reads: string[] = [];
+    const v = new AccountVersions(async (account) => {
+      reads.push(account);
+      if (account === "0uold") throw missing;
+      return 2;
+    });
+    expect(await v.of("0uold")).toBe(1);
+    expect(await v.of("0uold")).toBe(1);
+    expect(await v.of("0unew")).toBe(2);
+    expect(await v.of("0unew")).toBe(2);
+    expect(reads).toEqual(["0uold", "0unew"]);
+    expect(v.known("0unew")).toBe(2);
+    v.forget("0unew");
+    expect(v.known("0unew")).toBeNull();
+  });
+
+  test("an RPC failure or a missing account reads as v1 without being cached", async () => {
+    const { AccountVersions } = await import("../src/index");
+    let fail: Error | null = new Error("rpc 429");
+    const v = new AccountVersions(async () => {
+      if (fail) throw fail;
+      return 2;
+    });
+    expect(await v.of("0ua")).toBe(1);
+    fail = new Error("Account does not exist: 0ua");
+    expect(await v.of("0ua")).toBe(1);
+    fail = null;
+    expect(await v.of("0ua")).toBe(2);
+  });
+
+  test("concurrent reads share one view, and answers expire", async () => {
+    const { AccountVersions } = await import("../src/index");
+    let now = 0;
+    let reads = 0;
+    const v = new AccountVersions(
+      async () => {
+        reads++;
+        await Bun.sleep(5);
+        return 2;
+      },
+      { ttlMs: 1_000, now: () => now },
+    );
+    expect(await Promise.all([v.of("0ua"), v.of("0ua"), v.of("0ua")])).toEqual([2, 2, 2]);
+    expect(reads).toBe(1);
+    now = 1_001;
+    await v.of("0ua");
+    expect(reads).toBe(2);
+  });
+
+  test("the version view's answer: whole numbers from 2 up, anything else v1", async () => {
+    const { versionFrom, isMissingMethod } = await import("../src/index");
+    expect([versionFrom(2), versionFrom(3), versionFrom(1), versionFrom("2"), versionFrom(null), versionFrom(2.5)]).toEqual([2, 3, 1, 1, 1, 1]);
+    expect(isMissingMethod(missing)).toBe(true);
+    expect(isMissingMethod(new Error("CONTRACT_EXECUTION_ERROR"))).toBe(true);
+    expect(isMissingMethod(new Error("UNKNOWN_ACCOUNT"))).toBe(false);
+  });
+
+  test("v2 code joins the allowed hashes and the first request only once deployments names it", async () => {
+    const { accountCodeHashes, upgradeToV2 } = await import("../src/index");
+    const d = deployment("testnet");
+    expect(accountCodeHashes(d)).toEqual([d.globalCode.account]);
+    expect(upgradeToV2(d)).toBeNull();
+    const v2 = { ...d, globalCode: { ...d.globalCode, accountV2: "4reLvkAWfqk5fsqio1KLudk46cqRz9erQdaHkWZKMJDZ" } };
+    expect(accountCodeHashes(v2)).toEqual([d.globalCode.account, "4reLvkAWfqk5fsqio1KLudk46cqRz9erQdaHkWZKMJDZ"]);
+    expect(upgradeToV2(v2)).toEqual({ upgrade: { code_hash: "4reLvkAWfqk5fsqio1KLudk46cqRz9erQdaHkWZKMJDZ" } });
+  });
+});

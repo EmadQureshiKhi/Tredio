@@ -64,6 +64,8 @@ export const registry = {
   item_rejected: z.object({ id: z.string(), kind: z.string(), reason: z.string() }),
   mark_updated: z.object({ asset: z.string().min(1), price: u128, at: unix }),
   oracle_changed: z.object({ config: z.unknown() }),
+  /** Registry v2: the Hyperliquid asset index a ticker's marks vouch for, logged when it is first reported or changes. */
+  asset_index_set: z.object({ asset: z.string().min(1), asset_index: u32 }),
 };
 
 export const outcomes = {
@@ -206,11 +208,21 @@ export const userAccount = {
   hyperliquid_signed: z.object({ digest: z.string().min(1), kind: z.string().min(1) }),
   guard_rejected: z.object({ action: z.string(), reason: z.string() }),
   upgraded: z.object({ code_hash: z.string().min(1) }),
+  // Account v2. A revoke logs `session_revoked`, then `session_key_kept` (a gas key stays on the
+  // account, dormant) or `session_key_deleted`; deleting a dormant key logs only the latter.
+  session_key_kept: z.object({ public_key: z.string().min(1) }),
+  session_key_deleted: z.object({ public_key: z.string().min(1) }),
+  /** The key of a new session could not be added, so the account dropped the session. */
+  session_key_failed: z.object({ public_key: z.string().min(1) }),
+  /** A session moved NEAR from the account into its own gas key (`amount`; `today` so far this UTC day). */
+  gas_topped_up: z.object({ public_key: z.string().min(1), amount: u128, today: u128 }),
 };
 
 export const accountsFactory = {
   account_created: z.object({ account, owner_key: z.string().min(1), funded: z.string() }),
   account_creation_failed: z.object({ account }),
+  /** A failed creation's deposit went back to its payer, or (`claimable`) waits for `claim_refund`. */
+  deposit_refunded: z.object({ account, payer: account, amount: u128, claimable: z.boolean() }),
 };
 
 export const nep141 = {

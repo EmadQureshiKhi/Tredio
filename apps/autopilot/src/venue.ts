@@ -3,7 +3,7 @@ import { keccak_256 } from "@noble/hashes/sha3.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import type { Side } from "@tredio/autopilot";
 import { isTransient, toNear } from "@tredio/chain";
-import type { Session, SessionAction } from "@tredio/contracts";
+import { type AccountVersion, type Session, type SessionAction, sessionCallPrepaid } from "@tredio/contracts";
 import {
   type AccountState,
   actionHash,
@@ -81,6 +81,8 @@ export interface Venue {
   readonly maxLeverage: number;
   /** The account's Hyperliquid address (its Chain Signatures key). */
   address(): Promise<string>;
+  /** The account's code version: it decides the order guard's rules and the gas a session call attaches. */
+  version(): Promise<AccountVersion>;
   /** Sends `o`; `sent` runs once the account has signed it on chain, before Hyperliquid sees it. */
   send(o: PlaceOrder, sent: (txHash: string) => Promise<void>): Promise<SendResult>;
 }
@@ -90,7 +92,9 @@ export interface SessionChain {
   session(account: string, publicKey: string): Promise<Session | null>;
   /** The session gas key's prepaid balance (yoctoNEAR), or null when the key is gone. */
   gasBalance(account: string, publicKey: string): Promise<bigint | null>;
-  /** `session_call` signed by the session key as a gas key: the transaction and its return value. */
+  /** The account's code version (1 when it has no `version` view, or the read failed). */
+  version(account: string): Promise<AccountVersion>;
+  /** `session_call` signed by the session key as a gas key, with the gas the account's version needs: the transaction and its return value. */
   sessionCall(action: SessionAction): Promise<{ hash: string; value: unknown }>;
 }
 
@@ -144,8 +148,8 @@ export class Nonces {
 }
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-/** Account guard refusals that pass once the oracle posts the next mark. */
-const WAIT_FOR_MARK = /stale mark|no mark for asset/i;
+/** Account guard refusals that pass once the oracle posts the next mark (v2 also needs the mark to name the order's asset). */
+const WAIT_FOR_MARK = /stale mark|no mark for asset|mark is for another asset/i;
 
 export interface SessionVenueOptions {
   owner: string;
@@ -160,10 +164,11 @@ export interface SessionVenueOptions {
   nonces: Nonces;
   /** Tops up the session's gas key (the relayer); the balance it reports. */
   fund: () => Promise<bigint>;
-  /** Ask for a top-up below this balance (yoctoNEAR)... */
+  /**
+   * Ask for a top-up below this balance (yoctoNEAR); below what a session call prepays for its
+   * attached gas (0.3 NEAR on v1 account code, 0.15 on v2) the venue refuses to send.
+   */
   gasMin: bigint;
-  /** ...and refuse to send below this: what a session call prepays for its attached gas. */
-  gasNeeded: bigint;
   /** How long a session check holds (ms). */
   checkTtlMs?: number;
   /** First wait before posting again after Hyperliquid did not answer (ms), doubling each time. */
@@ -194,6 +199,10 @@ export class SessionVenue implements Venue {
     return this.addressValue;
   }
 
+  version(): Promise<AccountVersion> {
+    return this.o.chain.version(this.owner);
+  }
+
   /** The session is live on chain and its gas key can pay for a call, topped up through the relayer when low. */
   async ready(): Promise<void> {
     if (this.now() - this.checkedAt < (this.o.checkTtlMs ?? 10_000)) return;
@@ -210,8 +219,9 @@ export class SessionVenue implements Venue {
       } catch (e) {
         this.lastFundError = message(e);
       }
-      if (balance < this.o.gasNeeded) {
-        throw new VenueError(`the session's gas key holds ${toNear(balance)} NEAR, below the ${toNear(this.o.gasNeeded)} NEAR a session call prepays${this.lastFundError ? `; the relayer did not top it up: ${this.lastFundError}` : ""}`, true);
+      const needed = sessionCallPrepaid(await this.version());
+      if (balance < needed) {
+        throw new VenueError(`the session's gas key holds ${toNear(balance)} NEAR, below the ${toNear(needed)} NEAR a session call prepays${this.lastFundError ? `; the relayer did not top it up: ${this.lastFundError}` : ""}`, true);
       }
     }
     this.checkedAt = this.now();

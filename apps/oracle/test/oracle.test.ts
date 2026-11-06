@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { Trend } from "@tredio/contracts";
 import { boostedPoints, normalizeCount, toIndexUnits } from "../src/index-method";
 import { METHOD, measure } from "../src/method";
-import { allocate, assetClassOf, type Candidate, decide, freeListing, type LiveTrend, payableSurfacer } from "../src/plan";
+import { allocate, assetClassOf, type Candidate, decide, freeListing, type LiveTrend, payableSurfacer, reportMarks } from "../src/plan";
 
 const NOW = 1_793_900_000;
 const reading = (value: number, ageSec = 60) => ({ value, windowSec: 86_400, observedAt: NOW - ageSec });
@@ -111,3 +111,22 @@ describe("planning a run", () => {
     expect(payableSurfacer(`0u${"a".repeat(52)}`)).toBe(`0u${"a".repeat(52)}`);
   });
 });
+
+describe("marks", () => {
+  test("carry Hyperliquid's asset index, the universe position delisted markets keep", async () => {
+    const { HyperliquidInfo } = await import("@tredio/hyperliquid");
+    // Universe: BTC (0), a delisted market (1), ETH (2), kPEPE (3).
+    const answer = [
+      { universe: [{ name: "BTC", szDecimals: 5, maxLeverage: 40 }, { name: "OLD", szDecimals: 0, maxLeverage: 3, isDelisted: true }, { name: "ETH", szDecimals: 4, maxLeverage: 25 }, { name: "kPEPE", szDecimals: 0, maxLeverage: 10 }] },
+      [{ markPx: "65000.5" }, { markPx: "1" }, { markPx: "3000" }, { markPx: "0" }],
+    ];
+    const info = new HyperliquidInfo("testnet", async () => new Response(JSON.stringify(answer)));
+    const markets = await info.perpMarkets();
+    expect(markets.map((m) => [m.symbol, m.index])).toEqual([["BTC", 0], ["ETH", 2], ["kPEPE", 3]]);
+    expect(reportMarks(markets, new Set(["BTC", "ETH", "KPEPE", "SOL"]))).toEqual([
+      { asset: "BTC", price: "6500050000000", asset_index: 0 },
+      { asset: "ETH", price: "300000000000", asset_index: 2 },
+    ]);
+  });
+});
+

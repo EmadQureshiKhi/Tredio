@@ -4,7 +4,7 @@ import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { base58Encode, publicKeyOf } from "@tredio/chain";
-import type { Session, SessionAction } from "@tredio/contracts";
+import type { AccountVersion, Session, SessionAction } from "@tredio/contracts";
 import { type AccountState, actionHash, agentDigest, type EvmSignature, type ExchangeResponse, type L1Action, leverageAction, orderAction, type PerpMarket } from "@tredio/hyperliquid";
 import { connect, ExecutorDb } from "../src/db";
 import type { RegistryMark } from "../src/orders";
@@ -51,6 +51,8 @@ export class FakeAccount implements SessionChain {
   readonly key = ed25519Key();
   session_: Session | null;
   gas = 32n * 10n ** 22n;
+  /** The account's code version (`version` view; v1 has none). */
+  codeVersion: AccountVersion = 1;
   calls: SessionAction[] = [];
   /** Errors the next session calls throw, in order (the contract's panics, RPC failures). */
   failures: Error[] = [];
@@ -76,6 +78,10 @@ export class FakeAccount implements SessionChain {
 
   async gasBalance(): Promise<bigint | null> {
     return this.gas;
+  }
+
+  async version(): Promise<AccountVersion> {
+    return this.codeVersion;
   }
 
   async sessionCall(action: SessionAction): Promise<{ hash: string; value: unknown }> {
@@ -227,16 +233,19 @@ export class FakeExchange implements HyperliquidApi {
   }
 }
 
-/** Tredio's registry marks (8 decimals): fresh (ten seconds old at `now`) unless set with a time. */
+/**
+ * Tredio's registry marks (8 decimals): fresh (ten seconds old at `now`) unless set with a time,
+ * and without a Hyperliquid asset index (as the deployed registry returns them) unless set with one.
+ */
 export class FakeRegistry {
-  readonly marks = new Map<string, { price: string; at: number | null }>();
+  readonly marks = new Map<string, { price: string; at: number | null; assetIndex?: number }>();
   now = T;
-  set(asset: string, price: number, at: number | null = null): void {
-    this.marks.set(asset, { price: BigInt(Math.round(price * 1e8)).toString(), at });
+  set(asset: string, price: number, at: number | null = null, assetIndex?: number): void {
+    this.marks.set(asset, { price: BigInt(Math.round(price * 1e8)).toString(), at, assetIndex });
   }
   read = async (asset: string): Promise<RegistryMark | null> => {
     const m = this.marks.get(asset);
-    return m ? { price: m.price, at: m.at ?? this.now - 10 } : null;
+    return m ? { price: m.price, at: m.at ?? this.now - 10, ...(m.assetIndex === undefined ? {} : { asset_index: m.assetIndex }) } : null;
   };
 }
 

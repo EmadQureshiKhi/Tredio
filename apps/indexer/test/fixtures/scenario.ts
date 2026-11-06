@@ -3,7 +3,10 @@
  * a registry report with several events in one receipt, a failed receipt and an untracked
  * executor (both ignored), a skipped height (1001), account creation, complete sets, a book swap
  * and a limit-order fill, perps, trend coins, curation and USDC, then settlement, redemptions, a
- * failed payout, liquidation, graduation and a retirement.
+ * failed payout, liquidation, graduation and a retirement. Alice's account also does what account
+ * code v2 logs: a session renewed in place, a key that could not be added, a gas top-up, revoked
+ * gas keys kept dormant, one deleted later, and a revoked session reactivated; the factory refunds
+ * a failed creation.
  */
 import type { Deployment } from "../../src/deployments";
 import type { Block, ReceiptOutcome } from "../../src/neardata";
@@ -33,6 +36,12 @@ export const KEEPER = "tredio-keeper.testnet";
 export const OPENAI_COIN = `topic-openai.${C.coins}`;
 export const BTC_COIN = `crypto-btc.${C.coins}`;
 export const SESSION_KEY = "ed25519:5Fq5mbXX2rZ5d8x2sbzWfMn5A3ZCBBvVHZ9ZhqJx8Yzk";
+/** Account v2 keys: a second device's (revoked, kept, deleted later), Autopilot's (never added), a third (revoked and kept). */
+export const KEY_2 = "ed25519:8Hn4tWbQZm3oZYVjGw5eT9p1XKd2CzRr6sLfAqUu7NvB";
+export const KEY_3 = "ed25519:3Jr7yPcVhXo2Kq9SdUeWm4ZbN6tLgF1aRwCxTnHv5MiE";
+export const KEY_4 = "ed25519:6Tq2wZxRb8KjNo5HyUcVe3PmL9dGs4FaWr7CtXnJh1Qk";
+/** An account whose creation failed (its deposit is refunded). */
+export const BOB = `0u${"c".repeat(52)}`;
 
 /** Block times (unix seconds). Series 1 opens at 1002 and expires before 1004. */
 export const T: Record<number, number> = { 1000: 1793902800, 1002: 1793902802, 1003: 1793902803, 1004: 1793903704, 1005: 1793903705 };
@@ -110,6 +119,7 @@ export function scenario(): Map<number, Block | null> {
           reg("status_changed", { id: "crypto:btc", from: null, to: "active", at: T[1000] }),
           reg("item_rejected", { id: "Bad Id", kind: "new_trend", reason: "bad_identifier" }),
           reg("mark_updated", { asset: "BTC", price: "6512345000000", at: T[1000] }),
+          reg("asset_index_set", { asset: "BTC", asset_index: 0 }),
           reg("report_processed", { run_id: 1, observed_at: T[1000], created: 2, updated: 0, marks: 1, rejected: 1 }),
         ]),
         // A failed receipt: its logs never count.
@@ -279,6 +289,28 @@ export function scenario(): Map<number, Block | null> {
         receipt(OPENAI_COIN, [ft("ft_mint", [{ owner_id: ALICE, amount: "494752041000000000000000" }])]),
         receipt(C.usdc, [ft("ft_transfer", [{ old_owner_id: C.coins, new_owner_id: C.curation, amount: "1000" }])]),
         receipt(C.curation, [ev("tredio-curation", "accrued", { trend: "topic:openai", surfacer: ALICE, source: C.coins, amount: "1000" })]),
+        // Account v2: the session renews in place (same key, a later expiry) and three keys are added.
+        receipt(ALICE, [
+          acct("owner_executed", { nonce: 2, actions: 4 }),
+          acct("session_added", {
+            public_key: SESSION_KEY,
+            label: "This iPhone",
+            scope: { outcomes: true, perps: true, hyperliquid: false },
+            expires_at: T[1003]! + 7 * 86_400,
+            daily_limit: "250000000",
+            gas_key: true,
+          }),
+          acct("session_added", { public_key: KEY_2, label: "app", scope: { outcomes: true, perps: true, hyperliquid: true }, expires_at: T[1003]! + 86_400, daily_limit: "500000000", gas_key: true }),
+          acct("session_added", { public_key: KEY_3, label: "autopilot", scope: { outcomes: false, perps: false, hyperliquid: true }, expires_at: T[1003]! + 86_400, daily_limit: "100000000", gas_key: true }),
+          acct("session_added", { public_key: KEY_4, label: "app", scope: { outcomes: true, perps: false, hyperliquid: false }, expires_at: T[1003]! + 86_400, daily_limit: "50000000", gas_key: true }),
+        ]),
+        // KEY_3's key batch failed, so the account dropped its session.
+        receipt(ALICE, [acct("session_key_failed", { public_key: KEY_3 })]),
+        // The session moves 0.1 NEAR from the account into its own gas key.
+        receipt(ALICE, [
+          acct("session_action", { public_key: SESSION_KEY, action: "top_up_gas", outflow: "0", spent_today: "1042080" }),
+          acct("gas_topped_up", { public_key: SESSION_KEY, amount: "100000000000000000000000", today: "100000000000000000000000" }),
+        ]),
       ],
     ]),
   );
@@ -355,8 +387,16 @@ export function scenario(): Map<number, Block | null> {
         receipt(ALICE, [
           acct("hyperliquid_signed", { digest: "cd".repeat(32), kind: "order" }),
           acct("session_revoked", { public_key: SESSION_KEY }),
+          acct("session_key_kept", { public_key: SESSION_KEY }),
           acct("frozen", { frozen: true }),
           acct("upgraded", { code_hash: "J1GvtY5xj7QuNwmdDFM56EYxmTvwp1wHqkPZjY7CNK9x" }),
+        ]),
+        receipt(ALICE, [
+          acct("owner_executed", { nonce: 3, actions: 2 }),
+          acct("session_revoked", { public_key: KEY_2 }),
+          acct("session_key_kept", { public_key: KEY_2 }),
+          acct("session_revoked", { public_key: KEY_4 }),
+          acct("session_key_kept", { public_key: KEY_4 }),
         ]),
         receipt(C.curation, [ev("tredio-curation", "claimed", { account: ALICE, amount: "1000" })]),
         receipt(C.usdc, [
@@ -376,6 +416,23 @@ export function scenario(): Map<number, Block | null> {
         receipt(C.registry, [
           reg("status_changed", { id: "crypto:btc", from: "active", to: "retired", at: T[1005] }),
           reg("settlement_missed", { id: "crypto:btc", expiry: T[1003]! + 900, first_observation: T[1005] }),
+        ]),
+        // The revoked session comes back with its kept key; KEY_2's dormant key is deleted for good.
+        receipt(ALICE, [
+          acct("owner_executed", { nonce: 4, actions: 2 }),
+          acct("session_added", {
+            public_key: SESSION_KEY,
+            label: "This iPhone",
+            scope: { outcomes: true, perps: true, hyperliquid: false },
+            expires_at: T[1005]! + 7 * 86_400,
+            daily_limit: "250000000",
+            gas_key: true,
+          }),
+          acct("session_key_deleted", { public_key: KEY_2 }),
+        ]),
+        receipt(C.accounts, [
+          ev("tredio-accounts", "account_creation_failed", { account: BOB }),
+          ev("tredio-accounts", "deposit_refunded", { account: BOB, payer: "tredio-relayer.testnet", amount: "400000000000000000000000", claimable: false }),
         ]),
         receipt(C.coins, [coin("graduation_ready", { trend: "crypto:btc", reserve: "2000100000" })]),
         receipt(C.coins, [coin("graduation_step", { trend: "crypto:btc", step: "pool", ok: true })]),

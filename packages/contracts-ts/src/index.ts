@@ -3,6 +3,7 @@ export * from "./deployments";
 export * from "./events";
 export * from "./owner";
 export * from "./calls";
+export * from "./account-version";
 export * from "./units";
 export * from "./owner-approval";
 export * from "./activation";
