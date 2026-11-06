@@ -102,6 +102,18 @@ function ruleJson(r: StoredRule) {
   return { id: r.id, owner: r.owner, rule: r.rule, ruleHash: r.ruleHash, status: r.status, statusReason: r.statusReason, route: r.route, backtestId: r.backtestId, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString() };
 }
 
+/** An account's Hyperliquid address never changes (its own Chain Signatures key), so it is derived once. */
+const derived = new Map<string, Promise<string>>();
+function hyperliquidAddress(d: Pick<AutopilotRouteDeps, "view" | "signer">, account: string): Promise<string | null> {
+  let p = derived.get(account);
+  if (!p) {
+    p = hyperliquidAddressOf(d.view, d.signer, account);
+    derived.set(account, p);
+    p.catch(() => derived.delete(account));
+  }
+  return p.catch(() => null);
+}
+
 export function autopilotRoutes(d: AutopilotRouteDeps) {
   const now = d.now ?? Date.now;
   const nowSec = () => Math.floor(now() / 1000);
@@ -141,7 +153,7 @@ export function autopilotRoutes(d: AutopilotRouteDeps) {
   app.get("/hyperliquid/accounts/:account", async (c) => {
     const account = accountId.safeParse(c.req.param("account"));
     if (!account.success) return c.json({ error: "bad account" }, 400);
-    const address = await hyperliquidAddressOf(d.view, d.signer, account.data).catch(() => null);
+    const address = await hyperliquidAddress(d, account.data);
     if (!address) return c.json({ error: "could not derive the account's Hyperliquid address; try again" }, 503);
     const [state, orders] = await Promise.all([d.hyperliquid.accountState(address).catch(() => null), d.hyperliquid.openOrders(address).catch(() => [])]);
     return c.json({ network: d.hyperliquid.network, address, state, orders });
@@ -149,7 +161,7 @@ export function autopilotRoutes(d: AutopilotRouteDeps) {
   app.get("/hyperliquid/accounts/:account/fills", async (c) => {
     const account = accountId.safeParse(c.req.param("account"));
     if (!account.success) return c.json({ error: "bad account" }, 400);
-    const address = await hyperliquidAddressOf(d.view, d.signer, account.data).catch(() => null);
+    const address = await hyperliquidAddress(d, account.data);
     if (!address) return c.json({ error: "could not derive the account's Hyperliquid address; try again" }, 503);
     return c.json({ address, fills: (await d.hyperliquid.fills(address).catch(() => [])).slice(0, 200) });
   });

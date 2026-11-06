@@ -56,6 +56,8 @@ export interface Activity {
   exit: number | null;
   at: number;
   receipt: string | null;
+  /** The transaction that carried it, for an explorer link. */
+  tx: string | null;
 }
 
 /** A series the account holds UP or DOWN of, with the indexer's average-cost book of each side (raw, 6 decimals). */
@@ -267,8 +269,8 @@ export class IndexerReader {
           FROM ${this.t("outcome_flows")} f JOIN ${this.t("series")} s ON s.id = f.series
          WHERE f.account = ${account} ORDER BY f.block_height DESC, f.log_index DESC LIMIT ${limit}`,
     ]);
-    const out: Activity[] = [
-      ...perps.map((p): Activity => ({
+    const out: Array<Activity & { id?: number }> = [
+      ...perps.map((p): Activity & { id?: number } => ({
         kind: "perp",
         identifier: p.trend,
         label: `${p.is_long ? "Long" : "Short"} attention perp`,
@@ -280,6 +282,8 @@ export class IndexerReader {
         exit: points(p.exit_index),
         at: secs(p.closed_at ?? p.opened_at)!,
         receipt: p.close_receipt,
+        tx: null,
+        id: Number(p.id),
       })),
       ...coins.map((t): Activity => ({
         kind: "coin",
@@ -293,6 +297,7 @@ export class IndexerReader {
         exit: null,
         at: secs(t.at)!,
         receipt: t.receipt_id,
+        tx: null,
       })),
       ...flows.map((f): Activity => {
         const tokens = num(f.tokens) / USDC;
@@ -316,10 +321,33 @@ export class IndexerReader {
           exit: null,
           at: secs(f.at)!,
           receipt: f.receipt_id,
+          tx: null,
         };
       }),
     ];
-    return out.sort((a, b) => b.at - a.at).slice(0, limit);
+    const items = out.sort((a, b) => b.at - a.at).slice(0, limit);
+    // Transaction hashes: by receipt for closes, coin trades and flows; by position id for open perps.
+    const receipts = items.flatMap((i) => (i.receipt ? [i.receipt] : []));
+    const openedIds = items.flatMap((i) => (i.kind === "perp" && !i.receipt ? [String(i.id)] : []));
+    const [byReceipt, byPosition] = await Promise.all([
+      receipts.length ? this.sql<{ receipt_id: string; tx_hash: string | null }[]>`SELECT DISTINCT receipt_id, tx_hash FROM ${this.t("events")} WHERE receipt_id = ANY(${this.sql.array(receipts)})` : [],
+      openedIds.length
+        ? this.sql<{ id: string; tx_hash: string | null }[]>`
+            SELECT data->>'id' AS id, tx_hash FROM ${this.t("events")} WHERE standard = 'tredio-perps' AND event = 'position_opened' AND data->>'id' = ANY(${this.sql.array(openedIds)})`
+        : [],
+    ]);
+    const txOf = new Map(byReceipt.map((r) => [r.receipt_id, r.tx_hash]));
+    const openTx = new Map(byPosition.map((r) => [r.id, r.tx_hash]));
+    return items.map(({ id, ...i }) => ({ ...i, tx: (i.receipt ? txOf.get(i.receipt) : openTx.get(String(id))) ?? null }));
+  }
+
+  /** The account's resting book orders, newest first. */
+  async openOrders(account: string): Promise<Array<{ id: number; series: number; side: "up" | "down"; dir: "buy" | "sell"; tick: number; size: string; remaining: string; placedAt: number; tx: string | null }>> {
+    const rows = await this.sql<{ id: string; series: string; side: "up" | "down"; dir: "buy" | "sell"; tick: number; size: string; remaining: string; placed_at: Date; tx_hash: string | null }[]>`
+      SELECT o.id, o.series, o.side, o.dir, o.tick, o.size, o.remaining, o.placed_at,
+             (SELECT e.tx_hash FROM ${this.t("events")} e WHERE e.standard = 'tredio-book' AND e.event = 'order_placed' AND e.data->>'id' = o.id::text LIMIT 1) AS tx_hash
+        FROM ${this.t("book_orders")} o WHERE o.owner = ${account} AND o.status = 'open' ORDER BY o.placed_at DESC LIMIT 200`;
+    return rows.map((r) => ({ id: Number(r.id), series: Number(r.series), side: r.side, dir: r.dir, tick: r.tick, size: r.size, remaining: r.remaining, placedAt: secs(r.placed_at)!, tx: r.tx_hash }));
   }
 
   async outcomeHoldings(account: string): Promise<OutcomeHoldingRow[]> {

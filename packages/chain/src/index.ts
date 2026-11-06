@@ -18,7 +18,8 @@ import { base58Decode, base58Encode } from "./proofs";
 export * from "./proofs";
 
 export const DEFAULT_RPCS: Record<"testnet" | "mainnet", string[]> = {
-  testnet: ["https://test.rpc.fastnear.com", "https://rpc.testnet.near.org"],
+  // Intear's endpoint is slower but takes bursts the others refuse when several services share an address.
+  testnet: ["https://test.rpc.fastnear.com", "https://testnet-rpc.intea.rs", "https://rpc.testnet.near.org"],
   mainnet: ["https://free.rpc.fastnear.com", "https://rpc.mainnet.near.org"],
 };
 
@@ -173,6 +174,7 @@ export function publicKeyOf(secret: string): string {
 
 export class Sender {
   readonly accountId: string;
+  private readonly rpcUrls: string[];
   /** The key this sender signs with. */
   readonly publicKey: string;
   readonly network: Network;
@@ -186,7 +188,8 @@ export class Sender {
     this.accountId = o.accountId;
     this.publicKey = publicKeyOf(o.privateKey);
     this.network = o.network;
-    const rpcUrl = (o.rpcUrls ?? DEFAULT_RPCS[o.network])[0]!;
+    this.rpcUrls = o.rpcUrls ?? DEFAULT_RPCS[o.network];
+    const rpcUrl = this.rpcUrls[0]!;
     this.near = new Near({
       network: { networkId: o.network, rpcUrl },
       privateKey: o.privateKey as PrivateKey,
@@ -231,15 +234,27 @@ export class Sender {
     const run = async (lane: number | null) => {
       let tx = build(this.near.transaction(this.accountId));
       if (lane !== null) tx = tx.useGasKey(lane);
+      // Signed once: a broadcast that fails in transit is retried with the same bytes elsewhere and
+      // confirmed by hash, so a transaction runs at most once and is never reported failed when it ran.
+      try {
+        await tx.sign();
+      } catch (e) {
+        throw new TxError(`could not sign: ${String((e as Error).message ?? e)}`);
+      }
+      const hash = tx.getHash() ?? undefined;
       let o: FinalExecutionOutcome;
       try {
         o = (await tx.send({ waitUntil })) as FinalExecutionOutcome;
       } catch (e) {
         const details = (e as { details?: unknown }).details;
-        throw new TxError(details ? `${(e as Error).message}: ${JSON.stringify(details)}` : String((e as Error).message ?? e));
+        const message = details ? `${(e as Error).message}: ${JSON.stringify(details)}` : String((e as Error).message ?? e);
+        if (!isTransient(e) || !hash) throw new TxError(message, hash);
+        const landed = await this.recover(tx.serialize(), hash, waitUntil);
+        if (!landed) throw new TxError(message, hash);
+        o = landed;
       }
       const failed = failureOf(o);
-      if (failed) throw new TxError(failed, o.transaction?.hash);
+      if (failed) throw new TxError(failed, o.transaction?.hash ?? hash);
       return o;
     };
     if (this.lanes > 0) {
@@ -254,6 +269,39 @@ export class Sender {
     const p = this.chain.then(() => run(null));
     this.chain = p.catch(() => undefined);
     return p;
+  }
+
+  /**
+   * After a broadcast failed in transit: sends the same signed bytes through the other providers,
+   * then looks the hash up for up to half a minute. Null when the transaction is nowhere to be found.
+   */
+  private async recover(signed: Uint8Array, hash: string, waitUntil: string): Promise<FinalExecutionOutcome | null> {
+    const call = async <T>(url: string, method: string, params: unknown): Promise<T> => {
+      const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }), signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) throw new Error(`rpc ${res.status}`);
+      const body = (await res.json()) as { result?: T; error?: { cause?: { name?: string }; message?: string } };
+      if (body.error) throw new Error(body.error.cause?.name ?? body.error.message ?? "rpc error");
+      return body.result as T;
+    };
+    const signedB64 = Buffer.from(signed).toString("base64");
+    for (const url of this.rpcUrls.slice(1)) {
+      try {
+        return await call<FinalExecutionOutcome>(url, "send_tx", { signed_tx_base64: signedB64, wait_until: waitUntil });
+      } catch {
+        // Already known, rate limited or unreachable: the lookup below settles it.
+      }
+    }
+    for (let i = 0; i < 10; i++) {
+      for (const url of this.rpcUrls) {
+        try {
+          return await call<FinalExecutionOutcome>(url, "EXPERIMENTAL_tx_status", { tx_hash: hash, sender_account_id: this.accountId, wait_until: waitUntil });
+        } catch {
+          // Not seen there yet.
+        }
+      }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    return null;
   }
 
   /**

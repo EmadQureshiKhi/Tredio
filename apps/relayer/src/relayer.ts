@@ -23,6 +23,8 @@ export class RelayError extends Error {
   constructor(
     message: string,
     readonly status: 400 | 403 | 409 | 429 | 502 | 503,
+    /** The transaction, once one was signed: the app can follow it even when this request failed. */
+    readonly hash?: string,
   ) {
     super(message);
   }
@@ -157,7 +159,7 @@ export class Relayer {
     const message = e instanceof Error ? e.message : String(e);
     this.stats.lastError = message.slice(0, 300);
     if (e instanceof RelayError) throw e;
-    throw new RelayError(e instanceof TxError ? `the transaction failed: ${message.slice(0, 200)}` : "the relayer could not send the transaction; try again", 502);
+    throw new RelayError(e instanceof TxError ? `the transaction failed: ${message.slice(0, 200)}` : "the relayer could not send the transaction; try again", 502, e instanceof TxError ? e.hash : undefined);
   }
 
   /** Creates the universal account of `ownerKey` and runs its first owner request (adding the first session). */

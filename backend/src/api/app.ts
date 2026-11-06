@@ -330,6 +330,12 @@ export function createApp(d: AppDeps): Hono {
     if (!isAccount(address)) return c.json({ error: "bad account" }, 400);
     return fromIndexer(c, async (ix) => ({ holdings: await ix.outcomeHoldings(address) }));
   });
+  // Resting book orders of the account (the book has no per-owner view, so the indexer keeps them).
+  app.get("/v1/accounts/:address/orders", async (c) => {
+    const address = c.req.param("address");
+    if (!isAccount(address)) return c.json({ error: "bad account" }, 400);
+    return fromIndexer(c, async (ix) => ({ orders: await ix.openOrders(address) }));
+  });
   app.get("/v1/leaderboard/traders", (c) => fromIndexer(c, async (ix) => ({ traders: await ix.traders(50) })));
   app.get("/v1/trends/:identifier/stats", async (c) => {
     if (!d.indexer) return c.json({ error: "trade history is not available" }, 503);

@@ -48,7 +48,7 @@ export function createServer(d: ServerDeps): Hono {
     try {
       return c.json((await run(b.data as never)) as object);
     } catch (e) {
-      if (e instanceof RelayError) return c.json({ error: e.message }, e.status, e.status === 429 ? { "Retry-After": "300" } : {});
+      if (e instanceof RelayError) return c.json(e.hash ? { error: e.message, hash: e.hash } : { error: e.message }, e.status, e.status === 429 ? { "Retry-After": "300" } : {});
       throw e;
     }
   };
