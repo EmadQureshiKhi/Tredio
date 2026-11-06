@@ -78,14 +78,25 @@ test("an attention perp takes more margin with one prompt and closes through the
   await page.goto(`/t/${TREND}`);
   const panel = page.getByTestId("trade-panel");
   await panel.getByRole("radio", { name: "Perp" }).click();
+  const positions = panel.getByTestId("perp-position");
+  // Positions from earlier runs may be open: wait for the new one before acting on it, not just any last card.
+  await expect(panel.getByTestId("perp-margin")).toBeVisible({ timeout: 30_000 });
+  // The positions list loads from chain after the ticket: count once it holds steady.
+  let held = -1;
+  await expect(async () => {
+    const first = await positions.count();
+    await page.waitForTimeout(2_000);
+    held = await positions.count();
+    expect(held).toBe(first);
+  }).toPass({ timeout: 45_000 });
   await panel.getByTestId("perp-margin").fill("2");
   const open = panel.getByTestId("perp-submit");
   await expect(open).toBeEnabled({ timeout: 30_000 });
   await open.click();
   await landed(panel.getByTestId("perp-tx"));
 
-  const position = panel.getByTestId("perp-position").last();
-  await expect(position).toBeVisible({ timeout: 60_000 });
+  await expect(positions).toHaveCount(held + 1, { timeout: 60_000 });
+  const position = positions.nth(held);
   const before = await passkeyUses(live);
   await position.getByRole("button", { name: "Add margin" }).click();
   await position.getByTestId("perp-add-margin").fill("1");
@@ -93,9 +104,8 @@ test("an attention perp takes more margin with one prompt and closes through the
   await landed(position.getByTestId("perp-position-tx"));
   expect(await passkeyUses(live)).toBe(before + 1);
 
-  const count = await panel.getByTestId("perp-position").count();
   await position.getByTestId("perp-close").click();
-  await expect(panel.getByTestId("perp-position")).toHaveCount(count - 1, { timeout: 90_000 });
+  await expect(positions).toHaveCount(held, { timeout: 90_000 });
   expect(await passkeyUses(live)).toBe(before + 1);
 });
 
