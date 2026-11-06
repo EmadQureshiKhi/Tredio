@@ -9,6 +9,8 @@ export interface Snapshot {
   trends: Trend[];
   /** The latest series per live trend and window (null: none opened yet). */
   latest: Array<{ trend: string; window: number; series: Series | null }>;
+  /** Expired open series whose settlement value the registry already holds. */
+  settleable: Set<number>;
   /** Open series whose book markets are missing. */
   unlisted: number[];
   /** Expired series that still have book markets (resting orders to clear). */
@@ -19,6 +21,8 @@ export interface Snapshot {
 }
 
 const PAGE = 100;
+/** The outcomes contract voids a series this long after expiry when no settlement came (`VOID_GRACE`). */
+export const VOID_GRACE_SEC = 2 * 86_400;
 
 async function pages<T>(read: (from: number) => Promise<T[]>): Promise<T[]> {
   const out: T[] = [];
@@ -44,6 +48,12 @@ export async function snapshot(v: Viewer, d: Deployment, nowSec: number): Promis
       live.flatMap((t) => windows.map(async (window) => ({ trend: t.id, window, series: await v.view<Series | null>(c.outcomes, "latest_series", { trend: t.id, window }) }))),
     )
   ).flat();
+  // An expired series settles once the registry holds its value (or, past the void grace, as void).
+  const expiredOpen = latest.flatMap((l) => (l.series && l.series.outcome === "open" && nowSec >= l.series.expiry ? [l.series] : []));
+  const settlements = await Promise.all(
+    expiredOpen.map((s) => v.view<{ finalized: boolean }>(c.registry, "settlement_of", { id: s.trend, expiry: s.expiry }).catch(() => ({ finalized: false }))),
+  );
+  const settleable = new Set(expiredOpen.filter((s, i) => settlements[i]!.finalized || nowSec >= s.expiry + VOID_GRACE_SEC).map((s) => s.id));
   // Series still open or expired and unsettled: their book markets.
   const recent = latest.flatMap((l) => (l.series ? [l.series] : []));
   const markets = await Promise.all(
@@ -63,6 +73,7 @@ export async function snapshot(v: Viewer, d: Deployment, nowSec: number): Promis
     windows,
     trends,
     latest,
+    settleable,
     unlisted,
     expiredMarkets,
     positions: positions.map((p, i) => ({ ...p, state: states[i] ?? null })),

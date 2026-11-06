@@ -23,7 +23,7 @@ const trend = (id: string, over: Partial<Trend> = {}): Trend => ({
   ...over,
 });
 const series = (id: number, over: Partial<Series> = {}): Series => ({ id, trend: "topic:a", window: 86_400, number: 1, opened_at: NOW - 100, expiry: NOW + 86_300, opening_index: 50_000_000, settlement_index: null, outcome: "open", up_supply: "0", down_supply: "0", backing: "0", ...over });
-const snap = (over: Partial<Snapshot> = {}): Snapshot => ({ now: NOW, params, windows: [86_400, 604_800, 900], trends: [], latest: [], unlisted: [], expiredMarkets: [], positions: [], perpMarkets: [], curves: [], ...over });
+const snap = (over: Partial<Snapshot> = {}): Snapshot => ({ now: NOW, params, windows: [86_400, 604_800, 900], trends: [], latest: [], settleable: new Set([7]), unlisted: [], expiredMarkets: [], positions: [], perpMarkets: [], curves: [], ...over });
 const cfg = { seriesWindows: [86_400, 604_800], coins: true, settleDelaySec: 30 };
 const kinds = (s: Snapshot) => plan(s, D, cfg).map((a) => a.key);
 
@@ -41,6 +41,8 @@ describe("keeper plan", () => {
     expect(kinds(snap({ trends: [trend("topic:a")], latest: [{ trend: "topic:a", window: 86_400, series: expired }], curves: [{ trend: "topic:a" } as never] }))).toEqual(["settle:7", "openSeries:topic:a:86400"]);
     expect(kinds(snap({ trends: [trend("topic:a")], latest: [{ trend: "topic:a", window: 86_400, series: series(7, { expiry: NOW - 10 }) }], curves: [{ trend: "topic:a" } as never] }))).toEqual(["openSeries:topic:a:86400"]);
     expect(kinds(snap({ trends: [trend("topic:a", { updated_at: NOW - 1000 })], latest: [{ trend: "topic:a", window: 86_400, series: null }] }))).toEqual([]);
+    // Not settleable until the registry holds the value: the next series still opens.
+    expect(kinds(snap({ settleable: new Set(), trends: [trend("topic:a")], latest: [{ trend: "topic:a", window: 86_400, series: expired }], curves: [{ trend: "topic:a" } as never] }))).toEqual(["openSeries:topic:a:86400"]);
     expect(kinds(snap({ trends: [trend("topic:a", { status: "cooling" })], latest: [{ trend: "topic:a", window: 86_400, series: null }] }))).toEqual([]);
   });
 

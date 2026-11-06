@@ -51,7 +51,7 @@ export function plan(s: Snapshot, d: Deployment, cfg: PlanConfig): Action[] {
 
   for (const l of s.latest) {
     const v = l.series;
-    if (v && v.outcome === "open" && s.now >= v.expiry + cfg.settleDelaySec) {
+    if (v && v.outcome === "open" && s.now >= v.expiry + cfg.settleDelaySec && s.settleable.has(v.id)) {
       actions.push({ key: `settle:${v.id}`, kind: "settle", call: C.outcomes.settle(v.id), reason: `expired at ${v.expiry}` });
     }
   }
@@ -93,7 +93,8 @@ export function plan(s: Snapshot, d: Deployment, cfg: PlanConfig): Action[] {
     actions.push({ key: `poke:${trend}`, kind: "poke", call: C.perps.poke(trend), reason: `mark ${market.last_mark} behind index ${t.index}` });
   }
 
-  for (const m of s.expiredMarkets) actions.push({ key: `cancelExpired:${m.series}:${m.side}`, kind: "cancelExpired", call: C.book.cancelExpired(m.series, m.side), reason: "series expired" });
+  // Twenty orders a call keeps the attached gas, and a gas key's reserve for it, small.
+  for (const m of s.expiredMarkets) actions.push({ key: `cancelExpired:${m.series}:${m.side}`, kind: "cancelExpired", call: { ...C.book.cancelExpired(m.series, m.side, 20), gas: (150n * 10n ** 12n).toString() }, reason: "series expired" });
 
   return actions;
 }
