@@ -44,6 +44,7 @@ Each of these is a NEAR primitive doing real work in the product, not a logo on 
 3. **AI review you can verify.**
    Every candidate the radar finds is reviewed by NEAR AI Cloud's verifiable models.
    An answer without a `provider_tee` signature is refused, and the hash of the signed evidence is written on the trend in the registry.
+   The API serves the exact request and response the signature covers, so anyone can recompute both hashes and check the signature without trusting Tredio.
    Status on testnet: waiting for a NEAR AI Cloud key, so today's trends were added by hand and carry no review yet.
    In the app: the Verified chip on a reviewed trend opens the evidence.
    Code: [`backend/src/ai/nearai.ts`](backend/src/ai/nearai.ts), `GET /v1/reviews/:hash`.
