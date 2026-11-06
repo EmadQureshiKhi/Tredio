@@ -80,6 +80,11 @@ impl Accounts {
 
     pub fn set_protocol(&mut self, protocol: Protocol) {
         require!(env::predecessor_account_id() == self.owner, "owner only");
+        // The protocol is part of the state init an account id derives from, like the code hash.
+        require!(
+            self.created == 0,
+            "accounts exist: their addresses commit to this protocol, so change the protocol through their code instead"
+        );
         self.protocol = protocol;
     }
 
@@ -341,6 +346,22 @@ mod tests {
         f.created = 1;
         // Every passkey's address commits to this hash: changing it would strand existing users.
         f.set_account_code(Base58CryptoHash::from([8u8; 32]));
+    }
+
+    #[test]
+    #[should_panic(expected = "accounts exist")]
+    fn the_birth_protocol_is_fixed_once_accounts_exist() {
+        let mut f = setup();
+        let before = f.account_id_of(KEY.into());
+        // The protocol is in every account's state init: changing it moves every passkey's address.
+        let mut moved = f.protocol.clone();
+        moved.registry = "elsewhere.testnet".parse().unwrap();
+        let mut probe = setup();
+        probe.set_protocol(moved.clone());
+        assert_ne!(probe.account_id_of(KEY.into()), before);
+        // So once an account exists the factory refuses.
+        f.created = 1;
+        f.set_protocol(moved);
     }
 
     #[test]

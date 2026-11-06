@@ -20,7 +20,7 @@ Fixes are in the code in this repository; they reach testnet only when the contr
 - Each finding got a test first, run against the audited code to see it fail, then the fix.
   Tests are unit tests (near-sdk mocked blockchain) or sandbox tests (`near-workspaces` on a local nearcore node), including real gas-key transactions sent over JSON-RPC.
 - Verification: `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --check`, the sandbox suite (`cargo test -p tredio-sandbox-tests`) and a release build with `contracts/scripts/build.sh`.
-- Test counts: 126 unit tests and 7 sandbox tests before; 157 unit tests and 15 sandbox tests after (M-5 added one).
+- Test counts: 126 unit tests and 7 sandbox tests before; 158 unit tests and 15 sandbox tests after (M-5 and M-6 added one each).
 
 ## Findings
 
@@ -28,15 +28,16 @@ Severity reflects impact and how easily it can be triggered on testnet as deploy
 
 | Id | Severity | Contract | Title | Status |
 | --- | --- | --- | --- | --- |
-| H-1 | High | account, registry | The Hyperliquid guard checks a mark that is not bound to the asset it signs | Fixed (account v2, registry) |
+| H-1 | High | account, registry | The Hyperliquid guard checks a mark that is not bound to the asset it signs | Fixed in code; open on testnet until accounts run v2 (the registry part is deployed) |
 | M-1 | Medium | coins | Concurrent `graduate` calls repeat graduation steps | Fixed |
 | M-2 | Medium | accounts | A failed account creation keeps the caller's deposit | Fixed |
 | M-3 | Medium | accounts | `set_account_code` moves every passkey to a new address | Fixed |
 | M-4 | Medium | perps, book, outcomes | Trades price against an index whose next value can be known first | Open (design) |
 | L-1 | Low | outcomes | A failed payout can lose the redeemed tokens | Fixed |
 | L-2 | Low | book | A failed delivery skews the owner's storage accounting | Fixed |
-| L-3 | Low | account | A session whose key could not be added stays recorded | Fixed (account v2) |
+| L-3 | Low | account | A session whose key could not be added stays recorded | Fixed in code; open on testnet until accounts run v2 |
 | M-5 | Medium | coins | A buy quote ignores the floor ratchet the buy applies first | Fixed |
+| M-6 | Medium | accounts | `set_protocol` moves every passkey to a new address | Fixed |
 
 ### H-1: the Hyperliquid guard checks a mark that is not bound to the asset it signs
 
@@ -126,6 +127,24 @@ Severity reflects impact and how easily it can be triggered on testnet as deploy
 - Fix: `quote_buy` takes the registry's `peak_index` and applies the same ratchet before quoting; the app and the MCP server pass it.
 - Test: `coins` `a_buy_quote_with_the_peak_matches_the_buy_after_the_peak_rose`.
 
+### M-6: `set_protocol` moves every passkey to a new address
+
+- Location: `accounts/src/lib.rs`, `set_protocol`.
+- Found after the self-audit, by an independent review: the same class as M-3, missed by it.
+- The protocol (the contract accounts an account talks to) is part of the universal state init each account id derives from, like the code hash.
+  The owner could change it at any time, and one call would have moved every passkey's `account_id_of` to a new, empty address; the factory had created 12 accounts.
+- Fix: the protocol is fixed once any account exists, as the code hash is.
+- Test: `accounts` `the_birth_protocol_is_fixed_once_accounts_exist` (shows the address moves, then that the factory refuses).
+
+## Trust assumptions
+
+What the team can still do on testnet, stated plainly:
+- Every contract account (`registry`, `accounts`, `book`, `perps`, `outcomes`, `coins`, `curation`, `usdc`) holds a full-access key, so the team can redeploy any contract; the fixes above reached testnet that way.
+  Before mainnet these keys would be removed or moved behind a timelocked multisig.
+- The registry's owner sets the oracle key (`set_oracle`); every change is a public transaction and is logged as `oracle_changed`.
+- Until the registry trusts the enclave's key, index reports are signed by a bootstrap key the team holds and never published; a report still must pass the registry's checks (signature, increasing run id, time window, 50% move clamp).
+- A person's account is owned by their passkey alone: no Tredio key can act as its owner, and its code changes only by the passkey's own `upgrade`.
+
 ## Accepted risks and observations
 
 - Plain (non-gas) session keys have an unlimited allowance, so a leaked one sent directly could burn the account's liquid NEAR on failing calls.
@@ -138,7 +157,7 @@ Severity reflects impact and how easily it can be triggered on testnet as deploy
   At current gas prices one cycle costs more gas than it returns.
 - Receiver-side storage griefing, as in every NEP-145 token: anyone can mint sets to, transfer tokens to, or open a perp for another registered account, using up its storage entries until it redeems, transfers or closes them (the victim receives the value).
 - Bootstrap deposits are small: 0.01 NEAR at perps covers two open positions and 0.02 NEAR at outcomes about ten balances, and sessions cannot add storage (the passkey can).
-- The Hyperliquid mark limit is 300 seconds (v2, as decided) and the oracle reports every 300 seconds, so just before a report lands the mark can be a few seconds too old and orders are refused; reporting marks slightly more often avoids the gap.
+- The Hyperliquid mark limit is 300 seconds (v2) and the oracle reports marks on every run, once a minute, so a fresh mark is normally under a minute old; only a stalled oracle makes orders wait.
 - Two trends whose identifiers differ only in `:`, `.` or `_` map to the same coin account name; the second coin then fails to create and its curve is removed, which is safe.
 - Tokens burned in `mt_resolve_transfer` because the sender unregistered leave their backing USDC in the outcomes contract.
 - The factory's `created` counter also counts successful top-ups of existing accounts.
@@ -174,7 +193,7 @@ Published as a new global contract; each account upgrades with its passkey.
 
 ## Deployment
 
-`registry`, `book`, `outcomes`, `coins` and `accounts` were redeployed in place on testnet on 2026-11-06 with these fixes (M-5 included); their state read unchanged and the oracle's reports kept landing.
+`registry`, `book`, `outcomes`, `coins` and `accounts` were redeployed in place on testnet on 2026-11-06 with these fixes (M-5 and M-6 included); their state read unchanged and the oracle's reports kept landing.
 The account v2 global code is not published yet: publishing it burns about 31.6 NEAR, more than the testnet treasury holds, so accounts still run v1 and H-1 and L-3 stay open for them until they upgrade.
 
 | Contract | Change | Redeploy | State migration |
