@@ -55,7 +55,7 @@ The hosted app at app.tredio.bid goes live before judging; until then, run it lo
   The enclave build runs on OutLayer and its signatures verify the way the registry checks them, but the enclave reads the collectors' readings from the public API, so the switch to the enclave key (one `set_oracle` transaction, visible on chain) happens once the API is hosted.
   `pnpm verify` prints the key the registry trusts.
 - Account code v2 is written, tested and audited but not yet published on testnet (publishing burns about 32 NEAR, more than the testnet treasury holds), so every account runs v1, where H-1 (the Hyperliquid mark not bound to the signed asset) is still open; the registry's half of the fix is live.
-- Testnet trends were added by hand in the admin panel until a NEAR AI Cloud key is in place, so no live trend carries a review hash yet.
+- Testnet trends were added by hand in the admin panel: the NEAR AI Cloud key is in place, but the account has no credits yet (HTTP 402), so no live trend carries a review hash yet.
 - Hyperliquid answers "user does not exist" for derived addresses that hold no Hyperliquid testnet USDC; the orders are signed and sent, and they fill once an address is funded.
 - 1Click settles only on mainnet, so testnet deposits stop at a dry quote.
 - The collectors run on Tredio's server, outside the enclave; [`apps/oracle/docs/tee.md`](apps/oracle/docs/tee.md) says what the attestation does and does not prove.
