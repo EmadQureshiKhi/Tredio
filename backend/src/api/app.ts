@@ -40,6 +40,7 @@ import { waitlistAdminRoutes, waitlistRoutes } from "../waitlist/routes";
 import type { KeyCheck } from "../sources/elfa";
 import type { SystemMonitor } from "../system";
 import { type Alert, type Alerts, MAX_ALERTS } from "../alerts";
+import { x402Routes } from "../x402/routes";
 
 /** Topics one account can wait on at once (each wait also counts toward community picks). */
 const MAX_WATCHES = 25;
@@ -186,7 +187,7 @@ export function createApp(d: AppDeps): Hono {
   // The app and admin origins reach every route; the website reaches only the waitlist form. Pages
   // read Retry-After to say when a refused request may try again, and admin downloads keep their names.
   const corsOrigin = (origin: string, c: Context) => (d.cfg.frontendOrigins.includes(origin) || (c.req.path === "/v1/waitlist" && d.cfg.landingOrigins.includes(origin)) ? origin : null);
-  app.use("*", cors({ origin: corsOrigin, allowHeaders: ["content-type", "authorization", "x-tredio-account", "x-tredio-public-key", "x-tredio-timestamp", "x-tredio-nonce", "x-tredio-signature", "x-payment"], exposeHeaders: ["retry-after", "content-disposition"], maxAge: 600 }));
+  app.use("*", cors({ origin: corsOrigin, allowHeaders: ["content-type", "authorization", "x-tredio-account", "x-tredio-public-key", "x-tredio-timestamp", "x-tredio-nonce", "x-tredio-signature", "payment-signature"], exposeHeaders: ["retry-after", "content-disposition", "payment-required", "payment-response"], maxAge: 600 }));
   if (d.cfg.TRUSTED_PROXY_HOPS === 0) {
     // Behind a proxy with 0 hops, every caller shares the proxy's address and its per-IP limits.
     let warned = false;
@@ -752,6 +753,8 @@ export function createApp(d: AppDeps): Hono {
   app.route("/v1", activationTicketRoutes(d.tickets ?? null, d.cfg.TRUSTED_PROXY_HOPS, now));
   // The Mainnet waitlist, from the app and the website. Client addresses are stored as keyed hashes.
   app.route("/v1", waitlistRoutes({ sql: d.store.sql, trustedProxyHops: d.cfg.TRUSTED_PROXY_HOPS, ipSecret: d.adminSessionSecret, now }));
+  // Pay-per-call x402 routes for agents (USDC on NEAR, no sign-in): full index history, backtests.
+  app.route("/v1", x402Routes({ cfg: d.cfg, sql: d.store.sql, viewer: d.chain.viewer, trends: () => d.chain.trends(), history: d.history, backtest: (rule, days, nowSec) => d.autopilot.service.backtest(rule, days, nowSec), log: d.log, now }));
 
   // Web Push subscriptions for the signed-in account's devices.
   const subscription = z.object({
@@ -849,8 +852,9 @@ export function createApp(d: AppDeps): Hono {
   app.get("/v1/faucet", async (c) => {
     if (d.cfg.NEAR_NETWORK !== "testnet") return c.json({ available: false });
     const account = c.req.query("account");
-    const [amount, cooldownSec, last] = await d.chain.viewer.view<[string, number, number | null]>(d.cfg.deployment.contracts.usdc, "faucet_info", { account_id: account && isAccount(account) ? account : null });
-    return c.json({ available: true, contract: d.cfg.deployment.contracts.usdc, amount, cooldownSec, nextAt: last === null ? null : last + cooldownSec });
+    // faucet_info answers the time of the account's next allowed draw (its last draw plus the cooldown), not the last draw.
+    const [amount, cooldownSec, nextAt] = await d.chain.viewer.view<[string, number, number | null]>(d.cfg.deployment.contracts.usdc, "faucet_info", { account_id: account && isAccount(account) ? account : null });
+    return c.json({ available: true, contract: d.cfg.deployment.contracts.usdc, amount, cooldownSec, nextAt });
   });
 
   // The signed evidence behind a listing's AI review (ai/nearai.ts): its hash is what the registry

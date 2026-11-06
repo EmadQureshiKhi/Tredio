@@ -303,6 +303,7 @@ const system = new SystemMonitor({
       adminSessionSecret,
       cfg.VAPID_PRIVATE_KEY,
       cfg.ACTIVATION_TICKET_KEY,
+      cfg.X402_RELAYER_KEY,
     ],
     routes: cfg.ELFA_PROXIES,
     urls: [...cfg.rpcUrls, cfg.DATABASE_URL, cfg.INDEXER_DATABASE_URL],

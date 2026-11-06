@@ -7,6 +7,7 @@
  *   nonce collisions and pays gas from the key's own prepaid balance.
  * - `send(call)`: sends a `@tredio/contracts` call descriptor and returns the decoded result,
  *   failing with the contract's panic message when the transaction or any receipt failed.
+ * - `x402Fetch`, `createPaymentPayload`: the paying side of x402's NEAR `exact` scheme (x402.ts).
  */
 import type { Call } from "@tredio/contracts";
 import { Near } from "near-kit";
@@ -16,6 +17,7 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58Decode, base58Encode } from "./proofs";
 
 export * from "./proofs";
+export * from "./x402";
 
 export const DEFAULT_RPCS: Record<"testnet" | "mainnet", string[]> = {
   // Intear's endpoint is slower but takes bursts the others refuse when several services share an address.
@@ -144,7 +146,13 @@ export function failureOf(o: FinalExecutionOutcome): string | null {
     if (!status || typeof status !== "object" || !("Failure" in status)) return null;
     const f = JSON.stringify((status as { Failure: unknown }).Failure);
     const m = /ExecutionError":"([^"]+)"/.exec(f);
-    return m?.[1]?.replace(/^Smart contract panicked: /, "") ?? f;
+    if (m?.[1]) return m[1].replace(/^Smart contract panicked: /, "");
+    // Protocol refusals arrive as JSON; the common ones read as a sentence.
+    if (/LackBalanceForState/.test(f)) return "the account does not hold enough NEAR for its storage";
+    if (/NotEnoughBalance/.test(f)) return "the account does not hold enough NEAR for this";
+    if (/GasKeyBalance|NotEnoughGasKeyBalance|InsufficientGasKeyBalance/i.test(f)) return "the gas key's prepaid balance ran low";
+    if (/InvalidNonce/.test(f)) return "the key's nonce moved on; send again";
+    return f;
   };
   return (
     read(o.status) ??

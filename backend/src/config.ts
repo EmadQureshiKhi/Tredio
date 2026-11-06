@@ -147,9 +147,19 @@ const schema = z.object({
   ADMIN_SERVICES: z.string().default(""),
   /** The oracle counts as stale after this long without a run or a trend update. */
   ORACLE_STALE_SEC: z.coerce.number().int().positive().default(900),
-  /** x402 pay-per-call API: payee account and price per call (USDC, 6 decimals); off without a payee. */
+  /**
+   * x402 pay-per-call API (x402/): the account paid (the deployment's treasury when unset) and the
+   * price per call in USDC atomic units (6 decimals): full index history, and a rule backtest.
+   */
   X402_PAYEE: optional(accountId),
-  X402_PRICE: z.coerce.bigint().default(10_000n),
+  X402_PRICE: z.coerce.bigint().positive().default(10_000n),
+  X402_BACKTEST_PRICE: z.coerce.bigint().positive().default(20_000n),
+  /**
+   * The relayer that submits payers' signed transfers and pays their gas, with a full-access key
+   * nothing else signs with (so nonces never collide). The paid routes are off without it.
+   */
+  X402_RELAYER_ACCOUNT: optional(accountId),
+  X402_RELAYER_KEY: optional(ed25519Secret),
   /** Turn the background loops off (tests, one-off scripts). */
   BACKGROUND: z.enum(["on", "off"]).default("on"),
 });

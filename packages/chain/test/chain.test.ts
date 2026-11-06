@@ -92,6 +92,8 @@ describe("outcomes", () => {
     expect(failureOf(ok as never)).toBeNull();
     const failed = { status: { SuccessValue: "" }, receipts_outcome: [{ outcome: { status: { Failure: { ActionError: { kind: { FunctionCallError: { ExecutionError: "Smart contract panicked: unknown market" } } } } } } }] };
     expect(failureOf(failed as never)).toBe("unknown market");
+    const storage = { status: { Failure: { ActionError: { index: null, kind: { LackBalanceForState: { account_id: "0uabc", amount: "1" } } } } }, receipts_outcome: [] };
+    expect(failureOf(storage as never)).toBe("the account does not hold enough NEAR for its storage");
   });
 
   test("tells a rate limit from a real refusal", () => {

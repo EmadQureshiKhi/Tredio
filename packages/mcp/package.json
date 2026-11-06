@@ -1,0 +1,35 @@
+{
+  "name": "@tredio/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tredio's MCP server: read-only tools for AI agents over the public API and NEAR RPC views (trends, the attention index and its oracle signature, markets, accounts, reviews), plus optional x402 purchases from a key in env.",
+  "author": "Emad Qureshi",
+  "license": "MIT",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "bin": {
+    "tredio-mcp": "./src/bin.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun src/bin.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@noble/curves": "2.2.0",
+    "@noble/hashes": "2.0.1",
+    "@tredio/chain": "workspace:*",
+    "@tredio/contracts": "workspace:*",
+    "near-kit": "0.20.2",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.1",
+    "typescript": "5.9.3"
+  }
+}
