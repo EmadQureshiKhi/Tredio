@@ -12,7 +12,7 @@ import PerpTicket from "./PerpTicket";
 type Tab = "outcome" | "perp" | "coin" | "assetPerp";
 
 const BLURB: Record<Tab, string> = {
-  outcome: "Up or down on attention by a deadline. Each token pays 1 USDC if you are right.",
+  outcome: "Up or down on attention by a deadline. Each token pays 1\u00a0USDC if you are right.",
   perp: "Long or short the index itself, up to 3x, open as long as you like.",
   coin: "This trend's coin on a bonding curve, graduating to its own pool.",
   assetPerp: "Hyperliquid perpetuals on the asset's own market price, signed by your account through NEAR Chain Signatures.",
@@ -70,7 +70,7 @@ export default function TradePanel({ trend, className }: { trend: Trend; classNa
     <Card ref={panel} className={cn("flex flex-col gap-4 p-4 sm:p-5", className)} data-testid="trade-panel">
       <div>
         <Segmented label="How to trade" value={current} onChange={setTab} options={options} />
-        <p className="mt-2.5 text-[12.5px] leading-[18px] text-text-3">{BLURB[current]}</p>
+        <p className="mt-2.5 text-pretty text-[12.5px] leading-[18px] text-text-3">{BLURB[current]}</p>
       </div>
       {/* A panel taller than the window scrolls inside, under its fixed tabs, so its end stays reachable. */}
       <div className="-mx-4 -mb-4 -mt-1 min-h-0 overflow-y-auto overscroll-contain rounded-b-[var(--radius-card)] px-4 pb-4 pt-1 sm:-mx-5 sm:-mb-5 sm:px-5 sm:pb-5" data-testid="trade-panel-body">
