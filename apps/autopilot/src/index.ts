@@ -1,4 +1,4 @@
-import { Viewer, walletHealth } from "@tredio/chain";
+import { Viewer, walletWatch } from "@tredio/chain";
 import { calls } from "@tredio/contracts";
 import { type HlNetwork, HyperliquidInfo, hyperliquidAddressOf } from "@tredio/hyperliquid";
 import { loadConfig } from "./config";
@@ -15,6 +15,7 @@ import { nearGrantChain, nearSessionChain, type VenueRequest, Venues } from "./v
 const cfg = loadConfig(process.env);
 const log = jsonLog("autopilot");
 const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpcUrls);
+const botWallet = cfg.bot ? walletWatch(viewer, "Bot", cfg.bot.account, { gasKeys: [cfg.bot.sessionKey] }) : null;
 // The account contract signs for Hyperliquid's network of the same name ("a" mainnet, "b" testnet).
 const network: HlNetwork = cfg.NEAR_NETWORK;
 const info = new HyperliquidInfo(network);
@@ -83,7 +84,7 @@ const server = Bun.serve({
   fetch: healthApp({
     status: () => executor.status,
     stats: (nowSec) => db.stats(nowSec),
-    wallet: async () => (cfg.bot ? walletHealth(viewer, "Bot", cfg.bot.account, { gasKeys: [cfg.bot.sessionKey] }) : null),
+    wallet: async () => (botWallet ? botWallet() : null),
     network: cfg.NEAR_NETWORK,
     tickSec: cfg.TICK_SEC,
     sealKeyId: seal?.keyId ?? null,

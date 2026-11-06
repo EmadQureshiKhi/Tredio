@@ -1,4 +1,4 @@
-import { Sender, Viewer, walletHealth } from "@tredio/chain";
+import { Sender, Viewer, walletWatch } from "@tredio/chain";
 import { HyperliquidInfo } from "@tredio/hyperliquid";
 import { Hono } from "hono";
 import { loadConfig } from "./config";
@@ -65,9 +65,10 @@ void (async () => {
 
 const minBalance = BigInt(Math.round(cfg.MIN_BALANCE_NEAR * 1e6)) * 10n ** 18n;
 const app = new Hono();
+const oracleWallet = walletWatch(viewer, "Oracle", sender.accountId, { min: minBalance });
 app.get("/live", (c) => c.json({ live: true }));
 app.get("/health", async (c) => {
-  const wallet = await walletHealth(viewer, "Oracle", sender.accountId, { min: minBalance });
+  const wallet = await oracleWallet();
   const funded = wallet.balance !== null && Number(wallet.balance) >= cfg.MIN_BALANCE_NEAR;
   const recent = oracle.lastRun !== null && Date.now() / 1000 - oracle.lastRun.at < cfg.RUN_INTERVAL_SEC * 5;
   const ok = funded && recent;

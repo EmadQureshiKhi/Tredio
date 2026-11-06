@@ -374,3 +374,38 @@ export async function walletHealth(viewer: Viewer, label: string, account: strin
     gasKeys: keys.flatMap(({ pk, key }) => (key ? [{ publicKey: pk, balance: toNear(key.balance), nonces: key.nonces }] : [])),
   };
 }
+
+/**
+ * A reading served from memory: the first call waits for it, later calls get the last value at
+ * once and start a refresh in the background when it is older than `ttlMs`. Health endpoints use
+ * it, so a probe never waits on a rate-limited RPC and polling them spends no RPC quota.
+ */
+export function cached<T>(read: () => Promise<T>, ttlMs = 30_000): () => Promise<T> {
+  let last: { at: number; value: T } | null = null;
+  let inflight: Promise<T> | null = null;
+  const refresh = () =>
+    (inflight ??= read()
+      .then((value) => {
+        last = { at: Date.now(), value };
+        return value;
+      })
+      .finally(() => {
+        inflight = null;
+      }));
+  return async () => {
+    if (!last) return refresh();
+    if (Date.now() - last.at >= ttlMs) refresh().catch(() => {});
+    return last.value;
+  };
+}
+
+/** `walletHealth`, cached; a refresh that could not read the balance keeps the last good reading instead of reporting an empty wallet. */
+export function walletWatch(viewer: Viewer, label: string, account: string, opts: { min?: bigint; gasKeys?: readonly string[] } = {}, ttlMs = 30_000): () => Promise<WalletHealth> {
+  let good: WalletHealth | null = null;
+  return cached(async () => {
+    const w = await walletHealth(viewer, label, account, opts);
+    if (w.balance === null && good) return good;
+    good = w;
+    return w;
+  }, ttlMs);
+}

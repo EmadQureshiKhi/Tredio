@@ -1,4 +1,4 @@
-import { type Sender, type Viewer, walletHealth } from "@tredio/chain";
+import { type Sender, type Viewer, walletWatch } from "@tredio/chain";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
@@ -39,6 +39,7 @@ export interface ServerDeps {
 
 export function createServer(d: ServerDeps): Hono {
   const app = new Hono();
+  const relayerWallet = walletWatch(d.viewer, "Relayer", d.sender.accountId, { min: d.minBalance, gasKeys: [d.sender.publicKey] });
   app.use("*", cors({ origin: (o) => (d.origins.includes(o) ? o : null), allowHeaders: ["content-type"], exposeHeaders: ["retry-after"], maxAge: 600 }));
   app.onError((e, c) => c.json({ error: e instanceof Error ? e.message.slice(0, 200) : "internal error" }, 500));
 
@@ -60,7 +61,7 @@ export function createServer(d: ServerDeps): Hono {
 
   app.get("/live", (c) => c.json({ live: true }));
   app.get("/health", async (c) => {
-    const wallet = await walletHealth(d.viewer, "Relayer", d.sender.accountId, { min: d.minBalance, gasKeys: [d.sender.publicKey] });
+    const wallet = await relayerWallet();
     const balanceOk = wallet.balance !== null && Number(wallet.balance) >= Number(wallet.min);
     const s = d.relayer.stats;
     const ok = balanceOk;

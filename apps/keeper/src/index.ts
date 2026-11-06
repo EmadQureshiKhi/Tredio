@@ -1,4 +1,4 @@
-import { Sender, Viewer, walletHealth } from "@tredio/chain";
+import { Sender, Viewer, walletWatch } from "@tredio/chain";
 import { Hono } from "hono";
 import { loadConfig } from "./config";
 import { Executor } from "./executor";
@@ -35,8 +35,10 @@ keeper.start();
 const minBalance = BigInt(Math.round(cfg.MIN_BALANCE_NEAR * 1e6)) * 10n ** 18n;
 const app = new Hono();
 app.get("/live", (c) => c.json({ live: true }));
+const keeperWallet = walletWatch(viewer, "Keeper", sender.accountId, { min: minBalance, gasKeys: [sender.publicKey] });
+
 app.get("/health", async (c) => {
-  const wallet = await walletHealth(viewer, "Keeper", sender.accountId, { min: minBalance, gasKeys: [sender.publicKey] });
+  const wallet = await keeperWallet();
   const funded = wallet.balance !== null && Number(wallet.balance) >= cfg.MIN_BALANCE_NEAR;
   const scanned = keeper.lastScan !== null && Date.now() / 1000 - keeper.lastScan.at < cfg.SCAN_INTERVAL_SEC * 10;
   const alerts: Record<string, string> = {};

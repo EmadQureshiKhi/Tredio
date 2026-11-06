@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { Sender, Viewer, walletHealth } from "@tredio/chain";
+import { Sender, Viewer, walletWatch } from "@tredio/chain";
 import { Hono } from "hono";
 import { loadConfig } from "./config";
 import { Engine, type EngineState } from "./engine";
@@ -53,9 +53,10 @@ void loop();
 
 const minBalance = BigInt(Math.round(cfg.MIN_BALANCE_NEAR * 1e6)) * 10n ** 18n;
 const app = new Hono();
+const makerWallet = walletWatch(viewer, "Maker", sender.accountId, { min: minBalance, gasKeys: [sender.publicKey] });
 app.get("/live", (c) => c.json({ live: true }));
 app.get("/health", async (c) => {
-  const wallet = await walletHealth(viewer, "Maker", sender.accountId, { min: minBalance, gasKeys: [sender.publicKey] });
+  const wallet = await makerWallet();
   const funded = wallet.balance !== null && Number(wallet.balance) >= cfg.MIN_BALANCE_NEAR;
   const ticking = engine.lastTick !== null && Date.now() / 1000 - engine.lastTick.at < cfg.TICK_SEC * 10;
   const ok = funded && ticking;

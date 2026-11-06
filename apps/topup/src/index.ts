@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { Sender, Viewer, walletHealth } from "@tredio/chain";
+import { Sender, Viewer, walletWatch } from "@tredio/chain";
 import { Hono } from "hono";
 import { loadConfig } from "./config";
 import type { TargetMemory } from "./plan";
@@ -38,10 +38,11 @@ void (async () => {
 })();
 
 const app = new Hono();
+const treasuryWallet = walletWatch(viewer, "Treasury", treasury.accountId, { min: cfg.TREASURY_FLOOR_NEAR });
 app.get("/live", (c) => c.json({ live: true }));
 app.get("/health", async (c) => {
   const r = topup.report();
-  const wallet = await walletHealth(viewer, "Treasury", treasury.accountId, { min: cfg.TREASURY_FLOOR_NEAR });
+  const wallet = await treasuryWallet();
   const checked = topup.lastCheck !== null && topup.lastCheck.error === null && Date.now() / 1000 - topup.lastCheck.at < cfg.CHECK_INTERVAL_SEC * 5;
   const failing = r.targets.filter((t) => t.state === "failing");
   const alerts: Record<string, string> = {};

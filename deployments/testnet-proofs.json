@@ -1,0 +1,17 @@
+{
+  "about": "Hand-written: testnet records that JUDGES.md cites and scripts/verify.ts checks. deployments/testnet.json is written by the deploy script; this file is not.",
+  "passkeyAccounts": [
+    "0ugt5v5y5rdhyhndtyhrwrkp5rxrmxhpfbrcx9ets3g94pjsdjt330",
+    "0u5rr3y2bqwn16dvh33rwry06bpnyj97j5j9rk2gd0vyj0ncyy5nf0",
+    "0uwe0tdnrj46ft4cg7np83tbk6qwyay776as9nh47zb11p6hjsy4pg"
+  ],
+  "chainSignaturesOrder": {
+    "tx": "DDkP3q4UkhrcN7AWragXMzwn5f4nGo8CXbhnVdBWWBAF",
+    "sender": "0ugt5v5y5rdhyhndtyhrwrkp5rxrmxhpfbrcx9ets3g94pjsdjt330"
+  },
+  "outlayerRun": {
+    "tx": "73UDs4Yi8hNDu8xieSBJwmvrwFzPMcHium7xvkw3pcbm",
+    "project": "tredio.testnet/attention-oracle",
+    "attestations": "https://testnet-api.outlayer.ai/attestations/by-tx/"
+  }
+}
