@@ -1,6 +1,6 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
-import { Inbox, RefreshCw } from "lucide-react";
+import { Inbox, Plus, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -11,6 +11,7 @@ import { useToast } from "@/src/components/ui/Toasts";
 import { api, ApiError } from "@/src/lib/api";
 import { formatAge, useNow } from "@/src/lib/format";
 import { CANDIDATE_STATUSES, type Candidate, type CandidateStatus } from "@/src/types/admin";
+import { AddTopicDialog } from "./AddTopicDialog";
 import { CandidateCard } from "./CandidateCard";
 import { candidatesKey, useDecision } from "./queries";
 import { ReviewDialog } from "./ReviewDialog";
@@ -79,6 +80,7 @@ export default function CandidatesPage() {
   const notify = useToast();
   const decision = useDecision();
   const [reviewing, setReviewing] = useState<Candidate | null>(null);
+  const [adding, setAdding] = useState(false);
   /** Quick rejects in flight, by candidate id. */
   const [rejecting, setRejecting] = useState<ReadonlySet<number>>(() => new Set());
 
@@ -145,8 +147,12 @@ export default function CandidatesPage() {
           >
             Refresh
           </Button>
+          <Button size="sm" variant="primary" icon={<Plus size={14} aria-hidden />} onClick={() => setAdding(true)}>
+            Add a topic
+          </Button>
         </div>
       </div>
+      <AddTopicDialog open={adding} onClose={() => setAdding(false)} />
 
       <div className="mt-6">
         <Tabs items={tabs} value={tab} onChange={selectTab} label="Candidate status" panelId={PANEL_ID} />

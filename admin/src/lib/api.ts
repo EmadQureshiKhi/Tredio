@@ -83,6 +83,10 @@ export const api = {
 
   decide: (id: number, body: DecisionRequest) => admin<{ candidate: Candidate }>("POST", `/v1/admin/candidates/${id}/decision`, body).then((r) => r.candidate),
 
+  /** A topic added by hand: approved at once, credited to the admin, with no AI review. */
+  addCandidate: (body: { identifier: string; displayName: string; keywords: string[]; article: string | null; summary: string | null }) =>
+    admin<{ candidate: Candidate }>("POST", "/v1/admin/candidates", body).then((r) => r.candidate),
+
   /** Starts a job in the background; false when a run is already in progress. */
   runJob: (job: JobName) => admin<{ started: boolean }>("POST", `/v1/admin/jobs/${job}/run`).then((r) => r.started),
 

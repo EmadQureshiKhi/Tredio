@@ -21,7 +21,7 @@ import { AccountKeys, SIGNER_CHECK_TTL_MS, type SessionReader, userAuth } from "
 import { type OwnerKeyReader, ownerApprovalRoutes, OwnerApprovals } from "./owner-approval";
 import type { AccessKeyReader } from "./near-auth";
 import type { Config } from "../config";
-import { ASSET_CLASSES, baseOf, isNormalized } from "../identifiers";
+import { ASSET_CLASSES, assetClassOf, baseOf, isNormalized, tickerOf } from "../identifiers";
 import { LinkError, resolveLink } from "../links";
 import type { Log } from "../log";
 import { type Radar, SOURCE_ATTRIBUTION } from "../radar";
@@ -566,6 +566,44 @@ export function createApp(d: AppDeps): Hono {
     const valid: CandidateStatus[] = ["pending", "approved", "rejected", "live", "retired"];
     const rows = await d.store.candidates(valid.includes(status as CandidateStatus) ? (status as CandidateStatus) : null, 300);
     return c.json({ candidates: rows.map((r) => candidateJson(r, true)) });
+  });
+  // A topic an admin adds by hand ("manual"): approved at once and credited to the admin, with no
+  // AI review (no review hash, so the app shows no Verified chip for it). It waits in the queue
+  // like any approved candidate until the oracle lists it.
+  admin.post("/candidates", async (c) => {
+    const b = z
+      .object({
+        identifier: z.string().refine(isNormalized, "identifiers use a-z, 0-9 and :._- only").refine((i) => i.includes(":"), "prefix the identifier with its class, for example topic:"),
+        displayName: z.string().trim().min(1).max(40),
+        keywords: z.array(z.string().trim().min(1).max(60)).min(1).max(5),
+        article: z.string().trim().max(200).nullable().default(null),
+        summary: z.string().trim().max(140).nullable().default(null),
+      })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!b.success) return c.json({ error: b.error.issues[0]?.message ?? "bad request" }, 400);
+    const identifier = baseOf(b.data.identifier);
+    const assetClass = assetClassOf(identifier);
+    const { candidate, created } = await d.store.insertCandidate({
+      identifier,
+      displayName: b.data.displayName,
+      assetClass,
+      keywords: b.data.keywords,
+      article: b.data.article,
+      ticker: tickerOf(identifier),
+      summary: b.data.summary,
+      source: "manual",
+      sourceRef: { addedBy: c.get("admin") },
+      surfacer: c.get("admin"),
+      status: "approved",
+      confidence: 1,
+      ai: {},
+      decidedBy: c.get("admin"),
+      reviewHash: null,
+    });
+    if (!created) return c.json({ error: "a candidate with that identifier already exists", candidate: candidateJson(candidate, true) }, 409);
+    radarCache = null;
+    d.log.info({ identifier, by: c.get("admin") }, "candidate added by an admin");
+    return c.json({ candidate: candidateJson(candidate, true) }, 201);
   });
   admin.post("/candidates/:id/decision", async (c) => {
     const id = Number(c.req.param("id"));

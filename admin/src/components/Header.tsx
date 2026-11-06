@@ -49,7 +49,7 @@ function NavLinks({ layout }: { layout: "inline" | "bar" }) {
       {LINKS.map((link) => {
         const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
         const count = link.href === "/candidates" && pendingCount > 0 ? pendingCount : null;
-        const base = "flex items-center justify-center gap-2 text-sm font-medium transition-colors";
+        const base = "flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-colors";
         const style =
           layout === "inline"
             ? `${base} h-8 rounded-md px-3 ${active ? "bg-raised text-fg" : "text-muted hover:bg-raised hover:text-fg"}`
@@ -80,7 +80,7 @@ export default function Header() {
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
         <Logo />
         {session && (
-          <div className="hidden sm:block">
+          <div className="hidden lg:block">
             <NavLinks layout="inline" />
           </div>
         )}
@@ -109,7 +109,7 @@ export default function Header() {
         )}
       </div>
       {session && (
-        <div className="mx-auto max-w-6xl border-t border-line px-4 sm:hidden">
+        <div className="mx-auto max-w-6xl border-t border-line px-4 sm:px-6 lg:hidden">
           <NavLinks layout="bar" />
         </div>
       )}
