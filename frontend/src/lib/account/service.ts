@@ -99,6 +99,8 @@ export class PasskeyOnlyError extends Error {}
 
 /** The trading session the app asks for: a week, 500 USDC of trades a day, every market. */
 export const SESSION_DAYS = 7;
+/** Storage left at a Tredio contract below which a trade asks the relayer to add more (an open perp takes about 0.003 NEAR). */
+const STORAGE_MIN = 5n * 10n ** 21n;
 export const SESSION_DAILY_LIMIT = 500_000_000n;
 export const SESSION_LABEL = "app";
 export const SESSION_SCOPE = { outcomes: true, perps: true, hyperliquid: true } as const;
@@ -459,9 +461,36 @@ export class AccountService {
       throw new SessionExpiredError("Your trading session ended.");
     }
     const version = await accountVersion(p.meta.account);
-    await this.fundGas(p.meta.account, p.meta.publicKey, false, version);
+    await Promise.all([this.fundGas(p.meta.account, p.meta.publicKey, false, version), this.ensureStorage(p.meta.account, action)]);
     const sent: Sent<T> = await p.sender.send<T>(C.account.sessionCall(p.meta.account, action, sessionCallTgas(version)));
     return { hash: sent.hash, value: sent.value, sender: p.meta.account, outcome: sent.outcome };
+  }
+
+  /** Contracts where `ensureStorage` last found room, until when (ms): a trade does not read them again within a minute. */
+  private storageRoom = new Map<string, number>();
+
+  /**
+   * A trade that stores something new (a perp position, a book balance, a token balance) needs the
+   * account's storage deposit at that contract to hold it; sign-up paid for a few. When what is left
+   * runs low the relayer adds to it first. A failure here leaves the trade to report the problem.
+   */
+  private async ensureStorage(account: string, action: SessionAction): Promise<void> {
+    if (typeof action !== "object") return;
+    const c = DEPLOYMENT.contracts;
+    const contracts = "perp_open" in action ? [c.perps] : "swap" in action ? [c.book, c.outcomes] : "mint_sets" in action ? [c.outcomes] : [];
+    await Promise.all(
+      contracts.map(async (contract) => {
+        const key = `${account}:${contract}`;
+        if ((this.storageRoom.get(key) ?? 0) > Date.now()) return;
+        const balance = await view<{ available: string } | null>(contract, "storage_balance_of", { account_id: account }).catch(() => undefined);
+        if (balance === undefined) return;
+        if (balance && BigInt(balance.available) >= STORAGE_MIN) {
+          this.storageRoom.set(key, Date.now() + 60_000);
+          return;
+        }
+        await relayer.fundStorage({ account, contract }).catch(() => null);
+      }),
+    );
   }
 
   /** A wallet does a session action itself; it registers storage with a contract first when it needs to. */

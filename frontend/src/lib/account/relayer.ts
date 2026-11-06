@@ -53,4 +53,6 @@ export const relayer = {
   ownerExecute: (b: { account: string; request: string; proof: PasskeyProof }) => post<{ hash: string; value: unknown; outcome?: Outcome }>("/v1/owner-execute", b),
   /** Tops up an active session's gas key when it runs low; `hash` is null when it did not need it. */
   fundSession: (b: { account: string; publicKey: string }) => post<{ hash: string | null; balance: string }>("/v1/sessions/fund", b),
+  /** Adds to the account's storage deposit at a Tredio contract when it runs low; `hash` is null when it did not need it. */
+  fundStorage: (b: { account: string; contract: string }) => post<{ hash: string | null; available: string }>("/v1/storage/fund", b),
 };

@@ -168,6 +168,35 @@ fn a_buy_quote_with_the_peak_matches_the_buy_after_the_peak_rose() {
 }
 
 #[test]
+fn the_factory_registers_on_each_coin_it_creates() {
+    ctx("owner.testnet", vec![]);
+    let mut c = Coins::new(
+        acc("owner.testnet"),
+        acc("usdc.testnet"),
+        acc("registry.testnet"),
+        acc("curation.testnet"),
+        acc("treasury.testnet"),
+        acc("ref-finance-101.testnet"),
+        30,
+        Base58CryptoHash::from([7u8; 32]),
+        U128(1_000 * ONE_USDC),
+        U128(500 * ONE_USDC),
+    );
+    ctx("coins.testnet", vec![]);
+    assert!(c.on_create_checked("topic:openai".into(), snap(40_000_000, Status::Active)).is_some());
+    // Sells reach the factory through ft_transfer_call, which a NEP-141 refuses for an unregistered receiver.
+    let batch = near_sdk::test_utils::get_created_receipts()
+        .into_iter()
+        .find(|r| r.receiver_id.as_str() == "topic-openai.coins.testnet")
+        .expect("the coin's creation batch");
+    assert!(batch.actions.iter().any(|a| matches!(
+        a,
+        near_sdk::mock::MockAction::FunctionCallWeight { method_name, args, .. }
+            if method_name == b"storage_deposit" && String::from_utf8_lossy(args).contains("\"account_id\":\"coins.testnet\"")
+    )));
+}
+
+#[test]
 fn sells_burn_and_pay() {
     let mut c = setup();
     buy(&mut c, 10 * ONE_USDC, 40_000_000);

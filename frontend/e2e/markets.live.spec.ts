@@ -62,7 +62,7 @@ test("pairs mint for USDC and redeem for it, through the session", async ({ live
   const panel = page.getByTestId("trade-panel");
   await panel.getByRole("radio", { name: "Up/Down" }).click();
   const before = await passkeyUses(live);
-  await panel.getByRole("button", { name: "Pairs" }).click();
+  await panel.getByRole("button", { name: "Pairs", exact: true }).click();
   await panel.getByTestId("mint-amount").fill("1");
   await panel.getByTestId("mint-pairs").click();
   await landed(panel.getByTestId("pairs-tx"));

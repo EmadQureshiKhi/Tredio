@@ -15,6 +15,8 @@ import { decodeSignedDelegateAction } from "near-kit";
  *   below the minimum.
  * - Room for a new session key: an owner request that adds a session, on an account whose NEAR
  *   beyond its storage fell below what a key needs (each device and renewal adds one).
+ * - Storage at Tredio's own contracts (perps, outcomes, book): a Tredio account's deposit there,
+ *   paid at sign-up, covers a few positions; when it runs low the relayer adds to it.
  * - Meta-transactions (NEP-366) from NEAR wallets: function calls to Tredio contracts only, with
  *   the methods the app uses and no more than a yoctoNEAR attached.
  *
@@ -104,6 +106,9 @@ export function metaAllowlist(d: Deployment): Map<string, Set<string>> {
 const GAS_COST_ESTIMATE = 3n * 10n ** 22n;
 /** yoctoNEAR per byte of account storage. */
 const STORAGE_PRICE = 10n ** 19n;
+/** A Tredio account's storage at a Tredio contract is topped up when below the minimum (an open perp takes about 0.003 NEAR). */
+const CONTRACT_STORAGE_MIN = 5n * 10n ** 21n;
+const CONTRACT_STORAGE_DEPOSIT = 2n * 10n ** 22n;
 const ONE_YOCTO = 1n;
 
 export interface RelayerDeps {
@@ -278,6 +283,31 @@ export class Relayer {
     try {
       await this.d.sender.sendTx((tx) => tx.transfer(account, `${amount} yocto` as never));
       this.stats.topups++;
+    } catch (e) {
+      this.fail(e);
+    }
+  }
+
+  /** Adds to a Tredio account's storage deposit at one of Tredio's contracts when what is left would not hold one more position. */
+  async fundContractStorage(a: { account: string; contract: string }): Promise<{ hash: string | null; available: string }> {
+    const c = this.d.deployment.contracts;
+    if (![c.perps, c.outcomes, c.book].includes(a.contract)) throw new RelayError("the relayer adds storage at Tredio's contracts only", 400);
+    if (!(await this.tredioOwner(a.account))) throw new RelayError("not a Tredio account", 403);
+    const balance = await this.d.viewer.view<{ total: string; available: string } | null>(a.contract, "storage_balance_of", { account_id: a.account }).catch(() => {
+      throw new RelayError("could not read the chain; try again", 503);
+    });
+    const available = BigInt(balance?.available ?? "0");
+    if (balance && available >= CONTRACT_STORAGE_MIN) return { hash: null, available: available.toString() };
+    if (this.day.count(`contract-storage:${a.account}`) >= this.d.limits.storageTopupsPerAccountPerDay) {
+      this.stats.refused++;
+      throw new RelayError("this account's storage was topped up enough today; try again tomorrow", 429);
+    }
+    this.spend(CONTRACT_STORAGE_DEPOSIT + GAS_COST_ESTIMATE / 10n);
+    this.day.add(`contract-storage:${a.account}`);
+    try {
+      const r = await this.d.sender.send({ receiverId: a.contract, methodName: "storage_deposit", args: { account_id: a.account, registration_only: false }, gas: (30n * 10n ** 12n).toString(), deposit: CONTRACT_STORAGE_DEPOSIT.toString() });
+      this.stats.topups++;
+      return { hash: r.hash, available: (available + CONTRACT_STORAGE_DEPOSIT).toString() };
     } catch (e) {
       this.fail(e);
     }

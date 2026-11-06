@@ -11,6 +11,7 @@ import { RelayError, type Relayer } from "./relayer";
  * - POST /v1/accounts: create a passkey account (activation ticket, first owner request and proof).
  * - POST /v1/owner-execute: relay a passkey-signed owner request.
  * - POST /v1/sessions/fund: top up a session's gas key.
+ * - POST /v1/storage/fund: add to a Tredio account's storage deposit at a Tredio contract.
  * - POST /v1/meta: relay a NEAR wallet's signed delegate action (NEP-366).
  * - GET /health (detail for the status views), GET /live.
  */
@@ -26,6 +27,7 @@ const createBody = z.object({
 const executeBody = z.object({ account, request: z.string().min(10).max(8192), proof });
 const fundBody = z.object({ account, publicKey: z.string().regex(/^ed25519:[1-9A-HJ-NP-Za-km-z]{43,44}$/) });
 const metaBody = z.object({ signedDelegate: z.string().min(40).max(16_384) });
+const storageBody = z.object({ account, contract: z.string().min(2).max(64) });
 
 export interface ServerDeps {
   relayer: Relayer;
@@ -66,6 +68,7 @@ export function createServer(d: ServerDeps): Hono {
   app.post("/v1/accounts", (c) => handle(c, createBody, (b: z.infer<typeof createBody>) => d.relayer.createAccount(b)));
   app.post("/v1/owner-execute", (c) => handle(c, executeBody, (b: z.infer<typeof executeBody>) => d.relayer.ownerExecute(b)));
   app.post("/v1/sessions/fund", (c) => handle(c, fundBody, (b: z.infer<typeof fundBody>) => d.relayer.fundSession(b)));
+  app.post("/v1/storage/fund", (c) => handle(c, storageBody, (b: z.infer<typeof storageBody>) => d.relayer.fundContractStorage(b)));
   app.post("/v1/meta", (c) => handle(c, metaBody, (b: z.infer<typeof metaBody>) => d.relayer.relayMeta(b.signedDelegate)));
 
   app.get("/live", (c) => c.json({ live: true }));

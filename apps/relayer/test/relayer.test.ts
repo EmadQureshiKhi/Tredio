@@ -33,7 +33,7 @@ const ticketFor = (ownerKey: string, account: string, expiresAt = NOW / 1000 + 6
 });
 
 /** A chain where `existing` accounts exist and each owner key derives to `0u` + 52 a's with its last char. */
-function fakes(opts: { existing?: Set<string>; owners?: Map<string, string>; session?: { expires_at: number; gas_key: boolean } | null; gasKey?: bigint; account?: { amount: bigint; storage: number } } = {}) {
+function fakes(opts: { existing?: Set<string>; owners?: Map<string, string>; session?: { expires_at: number; gas_key: boolean } | null; gasKey?: bigint; account?: { amount: bigint; storage: number }; storage?: bigint } = {}) {
   const sent: Array<{ kind: string; detail: unknown }> = [];
   const derive = (ownerKey: string) => `0u${ownerKey.slice(-1).toLowerCase().repeat(52)}`;
   const viewer = {
@@ -46,6 +46,7 @@ function fakes(opts: { existing?: Set<string>; owners?: Map<string, string>; ses
       }
       if (method === "nonce_used") return false;
       if (method === "session") return opts.session ?? null;
+      if (method === "storage_balance_of") return opts.storage === undefined ? null : { total: "10000000000000000000000", available: opts.storage.toString() };
       throw new Error(`unexpected view ${method}`);
     },
     rpc: async (_m: string, p: { account_id: string }) => {
@@ -150,6 +151,21 @@ describe("owner requests and session gas", () => {
       throw new TxError('Server error: {"InvalidTxError":{"NotEnoughBalanceForDeposit":{"signer_id":"relayer.testnet"}}}');
     };
     await expect(relayer(f).fundSession({ account, publicKey: "ed25519:x" })).rejects.toThrow(/low on NEAR and is being refilled/);
+  });
+
+  test("adds storage at Tredio's contracts for a Tredio account that runs low, and only there", async () => {
+    const pk = passkey();
+    const account = fakes().derive(pk.ownerKey);
+    const low = fakes({ owners: new Map([[account, pk.ownerKey]]), storage: 2_800_000_000_000_000_000_000n });
+    const r = relayer(low);
+    const done = await r.fundContractStorage({ account, contract: D.contracts.perps });
+    expect(done.hash).toBe("tx1");
+    const call = low.sent.at(-1)!.detail as { receiverId: string; methodName: string; deposit: string; args: { account_id: string } };
+    expect([call.receiverId, call.methodName, call.args.account_id, call.deposit]).toEqual([D.contracts.perps, "storage_deposit", account, "20000000000000000000000"]);
+    const roomy = fakes({ owners: new Map([[account, pk.ownerKey]]), storage: 10n ** 22n });
+    expect((await relayer(roomy).fundContractStorage({ account, contract: D.contracts.perps })).hash).toBeNull();
+    await expect(r.fundContractStorage({ account, contract: "evil.testnet" })).rejects.toThrow(/Tredio's contracts only/);
+    await expect(relayer(fakes({ storage: 0n })).fundContractStorage({ account, contract: D.contracts.perps })).rejects.toThrow(/not a Tredio account/);
   });
 
   test("makes room for a new session key on an account low on NEAR, at most a few times a day", async () => {

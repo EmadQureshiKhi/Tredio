@@ -35,6 +35,8 @@ use crate::curve::{ratchet_bps, CurveError, CurveMath, Trade};
 
 /// NEAR given to a new coin account for its state (the code itself is global).
 pub const COIN_ACCOUNT_DEPOSIT: NearToken = NearToken::from_millinear(30);
+/// A NEP-141 registration on a coin (the factory registers on each coin, to receive sells).
+const COIN_REGISTRATION: NearToken = NearToken::from_micronear(2_500);
 /// Storage for a new coin holder, attached to each mint (unused part comes back).
 pub const HOLDER_STORAGE: NearToken = NearToken::from_micronear(1_250);
 
@@ -288,6 +290,15 @@ impl Coins {
                 .transfer(COIN_ACCOUNT_DEPOSIT)
                 .use_global_contract(self.coin_code)
                 .function_call("new", args.to_string().into_bytes(), NearToken::from_yoctonear(0), GAS_SMALL)
+                // Every sell sends coins to the factory (`ft_transfer_call`), so it registers on the coin it just made.
+                .function_call(
+                    "storage_deposit",
+                    serde_json::json!({ "account_id": env::current_account_id(), "registration_only": true })
+                        .to_string()
+                        .into_bytes(),
+                    COIN_REGISTRATION,
+                    GAS_SMALL,
+                )
                 .then(Self::ext(env::current_account_id()).with_static_gas(GAS_SMALL).on_coin_created(trend)),
         )
     }
