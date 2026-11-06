@@ -10,8 +10,30 @@
     "sender": "0ugt5v5y5rdhyhndtyhrwrkp5rxrmxhpfbrcx9ets3g94pjsdjt330"
   },
   "outlayerRun": {
-    "tx": "73UDs4Yi8hNDu8xieSBJwmvrwFzPMcHium7xvkw3pcbm",
-    "project": "tredio.testnet/attention-oracle",
+    "about": "One OutLayer run of the enclave build, requested as the oracle service requests it (request_execution with WasmUrl pinned by sha256, so no project). enclaveOutput is the run's stdout, which hashes to the attestation's output_hash.",
+    "tx": "4WKiUBZ38SWfwT1ptEeHJNvWNX1ywRCK31Pa9gZp39D6",
+    "project": null,
+    "caller": "tredio.testnet",
+    "wasmUrl": "https://test.fastfs.io/tredio.testnet/outlayer.testnet/434381e425292a8aaaf9edf0d74d27c0d8bfba3ad82794823e27e3959523b9ff.wasm",
+    "wasmSha256": "434381e425292a8aaaf9edf0d74d27c0d8bfba3ad82794823e27e3959523b9ff",
+    "commit": "f2424fa34864c42117e707809d2ab1c71bcc9041",
+    "toolchain": "rustc 1.98.1 (48a229cea 2026-09-01), wasm32-wasip2 (apps/oracle/tee/rust-toolchain.toml)",
+    "buildEnv": {
+      "TREDIO_BACKEND_URL": "https://api.tredio.bid",
+      "TREDIO_RPC_URL": "https://test.rpc.fastnear.com",
+      "TREDIO_REGISTRY": "registry.tredio.testnet",
+      "TREDIO_HYPERLIQUID_URL": "https://api.hyperliquid-testnet.xyz"
+    },
+    "enclavePublicKey": "ed25519:8qDVQ9AySqUWeWdSJSUfLEpNkxtsrhDUjxyPDGFVWXsk",
+    "enclaveOutput": {
+      "observed_at": 1793950664,
+      "public_key": "ed25519:8qDVQ9AySqUWeWdSJSUfLEpNkxtsrhDUjxyPDGFVWXsk",
+      "report_json": "{\"run_id\":1793950664,\"observed_at\":1793950664,\"new_trends\":[],\"updates\":[],\"marks\":[{\"asset\":\"SOL\",\"price\":\"8952000000\",\"asset_index\":0},{\"asset\":\"BTC\",\"price\":\"7578400000000\",\"asset_index\":3},{\"asset\":\"ETH\",\"price\":\"222870000000\",\"asset_index\":4},{\"asset\":\"NEAR\",\"price\":\"365870000\",\"asset_index\":54},{\"asset\":\"HYPE\",\"price\":\"7907200000\",\"asset_index\":135}]}",
+      "signature": "C+/76fiTrbiKvp+AWk3oPdM57qYzCpbSj/jY47wA5q3hIenme7TY47lLaehYIDAo8hV8WfAb6hc2V8vSlKt9Dw==",
+      "warnings": [
+        "no BACKEND_TOKEN secret: no candidates or readings"
+      ]
+    },
     "attestations": "https://testnet-api.outlayer.ai/attestations/by-tx/"
   },
   "x402Payment": {

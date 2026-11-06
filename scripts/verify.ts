@@ -3,16 +3,18 @@
  *
  *   pnpm verify                 chain checks and tests
  *   pnpm verify --chain-only    chain checks only (no Rust or Postgres needed)
- *   pnpm verify --build         also rebuild the oracle's enclave program and print its sha256
+ *   pnpm verify --build         also rebuild the oracle's enclave program and require the attested run's sha256
  *
  * Read-only: it sends no transaction and needs no key. NEAR_NETWORK picks the network (testnet),
  * TREDIO_API_URL the API to ask (https://api.tredio.bid, then http://localhost:4000).
  * Backend tests run only when TEST_DATABASE_URL points at a Postgres test database.
  * Exits 1 when any check fails.
  */
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DEFAULT_RPCS, Viewer } from "@tredio/chain";
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { base58Decode, DEFAULT_RPCS, Viewer } from "@tredio/chain";
 import { accountCodeHashes, deployment, type Network } from "@tredio/contracts";
 
 const ROOT = join(import.meta.dir, "..");
@@ -21,12 +23,23 @@ const D = deployment(NETWORK);
 const proofs = JSON.parse(readFileSync(join(ROOT, `deployments/${NETWORK}-proofs.json`), "utf8")) as {
   passkeyAccounts: string[];
   chainSignaturesOrder: { tx: string; sender: string };
-  outlayerRun: { tx: string; project: string; attestations: string };
+  outlayerRun: {
+    tx: string;
+    project: string | null;
+    caller: string;
+    wasmSha256: string;
+    toolchain: string;
+    enclavePublicKey: string;
+    /** The run's stdout as the enclave printed it; its sha256 is the attestation's output_hash. */
+    enclaveOutput: { public_key: string; report_json: string; signature: string };
+    attestations: string;
+  };
   x402Payment: { tx: string; relayer: string; payer: string; amount: string };
 };
 const args = new Set(process.argv.slice(2));
 const viewer = new Viewer(NETWORK, DEFAULT_RPCS[NETWORK]);
 const nowSec = () => Math.floor(Date.now() / 1000);
+const sha256 = (data: string) => createHash("sha256").update(data).digest();
 
 type Result = { ok: boolean | null; detail: string };
 const results: Array<{ section: string; name: string } & Result> = [];
@@ -63,13 +76,15 @@ const events = (o: Outcome) =>
     r.outcome.logs.filter((l) => l.startsWith("EVENT_JSON:")).map((l) => JSON.parse(l.slice(11)) as { standard: string; event: string; data: unknown }),
   );
 
+const PUBLIC_API = "https://api.tredio.bid";
+const LOCAL_API = "http://localhost:4000";
+
 async function apiUrl(): Promise<string | null> {
-  const candidates = process.env.TREDIO_API_URL ? [process.env.TREDIO_API_URL] : ["https://api.tredio.bid", "http://localhost:4000"];
-  for (const url of candidates) {
-    const live = await fetch(`${url}/live`, { signal: AbortSignal.timeout(4_000) }).catch(() => null);
-    if (live?.ok) return url;
-  }
-  return null;
+  const answers = async (url: string) => (await fetch(`${url}/live`, { signal: AbortSignal.timeout(4_000) }).catch(() => null))?.ok === true;
+  if (process.env.TREDIO_API_URL) return (await answers(process.env.TREDIO_API_URL)) ? process.env.TREDIO_API_URL : null;
+  if (await answers(PUBLIC_API)) return PUBLIC_API;
+  console.log(`  warn  the public API ${PUBLIC_API} is unreachable; checking the local API ${LOCAL_API} instead (set TREDIO_API_URL to choose)`);
+  return (await answers(LOCAL_API)) ? LOCAL_API : null;
 }
 
 async function chain() {
@@ -78,12 +93,25 @@ async function chain() {
 
   await check(S, "Contracts deployed", async () => {
     const entries = Object.entries(D.contracts);
-    const missing: string[] = [];
+    const absent: string[] = [];
+    const empty: string[] = [];
     for (const [, account] of entries) {
-      const a = await viewAccount(account).catch(() => null);
-      if (!a || (a.code_hash === EMPTY_CODE && !a.global_contract_hash)) missing.push(account);
+      let a: AccountView;
+      try {
+        a = await viewAccount(account);
+      } catch (e) {
+        // Only the node's UNKNOWN_ACCOUNT answer means the account is missing; a rate limit or an outage fails the check as itself.
+        const message = String((e as Error).message ?? e);
+        if (message.includes("UNKNOWN_ACCOUNT")) {
+          absent.push(account);
+          continue;
+        }
+        return fail(`could not read ${account}: ${message.slice(0, 120)}`);
+      }
+      if (a.code_hash === EMPTY_CODE && !a.global_contract_hash) empty.push(account);
     }
-    return missing.length ? fail(`no code on ${missing.join(", ")}`) : ok(`${entries.length} of ${entries.length} accounts hold code`);
+    const problems = [absent.length ? `no account ${absent.join(", ")}` : "", empty.length ? `no code on ${empty.join(", ")}` : ""].filter(Boolean);
+    return problems.length ? fail(problems.join("; ")) : ok(`${entries.length} of ${entries.length} accounts hold code`);
   });
 
   await check(S, "Account code is one global contract", async () => {
@@ -128,7 +156,10 @@ async function chain() {
     const [mode, cfg] = Object.entries(o)[0] ?? [];
     if (!cfg) return fail("no oracle configured");
     if (cfg.public_key !== D.oracle.publicKey) return fail(`registry trusts ${cfg.public_key}, deployments say ${D.oracle.publicKey}`);
-    return ok(`${mode} ${cfg.public_key.slice(0, 18)}... (matches deployments)`);
+    const enclave = proofs.outlayerRun.enclavePublicKey;
+    if (cfg.public_key === enclave) return ok(`${mode} ${cfg.public_key.slice(0, 18)}..., the enclave key of wasm ${proofs.outlayerRun.wasmSha256.slice(0, 12)}... (matches deployments)`);
+    // Until the switch the registry trusts the bootstrap key the deploy script wrote to deployments; say so plainly.
+    return ok(`bootstrap key ${cfg.public_key.slice(0, 18)}... (${mode}, matches deployments); enclave key ${enclave} recorded, not set yet`);
   });
 
   await check(S, "Index reports are recent", async () => {
@@ -156,12 +187,30 @@ async function chain() {
   });
 
   await check(S, "Oracle run attested by OutLayer", async () => {
-    const r = await fetch(`${proofs.outlayerRun.attestations}${proofs.outlayerRun.tx}`, { signal: AbortSignal.timeout(10_000) });
+    const run = proofs.outlayerRun;
+    const r = await fetch(`${run.attestations}${run.tx}`, { signal: AbortSignal.timeout(10_000) });
     if (!r.ok) return fail(`attestation lookup answered ${r.status}`);
-    const a = (await r.json()) as { project_id?: string; wasm_hash?: string; executed_wasm_sha256?: string; tdx_quote?: string };
-    if (a.project_id !== proofs.outlayerRun.project) return fail(`attested project is ${a.project_id}`);
-    if (!a.tdx_quote || a.wasm_hash !== a.executed_wasm_sha256) return fail("attestation without a TDX quote or with a different executed hash");
-    return ok(`${a.project_id}, TDX quote over wasm ${a.wasm_hash?.slice(0, 12)}...`);
+    const a = (await r.json()) as {
+      transaction_hash?: string;
+      caller_account_id?: string;
+      project_id?: string | null;
+      wasm_hash?: string;
+      executed_wasm_sha256?: string;
+      output_hash?: string;
+      tdx_quote?: string;
+    };
+    if (a.transaction_hash !== run.tx) return fail(`attestation is for tx ${a.transaction_hash}`);
+    if (!a.tdx_quote) return fail("attestation without a TDX quote");
+    if (a.wasm_hash !== run.wasmSha256 || a.executed_wasm_sha256 !== run.wasmSha256) return fail(`attested wasm ${a.wasm_hash} (executed ${a.executed_wasm_sha256}), recorded build ${run.wasmSha256}`);
+    if ((a.project_id ?? null) !== run.project) return fail(`attested project ${a.project_id ?? "none"}, recorded ${run.project ?? "none"}`);
+    if (a.caller_account_id !== run.caller) return fail(`requested by ${a.caller_account_id}, recorded ${run.caller}`);
+    // The recorded output is what the enclave printed: it hashes to the attested output_hash, so the key and signature in it came from this run.
+    if (sha256(JSON.stringify(run.enclaveOutput)).toString("hex") !== a.output_hash) return fail("the recorded enclave output does not hash to the attested output_hash");
+    const out = run.enclaveOutput;
+    if (out.public_key !== run.enclavePublicKey) return fail(`the run printed key ${out.public_key}, recorded ${run.enclavePublicKey}`);
+    const signed = ed25519.verify(Buffer.from(out.signature, "base64"), sha256(out.report_json), base58Decode(out.public_key.replace(/^ed25519:/, "")));
+    if (!signed) return fail("the run's report signature does not verify under the key it printed");
+    return ok(`tx ${run.tx.slice(0, 10)}...: TDX quote over wasm ${run.wasmSha256.slice(0, 12)}... (the recorded build); its report verifies under ${run.enclavePublicKey.slice(0, 18)}...`);
   });
 
   await check(S, "x402 payment settled in USDC on NEAR", async () => {
@@ -176,8 +225,12 @@ async function chain() {
   if (args.has("--build")) {
     await check(S, "Enclave build is reproducible", async () => {
       const p = Bun.spawnSync(["bash", "apps/oracle/tee/build.sh"], { cwd: ROOT, stdout: "pipe", stderr: "pipe" });
-      const hash = /^([0-9a-f]{64})\s/m.exec(p.stdout.toString())?.[1];
-      return hash ? ok(`sha256 ${hash}`) : fail(p.stderr.toString().trim().split("\n").pop() ?? "build failed");
+      const out = p.stdout.toString();
+      const hash = /^([0-9a-f]{64})\s/m.exec(out)?.[1];
+      if (p.exitCode !== 0 || !hash) return fail(p.stderr.toString().trim().split("\n").pop() ?? "build failed");
+      const toolchain = /^toolchain: (rustc [^,]+)/m.exec(out)?.[1] ?? "unknown rustc";
+      const attested = proofs.outlayerRun.wasmSha256;
+      return hash === attested ? ok(`sha256 ${hash.slice(0, 16)}... with ${toolchain}, the attested build`) : fail(`local build ${hash} with ${toolchain}, attested ${attested} (${proofs.outlayerRun.toolchain})`);
     });
   }
 
