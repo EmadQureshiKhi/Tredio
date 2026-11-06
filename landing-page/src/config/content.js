@@ -78,7 +78,7 @@ export const TRACKS = [
     background: "bg-[#110F28]",
     title: "Agents read the index and trade by the rules you set.",
     description:
-      "An MCP server and a pay-per-call x402 API give agents the index and the markets. Autopilot runs your rules on a policy wallet, inside limits your passkey signed.",
+      "An MCP server and a pay-per-call x402 API give agents the index and the markets. Autopilot trades your rules through a revocable session on your own account, inside limits your passkey signed.",
     image: "/assets/img/track-agents.webp",
     alt: "An agent's tool call reading a trend's index, and an Autopilot rule with its limits",
   },
@@ -123,7 +123,7 @@ export const NUMBERS = [
   {
     number: "100",
     heading: "Attention, scored 0 to 100",
-    content: "Six data sources become one index, computed in an OutLayer TEE and recorded on NEAR every minute.",
+    content: "Six data sources become one index, signed by the oracle and recorded on NEAR every minute. Its build runs in an OutLayer TEE.",
     image: "/assets/img/attention-cat.jpg",
     alt: "An illustrated lavender cat in a hoodie trading Up and Down at a desk in a library",
   },

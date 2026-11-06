@@ -329,9 +329,10 @@ const Hero = () => {
       <div className="fixed inset-0 bg-[#9C93E8] pointer-events-none h-full w-full hero-veil z-[99999]"></div>
 
       <div className="h-screen w-full max-lg:w-screen sticky top-0 max-lg:left-0 overflow-hidden flex justify-center items-center">
+        {/* Below lg the headline, the picture and the intro stack in one screen; a wide but short window (600 px and up, 920 px tall or less) shrinks the picture and the headline so they never overlap. */}
         <div
           ref={videoRef}
-          className="h-[60vw] w-[102vw] max-lg:h-[25vh] max-lg:mx-auto max-lg:w-[90vw] opacity-0 hero-video relative z-40 rounded-[4.5vw] overflow-hidden shadow-2xl origin-center max-lg:rounded-[3.5vw]"
+          className="h-[60vw] w-[102vw] max-lg:h-[25vh] max-lg:[@media(min-width:600px)_and_(max-height:920px)]:h-[18vh] max-lg:mx-auto max-lg:w-[90vw] opacity-0 hero-video relative z-40 rounded-[4.5vw] overflow-hidden shadow-2xl origin-center max-lg:rounded-[3.5vw]"
           style={{ transformStyle: "preserve-3d", willChange: "transform" }}
           onClick={tapTogglesSound && hasVideo ? toggleMute : undefined}
           data-video-sound={tapTogglesSound && hasVideo ? "" : undefined}
@@ -375,7 +376,7 @@ const Hero = () => {
               </span>
               Live on NEAR testnet
             </p>
-            <h1 className="text-[2.5vw] max-lg:text-[clamp(36px,10vw,64px)] max-lg:text-white max-lg:[text-shadow:0_1px_14px_rgba(0,0,0,0.5)] font-third leading-[1.1] hero-text max-lg:text-left">
+            <h1 className="text-[2.5vw] max-lg:text-[clamp(36px,10vw,64px)] max-lg:[@media(min-width:600px)_and_(max-height:920px)]:text-[clamp(32px,6vw,48px)] max-lg:text-white max-lg:[text-shadow:0_1px_14px_rgba(0,0,0,0.5)] font-third leading-[1.1] hero-text max-lg:text-left">
               Trade the World&apos;s <br /> Attention
             </h1>
             <div className="hero-cta mt-[1.7vw] flex flex-wrap items-center gap-[0.6vw] max-lg:mt-5 max-lg:gap-2.5">
@@ -491,7 +492,7 @@ const Hero = () => {
             type="button"
             data-video-sound=""
             onClick={turnSoundOn}
-            className={`absolute left-1/2 -translate-x-1/2 ${isFullyScaled ? "bottom-20" : "top-[calc(50%+11.5vw)]"} max-lg:top-[calc(50%+12.5vh+14px)] max-lg:bottom-auto z-[55] flex items-center gap-2 rounded-full bg-black/55 backdrop-blur-md border border-white/25 px-4 py-2 text-white font-body font-semibold uppercase tracking-[0.14em] text-[11px] shadow-lg cursor-pointer transition-transform hover:scale-105 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
+            className={`absolute left-1/2 -translate-x-1/2 ${isFullyScaled ? "bottom-20" : "top-[calc(50%+11.5vw)]"} max-lg:top-[calc(50%+12.5vh+14px)] max-lg:[@media(min-width:600px)_and_(max-height:920px)]:top-[calc(50%+9vh+14px)] max-lg:bottom-auto z-[55] flex items-center gap-2 rounded-full bg-black/55 backdrop-blur-md border border-white/25 px-4 py-2 text-white font-body font-semibold uppercase tracking-[0.14em] text-[11px] shadow-lg cursor-pointer transition-transform hover:scale-105 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="white" aria-hidden="true">
               <path d={SOUND_ON_PATH} />
