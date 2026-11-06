@@ -45,8 +45,8 @@ Each of these is a NEAR primitive doing real work in the product, not a logo on 
    Every candidate the radar finds is reviewed by NEAR AI Cloud's verifiable models.
    An answer without a `provider_tee` signature is refused, and the hash of the signed evidence is written on the trend in the registry.
    The API serves the exact request and response the signature covers, so anyone can recompute both hashes and check the signature without trusting Tredio.
-   Status on testnet: the radar's candidates are reviewed by NEAR AI Cloud, with evidence signed in the provider's TEE.
-   The first reviewed candidates are crypto and list only once smart-money inflow confirms them, so the trends live so far were added by hand and carry no review hash yet.
+   Status on testnet: the radar's candidates are reviewed by NEAR AI Cloud, with evidence signed in the provider's TEE, and `equity:tsla`, `topic:godzilla-minus-zero` and `person:stephen-miller` were listed from those reviews.
+   Crypto candidates list only once smart-money inflow confirms them.
    In the app: the Verified chip on a reviewed trend opens the evidence.
    Code: [`backend/src/ai/nearai.ts`](backend/src/ai/nearai.ts), `GET /v1/reviews/:hash`.
 4. **Hyperliquid perps from a NEAR account.**
@@ -126,7 +126,25 @@ The launch film is a Remotion project in [`video/`](video).
 pnpm verify
 ```
 
-`pnpm verify` reads NEAR testnet and checks the claims in [JUDGES.md](JUDGES.md): every contract holds code, user accounts run the factory's global code and derive from their passkeys, a live session gas key, the oracle key the registry trusts and how fresh its last report is, a Hyperliquid order signed through Chain Signatures, the OutLayer attestation of an enclave run, and an x402 payment; then it runs every test suite.
+`pnpm verify` reads NEAR testnet and checks the claims in [JUDGES.md](JUDGES.md): every contract holds code, and that code hashes byte for byte like the wasm `pnpm build:contracts` makes from this checkout; user accounts run published global code and derive from their passkeys, a live session gas key, the oracle key the registry trusts and how fresh its last report is, a Hyperliquid order signed through Chain Signatures, the OutLayer attestation of an enclave run, and an x402 payment; then it runs every test suite.
+
+## Security
+
+The contracts get the checks any serious smart-contract codebase gets: an audit, static analysis, dependency scans and verified deployed code.
+Details and how to rerun each one are in [SECURITY.md](SECURITY.md).
+
+| Check | Result |
+| --- | --- |
+| Self-audit ([contracts/AUDIT.md](contracts/AUDIT.md)) | 11 findings, 10 fixed with a test each, 1 open by design |
+| Deployed code is this source (`pnpm verify`) | 10 of 10 code hashes match the local build byte for byte |
+| NEAR rules (`pnpm security`) | private callbacks, token receivers check their token, overflow checks, no `unsafe`: all hold |
+| Clippy security lints on the wasm build | 0 panics; every truncating cast, unwrap and slice index reviewed |
+| `cargo deny` on the deployed wasm's dependencies | advisories, bans and sources ok |
+| Tests | 159 unit tests, 15 integration flows on a real NEAR node, end to end on testnet |
+
+```bash
+pnpm security
+```
 
 ## For AI agents
 

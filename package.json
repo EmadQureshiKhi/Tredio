@@ -17,7 +17,8 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "pnpm -r --if-present lint",
     "dev": "bun scripts/dev.ts",
-    "verify": "bun scripts/verify.ts"
+    "verify": "bun scripts/verify.ts",
+    "security": "bun scripts/security.ts"
   },
   "devDependencies": {
     "@noble/curves": "2.2.0",

@@ -16,6 +16,7 @@ Fixes are in the code in this repository; they reach testnet only when the contr
 
 - The `near-contract-audit` checklist: non-private callbacks, state changed after cross-contract calls, JSON integer types, unsaved collection changes, owner checks, one-yocto deposits, storage prefix collisions, init macros, unbounded loops, randomness, gas reserved for callbacks, storage cost coverage, unchecked math and floats.
 - No NEAR-specific static analyzer was available offline, so the checklist was applied by reading every source file, helped by searches (for example every `on_*`, `after_*` and resolver method, every `#[init]`, every storage key enum, every float).
+  The searchable rules now run as `pnpm security`, with Clippy's security lints and dependency scans ([SECURITY.md](../SECURITY.md)).
 - Manual review of business logic, access control, economic attacks and failure paths of every promise chain.
 - Each finding got a test first, run against the audited code to see it fail, then the fix.
   Tests are unit tests (near-sdk mocked blockchain) or sandbox tests (`near-workspaces` on a local nearcore node), including real gas-key transactions sent over JSON-RPC.
@@ -28,14 +29,14 @@ Severity reflects impact and how easily it can be triggered on testnet as deploy
 
 | Id | Severity | Contract | Title | Status |
 | --- | --- | --- | --- | --- |
-| H-1 | High | account, registry | The Hyperliquid guard checks a mark that is not bound to the asset it signs | Fixed in code; open on testnet until accounts run v2 (the registry part is deployed) |
+| H-1 | High | account, registry | The Hyperliquid guard checks a mark that is not bound to the asset it signs | Fixed; account code v2 is published (2026-11-06), so new accounts carry it and older ones once their passkey upgrades |
 | M-1 | Medium | coins | Concurrent `graduate` calls repeat graduation steps | Fixed |
 | M-2 | Medium | accounts | A failed account creation keeps the caller's deposit | Fixed |
 | M-3 | Medium | accounts | `set_account_code` moves every passkey to a new address | Fixed |
 | M-4 | Medium | perps, book, outcomes | Trades price against an index whose next value can be known first | Open (design) |
 | L-1 | Low | outcomes | A failed payout can lose the redeemed tokens | Fixed |
 | L-2 | Low | book | A failed delivery skews the owner's storage accounting | Fixed |
-| L-3 | Low | account | A session whose key could not be added stays recorded | Fixed in code; open on testnet until accounts run v2 |
+| L-3 | Low | account | A session whose key could not be added stays recorded | Fixed; carried by account code v2, as H-1 |
 | M-5 | Medium | coins | A buy quote ignores the floor ratchet the buy applies first | Fixed |
 | M-6 | Medium | accounts | `set_protocol` moves every passkey to a new address | Fixed |
 | M-7 | Medium | coins | The factory never registers on its coins, so no coin can be sold back | Fixed |

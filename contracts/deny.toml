@@ -1,0 +1,24 @@
+# cargo-deny policy for the contracts, run by `pnpm security`: it checks the dependency graph of the
+# wasm the chain runs (no dev-dependencies, no test crates). `cargo audit` in the same command still
+# reports advisories in test and tooling crates, for information.
+
+[graph]
+targets = ["wasm32-unknown-unknown"]
+exclude-dev = true
+exclude = ["tredio-sandbox-tests", "tredio-test-publisher"]
+
+[advisories]
+ignore = [
+  # Unmaintained, no known vulnerability. It is near-sdk's default wasm allocator; a contract call starts
+  # with fresh memory and ends with the call, so the allocator's known leak cannot build up.
+  { id = "RUSTSEC-2022-0054", reason = "near-sdk's default wasm allocator; memory lives for one call" },
+]
+
+[bans]
+multiple-versions = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+# NEP-245 multi-token types come from NEAR's own intents repository at a pinned revision.
+allow-git = ["https://github.com/near/intents"]

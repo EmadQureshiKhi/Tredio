@@ -14,7 +14,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ed25519 } from "@noble/curves/ed25519.js";
-import { base58Decode, rpcEndpoints, Viewer } from "@tredio/chain";
+import { base58Decode, base58Encode, rpcEndpoints, Viewer } from "@tredio/chain";
 import { accountCodeHashes, deployment, type Network } from "@tredio/contracts";
 
 const ROOT = join(import.meta.dir, "..");
@@ -36,6 +36,7 @@ const proofs = JSON.parse(readFileSync(join(ROOT, `deployments/${NETWORK}-proofs
   };
   x402Payment: { tx: string; relayer: string; payer: string; amount: string };
   settledSeries: { series: number; trend: string; window: number; openTx: string; settleTx: string; keeper: string };
+  graduation: { trend: string; pool: number; keeper: string; steps: string[] };
 };
 const args = new Set(process.argv.slice(2));
 const viewer = new Viewer(NETWORK, rpcEndpoints(NETWORK, [], (process.env.FASTNEAR_API_KEYS ?? "").split(",")));
@@ -113,6 +114,24 @@ async function chain() {
     }
     const problems = [absent.length ? `no account ${absent.join(", ")}` : "", empty.length ? `no code on ${empty.join(", ")}` : ""].filter(Boolean);
     return problems.length ? fail(problems.join("; ")) : ok(`${entries.length} of ${entries.length} accounts hold code`);
+  });
+
+  // A block explorer's "verified source", checked here: NEAR's code hash is the sha256 of the wasm, so each contract
+  // (and the global coin and account v2 code) must hash like the wasm `pnpm build:contracts` makes from this checkout.
+  // The build is not containerized, so a match needs the toolchain and cargo-near versions SECURITY.md records.
+  await check(S, "Deployed code matches this source", async () => {
+    const wasm = (crate: string) => join(ROOT, "contracts/target/near", `tredio_${crate}`, `tredio_${crate}.wasm`);
+    const pairs: Array<{ name: string; file: string; onChain: () => Promise<string> }> = [
+      ...Object.entries(D.contracts).map(([name, account]) => ({ name, file: wasm(name), onChain: async () => (await viewAccount(account)).code_hash })),
+      { name: "coin (global)", file: wasm("coin"), onChain: async () => D.globalCode.coin },
+      ...(D.globalCode.accountV2 ? [{ name: "account v2 (global)", file: wasm("account"), onChain: async () => D.globalCode.accountV2! }] : []),
+    ];
+    const built = pairs.filter((p) => existsSync(p.file));
+    if (built.length === 0) return skip("no local build: run `pnpm build:contracts` first");
+    const differ: string[] = [];
+    for (const p of built) if (base58Encode(createHash("sha256").update(readFileSync(p.file)).digest()) !== (await p.onChain())) differ.push(p.name);
+    if (differ.length) return fail(`${differ.join(", ")} differ from the local build (rebuild with the recorded toolchain, or the deployment is behind the source)`);
+    return built.length === pairs.length ? ok(`${pairs.length} of ${pairs.length} hash like the local build, byte for byte`) : skip(`${built.length} match; not built: ${pairs.filter((p) => !built.includes(p)).map((p) => p.name).join(", ")}`);
   });
 
   await check(S, "Accounts run published global code", async () => {
@@ -222,6 +241,20 @@ async function chain() {
     const o = await viewer.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: settleTx, sender_account_id: keeper, wait_until: "NONE" });
     if (s.outcome === "open" || !settlement.finalized || !("SuccessValue" in o.status)) return fail(`series ${series}: outcome ${s.outcome}, settlement finalized ${settlement.finalized}`);
     return ok(`series ${series} (${trend}) settled ${s.outcome} at ${(settlement.value / 1e6).toFixed(2)} by ${settleTx.slice(0, 10)}...`);
+  });
+
+  await check(S, "A trend coin graduated into Rhea", async () => {
+    const { trend, pool, steps, keeper } = proofs.graduation;
+    const c = await viewer.view<{ coin: string; stage: string; pool_id: number | null }>(D.contracts.coins, "get_curve", { trend });
+    if (c.stage !== "graduated" || c.pool_id !== pool) return fail(`${trend}: stage ${c.stage}, pool ${c.pool_id}`);
+    const p = await viewer.view<{ token_account_ids: string[]; amounts: string[] }>(D.external.exchange, "get_pool", { pool_id: pool });
+    const usdc = p.amounts[p.token_account_ids.indexOf(D.contracts.usdc)];
+    if (!p.token_account_ids.includes(c.coin) || !usdc || BigInt(usdc) === 0n) return fail(`pool ${pool} on ${D.external.exchange} does not hold ${c.coin} and USDC`);
+    for (const tx of steps) {
+      const o = await viewer.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: tx, sender_account_id: keeper, wait_until: "NONE" });
+      if (!("SuccessValue" in o.status)) return fail(`graduation step ${tx.slice(0, 10)}... failed`);
+    }
+    return ok(`${trend}: pool ${pool} on ${D.external.exchange} holds ${(Number(usdc) / 1e6).toFixed(2)} USDC and the coin, in ${steps.length} keeper steps`);
   });
 
   await check(S, "x402 payment settled in USDC on NEAR", async () => {

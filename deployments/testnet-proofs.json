@@ -51,5 +51,17 @@
     "openTx": "4mxS6GSbgofhyyK4iza2QubUnm7u9vVyc6KuXTqj5cpF",
     "settleTx": "2YNerBhhpGTNGbri9qfPjSxxqU5Pw7qofGG874LKwGBP",
     "keeper": "tredio-keeper.testnet"
+  },
+  "graduation": {
+    "trend": "topic:godzilla-minus-zero",
+    "pool": 2909,
+    "keeper": "tredio-keeper.testnet",
+    "steps": [
+      "8Th2vJY65bhgmcRHXoLLAhv97NKWsP7hw2hVAQpTUQSi",
+      "82ksZ5ve19DWyvWvAePUaREpjFcxjVVaSNoLurKp7KGz",
+      "ERoESZyFoYqiT3cDEm4HaphZzNxkNtgchrpTVrTTbosV",
+      "27P46fTHak6ATY8NxPJB4ZXeZMms8GgopQ181su9YtyN",
+      "57W1Juk1XCA1LQMrmqeExmbiLwQHNGJyxnxacei94qpF"
+    ]
   }
 }
