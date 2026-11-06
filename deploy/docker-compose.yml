@@ -1,0 +1,81 @@
+# Tredio's server side on one machine: Postgres, the API, every service and Caddy for TLS.
+# Run from this folder: docker compose up -d --build
+# Each service reads env/<name>.env (gitignored; start from the .env.example beside its code).
+name: tredio
+
+x-service: &service
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: env/postgres.env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tredio"]
+      interval: 5s
+      retries: 20
+
+  backend:
+    <<: *service
+    build: { context: .., dockerfile: backend/Dockerfile }
+    env_file: env/backend.env
+
+  relayer:
+    <<: *service
+    build: { context: .., dockerfile: apps/relayer/Dockerfile }
+    env_file: env/relayer.env
+
+  keeper:
+    <<: *service
+    build: { context: .., dockerfile: apps/keeper/Dockerfile }
+    env_file: env/keeper.env
+
+  market-maker:
+    <<: *service
+    build: { context: .., dockerfile: apps/market-maker/Dockerfile }
+    env_file: env/market-maker.env
+
+  autopilot:
+    <<: *service
+    build: { context: .., dockerfile: apps/autopilot/Dockerfile }
+    env_file: env/autopilot.env
+
+  topup:
+    <<: *service
+    build: { context: .., dockerfile: apps/topup/Dockerfile }
+    env_file: env/topup.env
+
+  oracle:
+    <<: *service
+    build: { context: .., dockerfile: apps/oracle/Dockerfile }
+    env_file: env/oracle.env
+
+  indexer:
+    <<: *service
+    build: { context: .., dockerfile: apps/indexer/Dockerfile }
+    env_file: env/indexer.env
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [backend, relayer]
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  pgdata:
+  caddy-data:
+  caddy-config:

@@ -55,3 +55,7 @@ Thumbs.db
 
 # Deploy script markers
 deployments/.*
+
+# README art tooling
+tools/.venv/
+__pycache__/

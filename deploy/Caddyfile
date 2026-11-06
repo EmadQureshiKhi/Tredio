@@ -1,0 +1,10 @@
+# Public endpoints. Service health stays on the internal network, where the API's status page reads it.
+api.tredio.bid {
+	encode zstd gzip
+	reverse_proxy backend:4000
+}
+
+relay.tredio.bid {
+	encode zstd gzip
+	reverse_proxy relayer:4100
+}

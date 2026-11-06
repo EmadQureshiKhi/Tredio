@@ -28,6 +28,11 @@ icons() {
   png "$here/app-icon-maskable.svg" 512 "$out/icon-maskable-512.png"
   png "$here/app-icon-ios.svg" 180 "$out/apple-touch-icon.png"
   rm -rf "$tmp"
+  # The README art (tools/make_readme_art.py) draws the glyph and the lockup from these.
+  for v in on-light on-dark; do
+    rsvg-convert -w 512 "$here/glyph-$v.svg" -o "$out/glyph-$v.png"
+    rsvg-convert -w 1600 "$here/lockup-$v.svg" -o "$out/lockup-$v.png"
+  done
 
   # The app (frontend/public and app/).
   mkdir -p "$root/frontend/public/icons"
