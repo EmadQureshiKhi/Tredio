@@ -10,8 +10,8 @@ COPY apps/indexer/src ./src
 # The contract addresses and start block come from the deployments file at the repo root.
 COPY deployments /app/deployments
 
-ENV NODE_ENV=production PORT=4600
+ENV NODE_ENV=production PORT=4700
 USER bun
-EXPOSE 4600
+EXPOSE 4700
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s CMD wget -qO- "http://127.0.0.1:${PORT}/live" >/dev/null || exit 1
 CMD ["bun", "src/index.ts"]

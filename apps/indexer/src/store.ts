@@ -2,6 +2,7 @@ import { DERIVED_TABLES, type Sql, type Tx } from "./db";
 import type { Tracker } from "./deployments";
 import { applyEvents } from "./derive";
 import type { StoredEvent } from "./extract";
+import { sleep } from "./http";
 import type { Log } from "./log";
 
 export interface Cursor {
@@ -45,13 +46,13 @@ const EVENT_COLUMNS = [
 
 /**
  * Stores a block's events and applies the new ones to the derived tables, and moves the cursor
- * to the block, all in one transaction. Re-processing a block stores and applies nothing twice.
- * Returns the number of events stored for the first time.
+ * to the block (unless `cursor` is null), all in one transaction. Re-processing a block stores
+ * and applies nothing twice. Returns the number of events stored for the first time.
  */
 export async function commitBlock(
   sql: Sql,
   network: string,
-  cursor: Cursor,
+  cursor: Cursor | null,
   events: StoredEvent[],
   tracker: Tracker,
   log: Log,
@@ -69,9 +70,35 @@ export async function commitBlock(
     }
     const fresh = events.filter((e) => keys.has(`${e.receipt_id}#${e.log_index}`));
     if (fresh.length) await applyEvents(tx, fresh, tracker, log, isolate);
-    await writeCursor(tx, network, cursor);
+    if (cursor) await writeCursor(tx, network, cursor);
     return fresh.length;
   });
+}
+
+/** Failed commits retried before each event runs on its own (see `applyEvents`). */
+const ISOLATE_AFTER = 3;
+
+/**
+ * `commitBlock` until it succeeds: a database error retries after a pause (1 s doubling to
+ * 30 s), and after repeated failures each event runs on its own, so one that cannot be applied
+ * is skipped (and logged) instead of holding the stream back forever.
+ */
+export async function commitRetrying(
+  o: { sql: Sql; network: string; tracker: Tracker; log: Log; signal: AbortSignal; beat: () => void },
+  cursor: Cursor | null,
+  events: StoredEvent[],
+): Promise<number> {
+  let delay = 1_000;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await commitBlock(o.sql, o.network, cursor, events, o.tracker, o.log, attempt > ISOLATE_AFTER);
+    } catch (e) {
+      o.log.error("commit failed, retrying", { height: cursor?.height ?? events[0]?.block_height, attempt, error: String(e) });
+      o.beat();
+      await sleep(delay, o.signal);
+      delay = Math.min(delay * 2, 30_000);
+    }
+  }
 }
 
 /** Empties every derived table. */

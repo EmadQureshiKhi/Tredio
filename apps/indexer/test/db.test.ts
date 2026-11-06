@@ -40,7 +40,7 @@ describe.skipIf(!TEST_DATABASE_URL)("derived tables", () => {
     expect(await count(sql, "events")).toBe(EVENTS);
     expect(await readCursor(sql, "testnet")).toEqual({ height: 1005, blockTime: at(1005) });
     const [first] = await sql`select * from events order by block_height, idx limit 1`;
-    expect(first).toMatchObject({ block_height: "1000", idx: 0, log_index: 1, executor: C.registry, standard: "tredio-registry", event: "trend_created" });
+    expect(first).toMatchObject({ block_height: "1000", idx: 1, log_index: 1, executor: C.registry, standard: "tredio-registry", event: "trend_created" });
     expect(first!.data).toMatchObject({ id: "topic:openai", index: 40_000_000 });
     expect(await count(sql, "events where data::text like '%topic:failed%'")).toBe(0);
   });

@@ -36,7 +36,8 @@ describe("extractEvents", () => {
     expect(events.every((e) => e.block_height === 276377507 && e.executor === "outcomes.tredio.testnet")).toBe(true);
     expect(events[0]!.receipt_id).toBe("7oxkLr2zh1ckFYx3Q2M7GDwHZr6QyiSfYpYLnCbvhHC9");
     expect(events[0]!.tx_hash).toBe("8A479jENp25XPgAAJQa4z9WKdpWkUbAZntTqEZGDxWTX");
-    expect(events.map((e) => e.idx)).toEqual([0, 1, 2]);
+    // The callback receipt waited for one data receipt, which takes index 0 before it.
+    expect(events.map((e) => e.idx)).toEqual([100, 101, 102]);
     expect(blockTime(b).toISOString()).toBe("2026-11-05T18:22:19.825Z");
   });
 

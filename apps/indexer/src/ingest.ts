@@ -1,8 +1,8 @@
 /**
- * The ingestion loop: from the cursor (or the start block) on, with a small window of requests
- * in flight, processed in height order. At the head the window reaches a few heights past the
- * final block: neardata holds such a request open until the block exists, so the next blocks
- * arrive as soon as they are final without polling. Blocks without Tredio events only move the
+ * The block feed (`INDEXER_SOURCE=blocks`): every block from neardata, from the cursor (or the
+ * start block) on, with a small window of requests in flight, processed in height order. At the
+ * head the window reaches a few heights past the final block: neardata holds such a request open
+ * until the block exists, so the next blocks arrive as soon as they are final without polling. Blocks without Tredio events only move the
  * cursor, written at most once a second for them; a block with events is committed with its
  * cursor in one transaction. A database error retries the same block after a pause.
  */
@@ -11,7 +11,7 @@ import type { Tracker } from "./deployments";
 import { blockTime, extractEvents } from "./extract";
 import type { Log } from "./log";
 import { type BlockResult, type Neardata, sleep, StoppedError } from "./neardata";
-import { commitBlock, type Cursor, readCursor, writeCursor } from "./store";
+import { commitRetrying, type Cursor, readCursor, writeCursor } from "./store";
 
 export interface IngestOptions {
   sql: Sql;
@@ -38,7 +38,6 @@ export interface IngestStatus {
 const HEAD_REFRESH_MS = 60_000;
 const CURSOR_FLUSH_MS = 1_000;
 const PROGRESS_LOG_MS = 15_000;
-const ISOLATE_AFTER = 3;
 const GAP_WARN_MS = 60_000;
 
 export class Ingestor {
@@ -120,23 +119,9 @@ export class Ingestor {
     const cursor: Cursor = { height: r.height, blockTime: r.kind === "block" ? blockTime(r.block) : status.blockTime };
     const events = r.kind === "block" ? extractEvents(r.block, o.tracker) : [];
     if (events.length) {
-      let delay = 1_000;
-      for (let attempt = 1; ; attempt++) {
-        try {
-          // After repeated failures each event runs on its own, so one that cannot be applied
-          // is skipped (and logged) instead of holding the block back forever.
-          const isolate = attempt > ISOLATE_AFTER;
-          status.eventsProcessed += await commitBlock(o.sql, o.network, cursor, events, o.tracker, o.log, isolate);
-          this.flushedHeight = cursor.height;
-          this.flushedAt = Date.now();
-          break;
-        } catch (e) {
-          o.log.error("commit failed, retrying", { height: r.height, attempt, error: String(e) });
-          this.beat();
-          await sleep(delay, o.signal);
-          delay = Math.min(delay * 2, 30_000);
-        }
-      }
+      status.eventsProcessed += await commitRetrying({ ...o, beat: () => this.beat() }, cursor, events);
+      this.flushedHeight = cursor.height;
+      this.flushedAt = Date.now();
       o.log.debug("block committed", { height: r.height, events: events.length });
     }
     status.height = cursor.height;
