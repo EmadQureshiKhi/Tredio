@@ -6,7 +6,7 @@ import { expect, fundWithFaucet, landed, LIVE, passkeyUses, test } from "./live"
 
 /**
  * Trading on the live Testnet stack with the worker's passkey account: test USDC from the faucet,
- * an Up buy on the order book and an attention perp, all through the session key with no passkey
+ * an Up (or Down) buy on the order book and an attention perp, all through the session key with no passkey
  * prompt, then the portfolio holding both. Then the same passkey on a second device finds the
  * account again (its key recovered from one signature) and opens a session there.
  *
@@ -18,7 +18,7 @@ test.skip(!LIVE, "live Testnet spec: run with playwright.live.config.ts");
 
 const TREND = process.env.E2E_TREND ?? "topic:world-cup";
 
-test("test USDC, an Up buy and an attention perp, with no passkey prompt, then the portfolio", async ({ live, account }) => {
+test("test USDC, an Up/Down buy and an attention perp, with no passkey prompt, then the portfolio", async ({ live, account }) => {
   const { page } = live;
   expect(account).toMatch(/^0u[0-9a-z]+$/);
   const prompts = await passkeyUses(live);
@@ -26,10 +26,14 @@ test("test USDC, an Up buy and an attention perp, with no passkey prompt, then t
   // Test USDC through the session (the faucet allows one draw per cooldown).
   await fundWithFaucet(page);
 
-  // An Up buy for 2 USDC on the order book, anchored to the attention-implied price.
+  // A buy for 2 USDC on the order book, anchored to the attention-implied price: Up, unless the
+  // market has run away and Up is all but certain, when no one sells it under 1 USDC; then Down.
   await page.goto(`/t/${TREND}`);
   const panel = page.getByTestId("trade-panel");
   await panel.getByRole("radio", { name: "Up/Down" }).click();
+  const quoted = async (side: "up" | "down") => /\d/.test((await panel.getByTestId(`outcome-side-${side}`).innerText()).split("\n")[1] ?? "");
+  await expect.poll(async () => (await quoted("up")) || (await quoted("down")), { timeout: 30_000 }).toBe(true);
+  if (!(await quoted("up"))) await panel.getByTestId("outcome-side-down").click();
   await panel.getByTestId("outcome-amount").fill("2");
   const buy = panel.getByTestId("outcome-submit");
   await expect(buy).toBeEnabled({ timeout: 30_000 });

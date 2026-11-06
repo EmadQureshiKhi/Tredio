@@ -1,6 +1,24 @@
 import { sessionRejected, sessionToken } from "@/src/lib/auth/session";
 import { BACKEND_URL } from "@/src/lib/config";
-import type { Candidate, CandidateStatus, DecisionRequest, ElfaReport, Health, JobName, RotationBoard, SystemReport, TrendsResponse, WaitlistPage } from "@/src/types/admin";
+import type {
+  Candidate,
+  CandidateStatus,
+  ContentKind,
+  ContentPage,
+  DecisionRequest,
+  ElfaReport,
+  Health,
+  JobName,
+  ModeratedCall,
+  ModeratedPost,
+  ModerationLogEntry,
+  ModerationState,
+  RotationBoard,
+  SocialCaller,
+  SystemReport,
+  TrendsResponse,
+  WaitlistPage,
+} from "@/src/types/admin";
 
 /** A failed backend call. `status` is 0 when the backend could not be reached at all. */
 export class ApiError extends Error {
@@ -122,4 +140,32 @@ export const api = {
 
   /** Calls off the running rotation; the oracle resumes updating the trend. */
   cancelRotation: () => admin<{ cancelled: string }>("POST", "/v1/admin/rotation/cancel"),
+
+  /** A page of thread posts or calls, newest first; `caller` is an identity or a handle. */
+  socialPosts: (q: ContentQuery) => admin<ContentPage<ModeratedPost>>("GET", `/v1/admin/social/posts?${contentParams(q)}`),
+  socialCalls: (q: ContentQuery) => admin<ContentPage<ModeratedCall>>("GET", `/v1/admin/social/calls?${contentParams(q)}`),
+
+  /** Takes a call or post out of every public view, or brings it back; the reason goes to the log. */
+  moderate: (kind: ContentKind, id: number, action: "hide" | "restore", reason: string) =>
+    admin<{ id: number; hiddenAt: string | null }>("POST", `/v1/admin/social/${kind}/${id}/${action}`, { reason }),
+
+  /** Callers newest first (at most 500); `q` matches part of an identity, handle or linked account. */
+  socialCallers: (q: string) => admin<{ callers: SocialCaller[] }>("GET", `/v1/admin/social/callers${q ? `?q=${encodeURIComponent(q)}` : ""}`).then((r) => r.callers),
+
+  /** Replaces a caller's handle and bio. */
+  renameCaller: (address: string, body: { handle: string; bio: string; reason: string }) =>
+    admin<{ caller: { address: string; handle: string; bio: string } }>("POST", `/v1/admin/social/callers/${encodeURIComponent(address)}/profile`, body).then((r) => r.caller),
+
+  /** The newest 200 moderation actions. */
+  moderationLog: () => admin<{ log: ModerationLogEntry[] }>("GET", "/v1/admin/social/moderation").then((r) => r.log),
 };
+
+export interface ContentQuery {
+  state: ModerationState;
+  caller: string;
+  offset: number;
+  limit: number;
+}
+
+const contentParams = (q: ContentQuery) =>
+  new URLSearchParams({ ...(q.state !== "all" ? { state: q.state } : {}), ...(q.caller ? { caller: q.caller } : {}), offset: String(q.offset), limit: String(q.limit) }).toString();

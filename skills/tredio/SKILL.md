@@ -67,6 +67,7 @@ The API serves JSON at `TREDIO_API_URL` (locally `http://localhost:4000`; `GET /
 | `GET /v1/trends/{identifier}` | One trend, 7 days of index points and source readings |
 | `GET /v1/trends/{identifier}/stats` | Volume, traders, open interest, coin state |
 | `GET /v1/trends/{identifier}/thread` | Calls and posts on the trend |
+| `GET /v1/calls/{id}` | One call, with its caller's track record |
 | `GET /v1/candidates` | Approved topics waiting for a live slot |
 | `GET /v1/reviews/{hash}` | NEAR AI Cloud review evidence, with the request and response it signed |
 | `GET /v1/accounts/{account}` | Trading summary (`?optional=1`: `null` instead of 404) |

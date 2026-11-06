@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
+  AUTOPILOT_MARKETS,
+  AUTOPILOT_MARKETS_TEXT,
+  autopilotMarketProblem,
   backtest,
   type Candle,
   copyLimit,
@@ -42,6 +45,20 @@ describe("rules", () => {
     expect(messages).toContain("beyond liquidation");
     expect(messages).toContain("above the maximum position");
     expect(ruleSchema.safeParse({ ...rule, entry: { ...rule.entry, attentionChangePct: 0 } }).success).toBe(false);
+  });
+
+  test("trades only the markets Tredio's oracle marks for the account's order guard", () => {
+    expect(AUTOPILOT_MARKETS).toEqual(["BTC", "ETH", "SOL", "NEAR", "HYPE"]);
+    expect(AUTOPILOT_MARKETS_TEXT).toBe("BTC, ETH, SOL, NEAR and HYPE");
+    for (const market of AUTOPILOT_MARKETS) expect(ruleSchema.safeParse({ ...rule, market }).success).toBe(true);
+    // Hyperliquid lists these, but the oracle does not always mark them, so the guard could refuse every order.
+    for (const market of ["ZEC", "UNI", "btc", ""]) {
+      const res = ruleSchema.safeParse({ ...rule, market });
+      expect(res.success).toBe(false);
+      expect(res.error!.issues).toEqual([expect.objectContaining({ path: ["market"], message: autopilotMarketProblem(market) })]);
+    }
+    expect(autopilotMarketProblem("ZEC")).toBe("ZEC is not an Autopilot market: Autopilot trades BTC, ETH, SOL, NEAR and HYPE, the markets Tredio's oracle marks for the account's order guard");
+    expect(autopilotMarketProblem("HYPE")).toBeNull();
   });
 });
 
@@ -177,7 +194,7 @@ describe("stats", () => {
 
 describe("copy-trading", () => {
   const follow = followSettingsSchema.parse({ mode: "ratio", ratio: 0.5, maxMarginUsdc: 100, maxLeverage: 3, maxDailyLossUsdc: 50, maxSlippagePct: 0.5, maxOpenLossUsdc: 30 });
-  const at = (price: number, realizedTodayUsdc = 0, openPnlUsdc = 0, maxLeverage = 10) => ({ price, realizedTodayUsdc, openPnlUsdc, maxLeverage });
+  const at = (price: number, realizedTodayUsdc = 0, openPnlUsdc = 0, maxLeverage = 10, sameNetwork = true) => ({ price, realizedTodayUsdc, openPnlUsdc, maxLeverage, sameNetwork });
 
   test("diffs a leader's position into opens, increases, decreases, closes and flips", () => {
     const long = (size: number) => ({ side: "long" as const, size, marginUsdc: size * 20 });
@@ -255,6 +272,40 @@ describe("copy-trading", () => {
     });
     // Closes never wait on a limit: the follower is not left holding the leader's exit.
     expect(mirror({ kind: "close", market: "BTC", side: "long" }, follow, { side: "long", size: 1, marginUsdc: 10 }, at(90))).toMatchObject({ action: "reduce", size: 1 });
+  });
+
+  test("a leader on another network: the mark where the copy executes bounds it, not the leader's fill", () => {
+    const across = (price: number, realizedTodayUsdc = 0, openPnlUsdc = 0, maxLeverage = 10) => at(price, realizedTodayUsdc, openPnlUsdc, maxLeverage, false);
+    // A mainnet leader long at 74,000 and testnet at 76,000 (2.7% apart): on one network that is a chase and skipped.
+    const long = { kind: "open" as const, market: "BTC", side: "long" as const, size: 0.005, leverage: 10, price: 74_000 };
+    expect(mirror(long, follow, null, at(76_000))).toEqual({ action: "skip", market: "BTC", reason: "the price moved 2.70% from the leader's fill, past your 0.5% limit" });
+    // Across networks the copy goes out at the testnet mark plus the follow's 0.5%, whatever the mainnet fill.
+    const copied = mirror(long, follow, null, across(76_000));
+    expect(copied).toMatchObject({ action: "open", side: "long", leverage: 3 });
+    if (copied.action === "open") {
+      expect(copied.worstPrice).toBeCloseTo(76_380);
+      // Half the leader's size at the follow's 3x, priced at the testnet mark.
+      expect(copied.marginUsdc).toBeCloseTo((0.0025 * 76_000) / 3);
+    }
+    // Shorts too, and a leader's fill on the far side of the mark cannot loosen the limit either.
+    const short = { kind: "open" as const, market: "BTC", side: "short" as const, size: 0.01, leverage: 2, price: 78_000 };
+    expect((mirror(short, follow, null, across(76_000)) as { worstPrice: number }).worstPrice).toBeCloseTo(75_620);
+    expect((mirror({ ...short, price: 70_000 }, follow, null, across(76_000)) as { worstPrice: number }).worstPrice).toBeCloseTo(75_620);
+    // Follows stored with more slippage are still held to 1% of the mark.
+    expect((mirror(long, { ...follow, maxSlippagePct: 3 }, null, across(76_000)) as { worstPrice: number }).worstPrice).toBeCloseTo(76_760);
+    // Every other cap still holds: the venue's leverage, the daily loss limit, the loss cap and the margin room.
+    expect(mirror({ ...long, size: 1 }, { ...follow, maxLeverage: 20, maxMarginUsdc: 100_000 }, null, across(76_000, 0, 0, 5))).toMatchObject({ action: "open", leverage: 5 });
+    expect(mirror(long, follow, null, across(76_000, -50))).toEqual({ action: "skip", market: "BTC", reason: "daily loss limit reached" });
+    expect(mirror(long, follow, null, across(76_000, 0, -30))).toEqual({ action: "skip", market: "BTC", reason: "open copies are at the loss cap" });
+    expect(mirror(long, follow, { side: "long", size: 0.01, marginUsdc: 100 }, across(76_000))).toEqual({ action: "skip", market: "BTC", reason: "position cap reached" });
+    expect(mirror(long, follow, { side: "short", size: 0.01, marginUsdc: 10 }, across(76_000))).toEqual({ action: "skip", market: "BTC", reason: "the follower holds the opposite side" });
+  });
+
+  test("copies openings only in Autopilot's markets, and still reduces whatever the follower holds", () => {
+    const zec = { kind: "open" as const, market: "ZEC", side: "long" as const, size: 1, leverage: 3, price: 140 };
+    expect(mirror(zec, follow, null, at(140))).toEqual({ action: "skip", market: "ZEC", reason: autopilotMarketProblem("ZEC")! });
+    expect(mirror({ ...zec, kind: "increase" }, follow, null, at(140, 0, 0, 10, false))).toMatchObject({ action: "skip", reason: autopilotMarketProblem("ZEC") });
+    expect(mirror({ kind: "close", market: "ZEC", side: "long" }, follow, { side: "long", size: 2, marginUsdc: 50 }, at(140))).toEqual({ action: "reduce", market: "ZEC", side: "long", size: 2 });
   });
 
   test("open losses count against the daily limit, and the loss cap stops new copies", () => {

@@ -1,7 +1,7 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, m } from "framer-motion";
-import { Fingerprint, KeyRound, MessageSquare, Share2, Target } from "lucide-react";
+import { Fingerprint, KeyRound, MessageSquare, Target } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Avatar } from "@/components/shell/AppShell";
@@ -10,7 +10,8 @@ import { describeError, useAccount } from "@/lib/account/AccountProvider";
 import { type Call, type Post, social, type Trend, trends } from "@/lib/api";
 import { ago, countdown, points, shortAddress } from "@/lib/format";
 import { callMessage, type Horizon, postMessage, signAsCaller } from "@/lib/social";
-import { callShareUrl, shareToX } from "@/features/share/share";
+import { ShareMenu } from "@/features/share/ShareActions";
+import { callSharePath } from "@/features/share/share";
 import { trendName } from "@/lib/trends";
 import { useNow } from "./ticket";
 
@@ -98,13 +99,12 @@ function Who({ address, handle }: { address: string; handle: string | null | und
 
 function CallRow({ call: c, identifier, name }: { call: Call; identifier: string; name: string }) {
   const now = useNow(30_000);
+  const account = useAccount();
   const resolvesAt = Number(c.resolves_at);
   const horizon = Number(c.horizon_sec) >= 604_800 ? "7 days" : "24 hours";
-  const share = () =>
-    shareToX({
-      text: `I called ${name} attention ${c.direction === "up" ? "UP" : "DOWN"} from ${points(Number(c.opening_index))} over ${horizon} on Tredio.`,
-      url: callShareUrl(identifier, c.id),
-    });
+  // Your own call reads "I called"; anyone else's is credited to its caller.
+  const who = account.privateIdentity?.id === c.caller ? "I" : c.handle ? `@${c.handle}` : shortAddress(c.caller);
+  const shareText = `${who} called ${name} attention ${c.direction === "up" ? "UP" : "DOWN"} from ${points(Number(c.opening_index))} over ${horizon} on Tredio.`;
   return (
     <div className="flex flex-col gap-2 py-3.5" data-testid="call-row">
       <div className="flex items-center justify-between gap-3">
@@ -118,9 +118,7 @@ function CallRow({ call: c, identifier, name }: { call: Call; identifier: string
         </span>
         <span className="ml-auto flex items-center gap-2">
           {c.outcome === "hit" ? <Badge tone="up">Hit at {points(Number(c.closing_index))}</Badge> : c.outcome === "miss" ? <Badge tone="down">Missed at {points(Number(c.closing_index))}</Badge> : c.outcome === "void" ? <Badge>Void</Badge> : <span className="num text-[12px] text-text-3">resolves in {countdown(resolvesAt, now)}</span>}
-          <button type="button" onClick={share} className="rounded-lg p-1 text-text-3 transition-colors hover:bg-surface-2 hover:text-text" aria-label="Share this call on X">
-            <Share2 className="size-3.5" aria-hidden />
-          </button>
+          <ShareMenu compact label="Share this call" text={shareText} path={callSharePath(identifier, c.id)} />
         </span>
       </div>
       {c.note ? <p className="whitespace-pre-wrap break-words text-[13.5px] leading-5 text-text">{c.note}</p> : null}

@@ -39,9 +39,10 @@ const ITEM = "flex h-9 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-le
 
 /**
  * A Share button with a small menu: "Share to X" and "Copy link". Closes on a choice, a click
- * outside or Escape; a copied link shows its check for a moment before the menu goes.
+ * outside or Escape; a copied link shows its check for a moment before the menu goes. `compact`
+ * draws the button as a small icon for list rows, named by `label`.
  */
-export function ShareMenu({ text, path, className }: { text: string; path: string; className?: string }) {
+export function ShareMenu({ text, path, className, compact = false, label = "Share" }: { text: string; path: string; className?: string; compact?: boolean; label?: string }) {
   const [open, setOpen] = useState(false);
   const { copied, copy } = useCopy();
   const root = useRef<HTMLDivElement>(null);
@@ -65,14 +66,31 @@ export function ShareMenu({ text, path, className }: { text: string; path: strin
 
   return (
     <div ref={root} className={cn("relative", className)} data-share-path={path}>
-      <Button tone="secondary" size="sm" icon={<Share2 className="size-3.5" aria-hidden />} onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} data-testid="share-menu">
-        Share
-      </Button>
+      {compact ? (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-label={label}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className={cn("flex size-6 items-center justify-center rounded-lg text-text-3 transition-colors hover:bg-surface-2 hover:text-text", open && "bg-surface-2 text-text")}
+          data-testid="share-menu"
+        >
+          <Share2 className="size-3.5" aria-hidden />
+        </button>
+      ) : (
+        <Button tone="secondary" size="sm" icon={<Share2 className="size-3.5" aria-hidden />} onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} data-testid="share-menu">
+          {label}
+        </Button>
+      )}
       {open ? (
         <div
           role="menu"
-          aria-label="Share"
-          className="absolute right-0 top-10 z-40 w-[184px] origin-top-right rounded-[14px] border border-line bg-surface p-1 shadow-pop transition-[opacity,scale] duration-150 ease-out starting:scale-[0.96] starting:opacity-0"
+          aria-label={label}
+          className={cn(
+            "absolute right-0 z-40 w-[184px] origin-top-right rounded-[14px] border border-line bg-surface p-1 shadow-pop transition-[opacity,scale] duration-150 ease-out starting:scale-[0.96] starting:opacity-0",
+            compact ? "top-8" : "top-10",
+          )}
         >
           <button
             type="button"

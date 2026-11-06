@@ -383,3 +383,81 @@ export interface RotationBoard {
   live: BoardTrend[];
 }
 
+
+/** Social moderation (backend/src/social/moderation.ts). Hidden content leaves every public view and can be restored. */
+export const MODERATION_STATES = ["all", "visible", "hidden"] as const;
+export type ModerationState = (typeof MODERATION_STATES)[number];
+export type ContentKind = "posts" | "calls";
+/** `remove_*` are from before moderation hid rows: those were deleted and cannot be restored. */
+export type ModerationAction = "rename_caller" | "remove_call" | "remove_post" | "hide_call" | "hide_post" | "restore_call" | "restore_post";
+
+/** The newest moderation of a call or post. */
+export interface LastModeration {
+  admin: string;
+  action: ModerationAction;
+  reason: string;
+  at: string;
+}
+
+interface Moderated {
+  id: number;
+  /** The caller identity: an ed25519 public key as 64 hex characters. */
+  caller: string;
+  handle: string | null;
+  identifier: string;
+  hiddenAt: string | null;
+  lastAction: LastModeration | null;
+}
+
+export interface ModeratedPost extends Moderated {
+  body: string;
+  replyTo: number | null;
+  callId: number | null;
+  createdAt: string;
+}
+
+export interface ModeratedCall extends Moderated {
+  direction: "up" | "down";
+  horizonSec: number;
+  note: string | null;
+  /** Unix seconds. */
+  calledAt: number;
+  openingIndex: number;
+  resolvesAt: number;
+  closingIndex: number | null;
+  outcome: "open" | "hit" | "miss" | "void";
+}
+
+/** A page of calls or posts, newest first, with counts over the whole table (`matching`: the filters). */
+export interface ContentPage<T> {
+  total: number;
+  hidden: number;
+  matching: number;
+  limit: number;
+  offset: number;
+  rows: T[];
+}
+
+export interface SocialCaller {
+  address: string;
+  handle: string | null;
+  bio: string | null;
+  linkedAccount: string | null;
+  createdAt: string;
+  calls: number;
+  posts: number;
+  /** Calls and posts of theirs that are hidden. */
+  hidden: number;
+}
+
+export interface ModerationLogEntry {
+  id: number;
+  admin: string;
+  action: ModerationAction;
+  /** `calls:<id>`, `posts:<id>` or a caller identity. */
+  target: string;
+  reason: string;
+  /** The row as it stood before the action. */
+  before: Record<string, unknown>;
+  createdAt: string;
+}

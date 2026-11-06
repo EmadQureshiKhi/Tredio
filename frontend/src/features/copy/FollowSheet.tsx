@@ -1,11 +1,13 @@
 "use client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { AUTOPILOT_MARKETS_TEXT } from "@tredio/autopilot";
 import { Bot, Fingerprint, Info } from "lucide-react";
 import { useState } from "react";
 import { Avatar } from "@/components/shell/AppShell";
 import { Button, ErrorNote, Field, Segmented, Sheet } from "@/components/ui";
 import { describeError, useAccount } from "@/lib/account/AccountProvider";
 import { autopilot, type Follow } from "@/lib/api";
+import { IS_MAINNET } from "@/lib/config";
 import { usdc } from "@/lib/format";
 import { notify } from "@/lib/toast";
 import { GrantSheet } from "@/features/autopilot/grant/GrantSheet";
@@ -30,7 +32,7 @@ export function FollowSheet({ leader, name, open, onOpenChange }: { leader: stri
       onOpenChange={onOpenChange}
       testId="follow-sheet"
       title={existing ? "Your copy settings" : `Follow ${name ?? (dir.isBot(leader) ? "the Tredio bot" : "this trader")}`}
-      description="Each of their Hyperliquid trades is copied from your account at your size, inside caps you set."
+      description={`Each of their ${AUTOPILOT_MARKETS_TEXT} trades on Hyperliquid is copied from your account at your size, inside caps you set.`}
     >
       {leader ? <FollowForm key={`${leader}-${existing?.id ?? "new"}`} leader={leader} name={name} bot={dir.isBot(leader)} board={dir.leader(leader)} existing={existing} onDone={() => onOpenChange(false)} /> : null}
     </Sheet>
@@ -127,10 +129,16 @@ function FollowForm({ leader, name, bot, board, existing, onDone }: { leader: st
           <li>
             {f.mode === "ratio" ? `Each trade is copied at ${f.ratio || "?"}x their size` : `Each opening trade is copied with ${f.fixed || "?"} USDC margin`}, then cut to fit: never more than {f.maxMargin || "?"} USDC margin in one position, and never above {f.maxLeverage || "?"}x (higher leverage is reduced; Autopilot&rsquo;s access opens at up to {COPY_MAX_LEVERAGE}x).
           </li>
-          <li>A copy never fills more than {f.maxSlippage || "?"}% worse than their own fill or the market price, whichever is tighter. If the price already moved further, that copy is skipped.</li>
+          {/* Mainnet and testnet prices drift apart, so a mainnet leader's fill bounds nothing on testnet. */}
+          {IS_MAINNET || bot ? (
+            <li>A copy never fills more than {f.maxSlippage || "?"}% worse than their own fill or the market price, whichever is tighter. If the price already moved further, that copy is skipped.</li>
+          ) : (
+            <li>They trade on Hyperliquid mainnet and copies fill on testnet, whose prices drift apart, so a copy never fills more than {f.maxSlippage || "?"}% worse than the testnet price when it goes out.</li>
+          )}
           <li>Once you lose {f.maxDailyLoss || "?"} USDC in a UTC day, open losses included, new copies stop until the next day. Closes still copy, so you are never left holding their exit.</li>
           <li>If your open copies of this trader are down {f.maxOpenLoss || "?"} USDC together, Autopilot closes them all, pauses this follow and tells you why.</li>
           <li>Positions they opened before you followed are not copied, and a copy is skipped if your account already holds that market (from a rule or by hand).</li>
+          <li>Their trades in other markets are skipped: Autopilot trades only {AUTOPILOT_MARKETS_TEXT}, the markets the oracle always marks for your account&rsquo;s order guard.</li>
           <li>Copies go out from your account&rsquo;s own Hyperliquid address through Autopilot&rsquo;s Hyperliquid-only access{grant.data?.state === "active" ? `, which ends ${new Date(grant.data.validUntil * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : ""}; your account contract signs only orders within 2% of the oracle&rsquo;s mark.</li>
         </ul>
       </div>

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LoaderCircle, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { api } from "@/src/lib/api";
 import { signOut, useSession } from "@/src/lib/auth/session";
 import { formatDate, shortAddress } from "@/src/lib/format";
@@ -12,6 +13,7 @@ const LINKS = [
   { href: "/system", label: "System" },
   { href: "/candidates", label: "Candidates" },
   { href: "/rotation", label: "Live board" },
+  { href: "/moderation", label: "Moderation" },
   { href: "/operations", label: "Operations" },
   { href: "/waitlist", label: "Waitlist" },
 ] as const;
@@ -39,9 +41,22 @@ function NavLinks({ layout }: { layout: "inline" | "bar" }) {
   const pathname = usePathname();
   const pending = useQuery({ queryKey: candidatesKey("pending"), queryFn: () => api.candidates("pending") });
   const pendingCount = pending.data?.length ?? 0;
+  const activeLink = useRef<HTMLAnchorElement>(null);
+
+  // On a phone the bar scrolls sideways when the links do not fit, so the current page's link is brought into view.
+  useEffect(() => {
+    if (layout === "bar") activeLink.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [layout, pathname]);
 
   return (
-    <nav aria-label="Main" className={layout === "inline" ? "flex items-center gap-1" : "flex h-11 items-stretch"}>
+    <nav
+      aria-label="Main"
+      className={
+        layout === "inline"
+          ? "flex items-center gap-1"
+          : "-mx-4 flex h-11 items-stretch gap-4 overflow-x-auto px-4 [scrollbar-width:none] sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:hidden"
+      }
+    >
       {LINKS.map((link) => {
         const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
         const count = link.href === "/candidates" && pendingCount > 0 ? pendingCount : null;
@@ -51,7 +66,7 @@ function NavLinks({ layout }: { layout: "inline" | "bar" }) {
             ? `${base} h-8 rounded-md px-3 ${active ? "bg-raised text-fg" : "text-muted hover:bg-raised hover:text-fg"}`
             : `${base} flex-auto border-b-2 px-1.5 ${active ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg"}`;
         return (
-          <Link key={link.href} href={link.href} aria-current={active ? "page" : undefined} className={style}>
+          <Link key={link.href} ref={active ? activeLink : undefined} href={link.href} aria-current={active ? "page" : undefined} className={style}>
             {link.label}
             {count !== null && (
               <>

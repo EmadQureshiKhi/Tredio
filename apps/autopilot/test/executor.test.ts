@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { seal } from "@tredio/autopilot";
+import { autopilotMarketProblem, seal } from "@tredio/autopilot";
 import type { ExecutorDb } from "../src/db";
-import { FakeAccount, T, TEST_DATABASE_URL, testDb } from "./fakes";
+import { FakeAccount, market, T, TEST_DATABASE_URL, testDb } from "./fakes";
 import { audits, BOT, events, orders, positions, reset, rule, USER, type World, world } from "./world";
 
 const maybe = TEST_DATABASE_URL ? describe : describe.skip;
@@ -231,6 +231,17 @@ maybe("rules", () => {
     expect(r!.status).toBe("paused");
     expect(r!.status_reason).toBe("3 orders failed in a row: price outside 2% of the mark");
     expect((await positions(db, { ruleId: id })).map((p) => p.status)).toEqual(["failed", "failed", "failed"]);
+  });
+
+  test("a rule saved on a market outside Autopilot's pauses rather than waiting for a mark that may never come", async () => {
+    // Testnet lists ZEC and Tredio has a mark for it now (a live ZEC trend), but the oracle does not keep marking it.
+    w.exchange.markets.push(market("ZEC", 9, 2, 140, 10));
+    w.registry.set("ZEC", 140);
+    const id = await w.addRule({ ...rule, market: "ZEC", trend: "crypto:btc" });
+    await w.tick(T);
+    const [r] = await db.sql<{ status: string; status_reason: string }[]>`SELECT status, status_reason FROM autopilot_rules WHERE id = ${id}`;
+    expect(r).toEqual({ status: "paused", status_reason: autopilotMarketProblem("ZEC")! });
+    expect(w.exchange.posted).toHaveLength(0);
   });
 
   test("never opens a second position in a market the account already holds", async () => {

@@ -24,6 +24,9 @@ Signing out revokes the token on the backend (`POST /v1/admin/session/revoke`) a
 - `/candidates`: candidates by status (pending, approved, rejected, live, retired, all), with the AI's reason, policy flags, confidence, source and surfacer.
   Review opens a form for the identifier, display name, keywords, Wikipedia article and summary, checked with the backend's own rules; only changed fields are sent.
 - `/rotation`: the live board, with the rotation rules, the running rotation, recent ones and each live trend, where a trend can be pinned.
+- `/moderation`: thread posts and calls, newest first, filtered by caller and by whether they are hidden; callers with what they published; and the log of every moderation action with its reason.
+  Hiding a post or call takes it out of every public view (threads, profiles, the leaderboard, share links) without deleting it, and restoring brings it back as it was; an admin may also replace a caller's handle and bio.
+  Every action asks for a reason.
 - `/operations`: the admin health report from `/v1/admin/health` (database, oracle, Elfa and Nansen budgets, AI providers, GDELT, jobs), buttons that run the radar, collector or history job now and follow the run to its end, and the live trends.
 - `/waitlist`: the Mainnet waitlist, with search, invites, CSV export and deletion.
 
@@ -63,4 +66,5 @@ Run `npx playwright install chromium` once.
 
 The tests change real candidate rows and put them back: they only re-decide rejected or approved candidates that are not live, never a pending one (the API cannot set a row back to pending), and keep any approval to the moment it takes to check it.
 The API cannot restore `decidedBy` and `updatedAt`, so those two fields show the test run afterwards.
+The moderation test makes its own caller identity (an `e2e_mod_` handle), posts and calls on a live trend as the app would, and leaves both hidden, so nothing it wrote stays public; that caller and its log entries remain.
 The tests need an admin key and a running backend, so CI runs lint, typecheck and build only.

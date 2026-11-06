@@ -202,6 +202,7 @@ export default function RotationPage() {
             rows={d.live}
             rowKey={(r) => r.identifier}
             initialSort={{ key: "index", dir: "asc" }}
+            stackBelow="lg"
             mobile={(r) => (
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">

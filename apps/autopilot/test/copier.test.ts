@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import type { FollowSettings } from "@tredio/autopilot";
-import { holdingsOf } from "../src/copier";
+import { autopilotMarketProblem, type FollowSettings } from "@tredio/autopilot";
+import { holdingsOf, hyperliquidLeaders } from "../src/copier";
 import type { ExecutorDb } from "../src/db";
-import { T, TEST_DATABASE_URL, testDb } from "./fakes";
+import { market, T, TEST_DATABASE_URL, testDb } from "./fakes";
 import { audits, LEADER, positions, reset, USER, type World, world } from "./world";
 
 const maybe = TEST_DATABASE_URL ? describe : describe.skip;
@@ -29,6 +29,31 @@ describe("leader snapshots", () => {
   test("positions become holdings by market, with their side, margin and entry", () => {
     const state = { accountValue: 0, withdrawable: 0, totalMarginUsed: 0, time: 0, positions: [{ coin: "ETH", szi: -2, entryPx: 2_250, positionValue: 0, unrealizedPnl: 0, marginUsed: 450, leverage: 10, liquidationPx: null }] };
     expect(holdingsOf(state)).toEqual(new Map([["ETH", { side: "short", size: 2, marginUsdc: 450, entryPrice: 2_250 }]]));
+  });
+
+  test("the Tredio bot is read where it trades, every other leader on mainnet, and never on a guess", async () => {
+    const BOT_ADDRESS = "0x972dac64d693f387cd089f0efcda320c71097a2c";
+    const info = (px: number) => ({
+      read: [] as string[],
+      async accountState(user: string) {
+        this.read.push(user);
+        return { accountValue: 0, withdrawable: 0, totalMarginUsed: 0, time: 0, positions: [] };
+      },
+      perpMarkets: async () => [{ symbol: "BTC", markPx: px }, { symbol: "DEAD", markPx: 0 }],
+    });
+    const testnet = info(76_000);
+    const mainnet = info(75_800);
+    let derived: Promise<string> = Promise.resolve(BOT_ADDRESS);
+    const leaders = hyperliquidLeaders({ network: "testnet", trading: testnet, mainnet, onTradingNetwork: async (l) => l === (await derived) });
+    expect((await leaders.state(BOT_ADDRESS)).network).toBe("testnet");
+    expect((await leaders.state(LEADER)).network).toBe("mainnet");
+    expect([testnet.read, mainnet.read]).toEqual([[BOT_ADDRESS], [LEADER]]);
+    expect(await leaders.marks("mainnet")).toEqual(new Map([["BTC", 75_800]]));
+    expect(await leaders.marks("testnet")).toEqual(new Map([["BTC", 76_000]]));
+    // Without the bot's address no leader is read: a snapshot from the wrong network would copy positions as new.
+    derived = Promise.reject(new Error("rpc 429"));
+    await expect(leaders.state(LEADER)).rejects.toThrow("rpc 429");
+    expect(mainnet.read).toEqual([LEADER]);
   });
 });
 
@@ -113,12 +138,28 @@ maybe("copy-trading", () => {
     expect(all.map((p) => [p.status, p.close_reason])).toEqual([["closed", "leader_close"]]);
   });
 
-  test("never chases: a copy past the follow's slippage from the leader's fill, or in a market testnet lacks, is skipped", async () => {
+  test("a mainnet leader's fill does not bound a testnet copy, the testnet mark does; markets outside Autopilot's are skipped", async () => {
+    // Testnet lists ZEC, but Tredio's oracle does not mark it for the account's order guard.
+    w.exchange.markets.push(market("ZEC", 9, 2, 140, 10));
     await w.tick(T);
+    // Mainnet trades 2.7% below testnet: the leader's 74,000 fill is no price a testnet copy can get.
     w.leaders.hold(LEADER, "BTC", { side: "long", size: 0.01, marginUsdc: 74, entryPrice: 74_000 });
     w.leaders.hold(LEADER, "DOGE", { side: "long", size: 1000, marginUsdc: 20, entryPrice: 0.2 });
+    w.leaders.hold(LEADER, "ZEC", { side: "long", size: 10, marginUsdc: 450, entryPrice: 1_350 });
     await w.tick(T + 15);
-    expect(await skipped()).toEqual(["the price moved 2.70% from the leader's fill, past your 0.3% limit", "Hyperliquid testnet does not list DOGE"]);
+    expect(await skipped()).toEqual(["Hyperliquid testnet does not list DOGE", autopilotMarketProblem("ZEC")!]);
+    // The copy goes out within the follow's 0.3% of the testnet mark, at the follow's own 3x.
+    expect(w.exchange.posted[1]!.action).toMatchObject({ orders: [{ b: true, p: "76228", s: "0.001", r: false }] });
+    expect((await positions(db, { followId }))[0]).toMatchObject({ status: "open", side: "long", size: 0.001, entry_price: 76_000, leverage: 3 });
+  });
+
+  test("never chases a leader on the same network: a copy past the follow's slippage from the leader's fill is skipped", async () => {
+    // The Tredio bot trades on testnet, where its followers' copies execute.
+    w.leaders.onTestnet.add(LEADER);
+    await w.tick(T);
+    w.leaders.hold(LEADER, "BTC", { side: "long", size: 0.01, marginUsdc: 74, entryPrice: 74_000 });
+    await w.tick(T + 15);
+    expect(await skipped()).toEqual(["the price moved 2.70% from the leader's fill, past your 0.3% limit"]);
     expect(w.exchange.posted).toHaveLength(0);
   });
 });

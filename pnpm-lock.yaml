@@ -217,6 +217,9 @@ importers:
       '@noble/hashes':
         specifier: 2.0.1
         version: 2.0.1
+      '@tredio/autopilot':
+        specifier: workspace:*
+        version: link:../../packages/autopilot
       '@tredio/chain':
         specifier: workspace:*
         version: link:../../packages/chain

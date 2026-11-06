@@ -48,6 +48,7 @@ pnpm test:contracts
 - Prose and docs: no em dash; in long Markdown, one sentence per line.
 - Lines are long (about 160 columns) and code is not run through Prettier at its default width; match the file you are in.
 - Every service exposes `/health` (detailed, with alerts) and `/live` (process up).
+- Moderation hides calls and posts (`hidden_at`) and never deletes them: every public read of either table filters `hidden_at IS NULL`.
 - Secrets live only in gitignored `.env` files; every app ships a `.env.example`.
 - Run `pnpm verify` and the touched packages' tests before you call a change done.
 

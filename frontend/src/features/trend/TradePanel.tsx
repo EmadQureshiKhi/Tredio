@@ -14,7 +14,7 @@ type Tab = "outcome" | "perp" | "coin" | "assetPerp";
 const BLURB: Record<Tab, string> = {
   outcome: "Up or down on attention by a deadline. Each token pays 1\u00a0USDC if you are right.",
   perp: "Long or short the index itself, up to 3x, open as long as you like.",
-  coin: "This trend's coin on a bonding curve, graduating to its own pool.",
+  coin: "This trend's coin: a bonding curve that graduates into its own Rhea pool.",
   assetPerp: "Hyperliquid perpetuals on the asset's own market price, signed by your account through NEAR Chain Signatures.",
 };
 

@@ -3,8 +3,9 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 /**
- * A sortable table from `md` up and a stacked list below it, from one column definition. Headers
- * with a `sort` sort on click (again to reverse); `aria-sort` says how the table is sorted.
+ * A sortable table from `md` up (or `lg`, for tables too wide for a tablet) and a stacked list below
+ * it, from one column definition. Headers with a `sort` sort on click (again to reverse);
+ * `aria-sort` says how the table is sorted.
  */
 
 export interface Column<T> {
@@ -30,6 +31,7 @@ export function SortableTable<T>({
   testId,
   rowTestId,
   empty,
+  stackBelow = "md",
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -41,6 +43,8 @@ export function SortableTable<T>({
   testId?: string;
   rowTestId?: string;
   empty?: ReactNode;
+  /** Where the table takes over from the stacked list. */
+  stackBelow?: "md" | "lg";
 }) {
   const [sort, setSort] = useState<SortState>(initialSort);
   const column = sort ? columns.find((c) => c.key === sort.key) : undefined;
@@ -64,7 +68,7 @@ export function SortableTable<T>({
 
   return (
     <div data-testid={testId} className="overflow-hidden rounded-xl border border-line bg-surface shadow-card">
-      <table className="hidden w-full table-fixed border-collapse text-[13px] md:table" aria-label={label}>
+      <table className={`hidden w-full table-fixed border-collapse text-[13px] ${stackBelow === "lg" ? "lg:table" : "md:table"}`} aria-label={label}>
         <thead>
           <tr className="border-b border-line">
             {columns.map((c) => {
@@ -106,7 +110,7 @@ export function SortableTable<T>({
           ))}
         </tbody>
       </table>
-      <ul className="divide-y divide-line md:hidden" aria-label={label}>
+      <ul className={`divide-y divide-line ${stackBelow === "lg" ? "lg:hidden" : "md:hidden"}`} aria-label={label}>
         {sorted.map((row) => (
           <li key={rowKey(row)} className="px-4 py-3 text-[13px]">
             {mobile(row)}

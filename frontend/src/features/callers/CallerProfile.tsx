@@ -132,7 +132,7 @@ function Caller({ data }: { data: CallerData }) {
         <SectionTitle
           id="calls-title"
           title="Calls"
-          subtitle={calls.length ? `${calls.length} made` : undefined}
+          subtitle={calls.length ? (stats.total > calls.length ? `${stats.total} made · newest ${calls.length} shown` : `${stats.total} made`) : undefined}
           action={
             calls.length ? (
               <Segmented
@@ -150,7 +150,7 @@ function Caller({ data }: { data: CallerData }) {
           }
         />
         {shown.length ? (
-          <CallList calls={shown} trends={trends.data?.trends} />
+          <CallList calls={shown} trends={trends.data?.trends} shareable={mine} />
         ) : (
           <Card>
             <Empty

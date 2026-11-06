@@ -1,4 +1,4 @@
-import { equityCurve, followSettingsSchema, type Rule, ruleSchema, boxKeyId, sealKeyId, sessionLeverageProblem, stats } from "@tredio/autopilot";
+import { autopilotMarketProblem, equityCurve, followSettingsSchema, isAutopilotMarket, type Rule, ruleSchema, boxKeyId, sealKeyId, sessionLeverageProblem, stats } from "@tredio/autopilot";
 import { ownerRequests } from "@tredio/contracts";
 import { type HyperliquidInfo, hyperliquidAddressOf } from "@tredio/hyperliquid";
 import { Hono } from "hono";
@@ -142,9 +142,9 @@ export function autopilotRoutes(d: AutopilotRouteDeps) {
     return c.json({ ok: true });
   });
 
-  // Public: what Autopilot can trade (Hyperliquid perps on this network) and anyone's track record.
+  // Public: what Autopilot can trade (its markets that Hyperliquid lists on this network) and anyone's track record.
   app.get("/autopilot/markets", async (c) => {
-    const markets = await d.service.markets();
+    const markets = (await d.service.markets()).filter((m) => isAutopilotMarket(m.symbol));
     return c.json({ markets: markets.map((m) => ({ index: m.index, symbol: m.symbol, maxLeverage: m.maxLeverage, szDecimals: m.szDecimals, markPx: m.markPx })) });
   });
   // Hyperliquid for the app's ticket and portfolio: markets with marks and funding, an account's
@@ -352,8 +352,9 @@ export async function ruleDetail(d: Pick<AutopilotRouteDeps, "store">, r: Stored
 }
 
 /**
- * Enables, pauses or stops a rule. Enabling needs a recent backtest of exactly this rule and, for
- * accounts, an active grant; `approve` runs once those hold (the passkey's approval for accounts).
+ * Enables, pauses or stops a rule. Enabling needs a rule in one of Autopilot's markets (one saved
+ * before the list was this short may name another), a recent backtest of exactly this rule and,
+ * for accounts, an active grant; `approve` runs once those hold (the passkey's approval for accounts).
  */
 export async function setRuleStatus<R>(
   d: Pick<AutopilotRouteDeps, "store" | "service">,
@@ -365,6 +366,8 @@ export async function setRuleStatus<R>(
   approve?: () => Promise<{ body: unknown; status: 403 | 409 | 503 } | null>,
 ): Promise<R> {
   if (status === "enabled") {
+    const unsupported = autopilotMarketProblem(r.rule.market);
+    if (unsupported) return reply({ error: `${unsupported}; edit the rule to trade one of them` }, 409);
     const kill = await d.store.killSwitch();
     if (kill.engaged) return reply({ error: `Autopilot is halted: ${kill.reason ?? "kill switch engaged"}` }, 409);
     const bt = await d.store.recentBacktest(r.owner, r.ruleHash, BACKTEST_VALID_SEC);

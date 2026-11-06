@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { autopilotMarketProblem, isAutopilotMarket } from "./markets";
 
 /**
  * An Autopilot rule: when a trend's attention moves enough (and, optionally, smart money agrees),
@@ -7,14 +8,11 @@ import { z } from "zod";
  * trading, so a backtest shows exactly what the rule would have done.
  */
 
-/** Asset perp markets by symbol; Autopilot trades the ones listed on the active network. */
-export const ASSET_PERP_SYMBOLS = ["BTC", "ETH", "SOL", "NEAR", "ZEC", "HYPE", "UNI"] as const;
-
 export const ruleSchema = z
   .object({
     name: z.string().trim().min(1).max(60),
-    /** Asset perp market symbol, for example BTC. */
-    market: z.string().regex(/^[A-Z0-9]{1,12}$/),
+    /** Asset perp market symbol, one of AUTOPILOT_MARKETS, for example BTC (a string still: rules stored before the list was this short may name others). */
+    market: z.string().refine((m): boolean => isAutopilotMarket(m), { error: (iss) => autopilotMarketProblem(String(iss.input)) ?? "not an Autopilot market" }),
     /** Trend identifier whose attention index drives the rule, for example crypto:btc. */
     trend: z.string().regex(/^[a-z0-9:._-]{1,64}$/),
     entry: z.object({

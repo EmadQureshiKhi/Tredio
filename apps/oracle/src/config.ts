@@ -1,3 +1,4 @@
+import { AUTOPILOT_MARKETS, AUTOPILOT_MARKETS_TEXT } from "@tredio/autopilot";
 import { type RpcEndpoint, rpcEndpoints } from "@tredio/chain";
 import { type Deployment, deployment as deploymentOf } from "@tredio/contracts";
 import { z } from "zod";
@@ -41,8 +42,15 @@ const schema = z.object({
   HEARTBEAT_SEC: z.coerce.number().int().positive().default(420),
   DEVIATION_BPS: z.coerce.number().int().positive().default(100),
   MIN_CREATE_INDEX_POINTS: z.coerce.number().nonnegative().default(5),
-  /** Hyperliquid marks every report carries, for the account contract's order guard. */
-  MARK_ASSETS: z.string().default("BTC,ETH,SOL,NEAR,HYPE").transform((v) => list(v).map((s) => s.toUpperCase())),
+  /**
+   * Hyperliquid marks every report carries, for the account contract's order guard: Autopilot's
+   * markets (AUTOPILOT_MARKETS), which it trades only because these are marked, and any others listed.
+   */
+  MARK_ASSETS: z
+    .string()
+    .default(AUTOPILOT_MARKETS.join(","))
+    .transform((v) => list(v).map((s) => s.toUpperCase()))
+    .refine((assets) => AUTOPILOT_MARKETS.every((m) => assets.includes(m)), `MARK_ASSETS must include Autopilot's markets (${AUTOPILOT_MARKETS_TEXT}): their orders wait for these marks`),
   MIN_BALANCE_NEAR: z.coerce.number().nonnegative().default(2),
 });
 

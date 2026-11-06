@@ -2,7 +2,7 @@ import { Viewer, walletWatch } from "@tredio/chain";
 import { AccountVersions } from "@tredio/contracts";
 import { type HlNetwork, HyperliquidInfo, hyperliquidAddressOf } from "@tredio/hyperliquid";
 import { loadConfig } from "./config";
-import { Copier, mainnetLeaders } from "./copier";
+import { Copier, hyperliquidLeaders } from "./copier";
 import { connect, ExecutorDb } from "./db";
 import { type AccountReader, Executor } from "./executor";
 import { healthApp } from "./health";
@@ -76,7 +76,14 @@ const executor = new Executor(
   log,
   async (ctx) => copier?.tick(ctx),
 );
-copier = new Copier(db, executor, mainnetLeaders(new HyperliquidInfo("mainnet")), log, network);
+// Leaders: the Tredio bot where it trades (from its own account's address), everyone else on mainnet's leaderboard.
+const leaders = hyperliquidLeaders({
+  network,
+  trading: info,
+  mainnet: network === "mainnet" ? info : new HyperliquidInfo("mainnet"),
+  onTradingNetwork: async (leader) => cfg.bot !== null && leader.toLowerCase() === (await addressOf(cfg.bot.account)).toLowerCase(),
+});
+copier = new Copier(db, executor, leaders, log, network);
 
 const seal = cfg.AUTOPILOT_SEAL_PRIVATE_KEY ? await sealPublicKey(cfg.AUTOPILOT_SEAL_PRIVATE_KEY) : null;
 const server = Bun.serve({

@@ -1,5 +1,6 @@
 "use client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { isAutopilotMarket } from "@tredio/autopilot";
 import { AlertTriangle, CircleAlert, FlaskConical, Fingerprint, Info, Save, WandSparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useMemo, useRef, useState } from "react";
@@ -69,7 +70,7 @@ export default function RuleBuilder({ editId, fromId, trend }: { editId: number 
   const editing = editId !== null && stored && stored.status !== "stopped" ? stored : null;
   const initial: Draft = stored
     ? { ...draftFromRule(stored.rule), name: editing ? stored.rule.name : `${stored.rule.name} (copy)`.slice(0, 60) }
-    : { ...DEFAULT_DRAFT, ...(trend ? { trend } : liveDefault(trends.data?.trends ?? [], (markets.data?.markets ?? []).map((m) => m.symbol))) };
+    : { ...DEFAULT_DRAFT, ...(trend ? { trend } : liveDefault(trends.data?.trends ?? [], (markets.data?.markets ?? []).map((m) => m.symbol).filter(isAutopilotMarket))) };
   // Keyed by the source only: saving or refetching the rule keeps the form and its backtest.
   return <Builder key={sourceId ?? "new"} initial={initial} editing={editing} />;
 }
@@ -112,7 +113,8 @@ function Builder({ initial, editing }: { initial: Draft; editing: StoredRule | n
     setD((x) => ({ ...x, [k]: v }));
   };
 
-  const marketList = useMemo(() => markets.data?.markets ?? [], [markets.data]);
+  // Autopilot trades only the markets Tredio's oracle always marks for the account's order guard.
+  const marketList = useMemo(() => (markets.data?.markets ?? []).filter((m) => isAutopilotMarket(m.symbol)), [markets.data]);
   const market = marketList.find((m) => m.symbol === d.market);
   const topicName = trendLabel(d.trend, trends.data?.trends);
   const fallbackName = autoName(d, topicName);
@@ -224,9 +226,9 @@ function Builder({ initial, editing }: { initial: Draft; editing: StoredRule | n
   };
 
   const trendOptions = useMemo(() => trendChoices(trends.data?.trends ?? [], new Set(marketList.map((m) => m.symbol)), d.trend), [trends.data, marketList, d.trend]);
-  const marketOptions = marketList.length
-    ? marketList.map((m) => ({ value: m.symbol, label: `${m.symbol} · up to ${Math.min(m.maxLeverage, SESSION_MAX_LEVERAGE)}x` }))
-    : [{ value: d.market, label: d.market }];
+  const marketOptions = marketList.map((m) => ({ value: m.symbol, label: `${m.symbol} · up to ${Math.min(m.maxLeverage, SESSION_MAX_LEVERAGE)}x` }));
+  // The rule's own market stays shown (before the list loads, or a rule saved on a market Autopilot no longer trades, which the form flags).
+  if (!marketOptions.some((o) => o.value === d.market)) marketOptions.unshift({ value: d.market, label: d.market });
   const lev = Number(d.leverage);
   const margin = Number(d.margin);
   const notional = Number.isFinite(lev * margin) ? lev * margin : null;
@@ -415,11 +417,11 @@ function trendChoices(list: Trend[], tradable: Set<string>, current: string) {
   const lists = live.filter((t) => t.ticker && tradable.has(t.ticker));
   const others = live.filter((t) => !(t.ticker && tradable.has(t.ticker)));
   const options = [
-    ...lists.map((t) => ({ value: baseIdentifier(t.identifier), label: trendName(t), group: "Hyperliquid lists its coin" })),
+    ...lists.map((t) => ({ value: baseIdentifier(t.identifier), label: trendName(t), group: "Autopilot trades its coin" })),
     ...others.map((t) => ({ value: baseIdentifier(t.identifier), label: trendName(t), group: "Other live trends" })),
   ];
   const chosen = baseIdentifier(current);
-  if (!options.some((o) => o.value === chosen)) options.unshift({ value: current, label: current, group: "Hyperliquid lists its coin" });
+  if (!options.some((o) => o.value === chosen)) options.unshift({ value: current, label: current, group: "Autopilot trades its coin" });
   return options;
 }
 

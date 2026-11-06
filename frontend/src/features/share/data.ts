@@ -1,4 +1,4 @@
-import type { Call, Trend } from "@/lib/api";
+import type { Call, CallerRecord, Trend } from "@/lib/api";
 import { rpc } from "@/lib/chain/client";
 import { eventsOf, failureOf, type Outcome } from "@/lib/chain/outcome";
 import { BACKEND_URL, DEPLOYMENT } from "@/lib/config";
@@ -37,14 +37,15 @@ export interface SharedCall {
   record: { hits: number; misses: number; hitRate: number } | null;
 }
 
-/** One call from a trend's thread, with the trend and the caller's record. */
+/**
+ * One call by its id however old it is, with the trend and the caller's record; null when there is
+ * no such call (or moderation hid it) or the link names another trend than the call's.
+ */
 export async function sharedCall(identifier: string, callId: number): Promise<SharedCall | null> {
   const id = identifier.toLowerCase();
-  const [thread, trend] = await Promise.all([getJson<{ calls: Call[] }>(`/v1/trends/${encodeURIComponent(id)}/thread`), trendCard(id)]);
-  const call = thread?.calls.find((c) => Number(c.id) === callId);
-  if (!call) return null;
-  const caller = await getJson<{ stats: { hits: number; misses: number; hitRate: number } }>(`/v1/callers/${call.caller}`);
-  return { call: { ...call, identifier: id }, trend, record: caller ? caller.stats : null };
+  const [found, trend] = await Promise.all([getJson<{ call: Call; record: CallerRecord }>(`/v1/calls/${callId}`), trendCard(id)]);
+  if (!found || found.call.identifier !== id) return null;
+  return { call: found.call, trend, record: found.record };
 }
 
 export const callerName = (c: Pick<Call, "handle" | "caller">) => (c.handle ? `@${c.handle}` : `${c.caller.slice(0, 6)}...${c.caller.slice(-4)}`);

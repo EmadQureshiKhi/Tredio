@@ -1,5 +1,5 @@
 import { generateSealKeyPair, type Holding, type Rule, seal } from "@tredio/autopilot";
-import type { AccountState } from "@tredio/hyperliquid";
+import type { AccountState, HlNetwork } from "@tredio/hyperliquid";
 import { Copier } from "../src/copier";
 import type { ExecutorDb } from "../src/db";
 import { Executor } from "../src/executor";
@@ -28,10 +28,11 @@ export const rule: Rule = {
   limits: { maxPositionUsdc: 100, maxDailyLossUsdc: 30, cooldownMin: 0 },
 };
 
-/** Mainnet as leaders' positions. */
+/** Leaders' positions: on mainnet, or on testnet (where copies execute) for those in `onTestnet`, like the Tredio bot. */
 export class FakeLeaders {
   readonly states = new Map<string, Map<string, Holding>>();
   readonly marks = new Map<string, number>([["BTC", 76_000]]);
+  readonly onTestnet = new Set<string>();
   hold(leader: string, coin: string, h: Holding | null): void {
     const m = this.states.get(leader) ?? new Map<string, Holding>();
     if (h) m.set(coin, h);
@@ -39,23 +40,24 @@ export class FakeLeaders {
     this.states.set(leader, m);
   }
   source() {
+    const state = (leader: string): AccountState => ({
+      accountValue: 0,
+      withdrawable: 0,
+      totalMarginUsed: 0,
+      time: 0,
+      positions: [...(this.states.get(leader) ?? new Map<string, Holding>()).entries()].map(([coin, h]) => ({
+        coin,
+        szi: h.side === "long" ? h.size : -h.size,
+        entryPx: h.entryPrice ?? null,
+        positionValue: 0,
+        unrealizedPnl: 0,
+        marginUsed: h.marginUsdc,
+        leverage: 1,
+        liquidationPx: null,
+      })),
+    });
     return {
-      state: async (leader: string): Promise<AccountState> => ({
-        accountValue: 0,
-        withdrawable: 0,
-        totalMarginUsed: 0,
-        time: 0,
-        positions: [...(this.states.get(leader) ?? new Map<string, Holding>()).entries()].map(([coin, h]) => ({
-          coin,
-          szi: h.side === "long" ? h.size : -h.size,
-          entryPx: h.entryPrice ?? null,
-          positionValue: 0,
-          unrealizedPnl: 0,
-          marginUsed: h.marginUsdc,
-          leverage: 1,
-          liquidationPx: null,
-        })),
-      }),
+      state: async (leader: string) => ({ network: (this.onTestnet.has(leader) ? "testnet" : "mainnet") as HlNetwork, state: state(leader) }),
       marks: async () => this.marks,
     };
   }

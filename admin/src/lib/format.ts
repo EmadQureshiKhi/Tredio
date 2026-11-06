@@ -8,6 +8,9 @@ export function shortAddress(account: string): string {
 const numberFormat = new Intl.NumberFormat("en-US");
 export const formatNumber = (n: number) => numberFormat.format(n);
 
+/** "1 signup", "2,400 signups": a count with its noun. */
+export const plural = (n: number, one: string, many = `${one}s`) => `${formatNumber(n)} ${n === 1 ? one : many}`;
+
 /** "just now", "42s ago", "5m ago", "3h ago", "2d ago"; future times read "in 5m". */
 export function formatAge(timeMs: number, nowMs: number): string {
   const diff = Math.round((nowMs - timeMs) / 1000);
@@ -27,6 +30,16 @@ export function formatDuration(ms: number): string {
   const s = Math.round(ms / 1000);
   if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
   return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+}
+
+/** The value a moment after it stops changing, so a search box does not ask the backend on each keystroke. */
+export function useDebounced<T>(value: T, ms = 250): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return debounced;
 }
 
 /** The current time, refreshed every `intervalMs`, for relative timestamps. */

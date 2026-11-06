@@ -223,7 +223,7 @@ export interface Follow {
   createdAt: string;
 }
 
-/** Autopilot's markets: Hyperliquid perps on this network. */
+/** Autopilot's markets (AUTOPILOT_MARKETS) that Hyperliquid lists on this network. */
 export interface AutopilotMarket {
   index: number;
   symbol: string;
@@ -336,8 +336,19 @@ export interface CallerRow {
 
 export interface CallerProfileView {
   caller: { address: string; handle: string | null; bio: string | null; linked_account: string | null; created_at: string };
-  stats: { hits: number; misses: number; open: number; hitRate: number; score: number };
+  /** Over every call the caller made (as the leaderboard counts them); `calls` is the newest 100. */
+  stats: CallerRecord & { total: number };
   calls: Call[];
+}
+
+/** A caller's track record: resolved calls are hits and misses (voids do not count). */
+export interface CallerRecord {
+  hits: number;
+  misses: number;
+  open: number;
+  resolved: number;
+  hitRate: number;
+  score: number;
 }
 
 export const social = {

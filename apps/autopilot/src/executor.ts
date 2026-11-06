@@ -1,4 +1,4 @@
-import { evaluate, grossPnlUsdc, type RuleState, type Side } from "@tredio/autopilot";
+import { autopilotMarketProblem, evaluate, grossPnlUsdc, type RuleState, type Side } from "@tredio/autopilot";
 import type { AccountVersion } from "@tredio/contracts";
 import type { AccountState, PerpMarket } from "@tredio/hyperliquid";
 import type { ExecutorDb, OrderResult, OrderRow, PositionRow, RuleRow } from "./db";
@@ -220,6 +220,9 @@ export class Executor {
     if (pos && pos.status !== "open") return;
     // Paused and stopped rules only manage the position they hold.
     if (!pos && r.status !== "enabled") return;
+    // A rule saved before Autopilot kept to its markets manages what it holds to an exit, then pauses: the guard may never price its openings.
+    const unsupported = autopilotMarketProblem(market.symbol);
+    if (unsupported && !pos) return this.halt(r, unsupported, true);
     const price = ctx.mark(market.symbol);
     if (!price) return this.wait(r, `no ${market.symbol} mark price`);
 

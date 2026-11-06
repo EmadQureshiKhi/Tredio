@@ -67,6 +67,10 @@ export async function isFinal(hash: string, sender: string): Promise<boolean> {
 }
 
 /** An RPC that failed the request itself (HTTP status, unreachable), as opposed to judging the transaction. */
+/** Signing passes over every RPC up to three times, pausing about 0.6 s, then 1.8 s, between passes. */
+const SIGN_ROUNDS = 3;
+const SIGN_PAUSE_MS = 600;
+
 const providerFailed = (e: unknown) => (e as { name?: string })?.name === "NetworkError" || e instanceof TypeError || /HTTP \d{3}|fetch failed|Failed to fetch|NetworkError/i.test(String((e as Error)?.message ?? e));
 
 /** Sends signed bytes to one RPC; null when that RPC failed the request (try another). */
@@ -112,26 +116,33 @@ export class GasKeySender {
     return n;
   }
 
-  /** Builds and signs `call` on `lane` through the first RPC that can serve the nonce and block lookups. */
+  /**
+   * Builds and signs `call` on `lane` through the first RPC that can serve the nonce and block
+   * lookups. Nothing has gone out yet, so when every RPC fails (a burst of rate limits on one
+   * address) it waits and goes round again, up to three passes, instead of failing the trade.
+   */
   private async sign(call: Call, lane: number) {
     let last: unknown;
-    const urls = rpcOrder();
-    const via = this.sendingVia;
-    for (const url of via && urls.includes(via) ? [via, ...urls.filter((u) => u !== via)] : urls) {
-      const tx = this.nearAt(url)
-        .transaction(this.account)
-        .functionCall(call.receiverId, call.methodName, call.args, {
-          gas: `${BigInt(call.gas) / 10n ** 12n} Tgas` as never,
-          attachedDeposit: `${call.deposit} yocto` as never,
-        })
-        .useGasKey(lane);
-      try {
-        await tx.sign();
-        return { tx, url };
-      } catch (e) {
-        if (!providerFailed(e)) throw e;
-        last = e;
-        rest(url);
+    for (let round = 0; round < SIGN_ROUNDS; round++) {
+      if (round > 0) await new Promise((resolve) => setTimeout(resolve, SIGN_PAUSE_MS * 3 ** (round - 1) * (0.75 + Math.random() / 2)));
+      const urls = rpcOrder();
+      const via = this.sendingVia;
+      for (const url of via && urls.includes(via) ? [via, ...urls.filter((u) => u !== via)] : urls) {
+        const tx = this.nearAt(url)
+          .transaction(this.account)
+          .functionCall(call.receiverId, call.methodName, call.args, {
+            gas: `${BigInt(call.gas) / 10n ** 12n} Tgas` as never,
+            attachedDeposit: `${call.deposit} yocto` as never,
+          })
+          .useGasKey(lane);
+        try {
+          await tx.sign();
+          return { tx, url };
+        } catch (e) {
+          if (!providerFailed(e)) throw e;
+          last = e;
+          rest(url);
+        }
       }
     }
     throw last;

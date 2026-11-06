@@ -62,6 +62,40 @@ export function wilson(hits: number, total: number): number {
   return (p + (z * z) / (2 * total) - z * Math.sqrt((p * (1 - p) + (z * z) / (4 * total)) / total)) / (1 + (z * z) / total);
 }
 
+/** A caller's calls by outcome (calls aliased `c`), the same for the leaderboard, profiles and share pages. */
+interface Tally {
+  hits: number;
+  misses: number;
+  open: number;
+  total: number;
+}
+const tally = (sql: Sql) =>
+  sql`count(*) FILTER (WHERE c.outcome = 'hit')::int AS hits, count(*) FILTER (WHERE c.outcome = 'miss')::int AS misses, count(*) FILTER (WHERE c.outcome = 'open')::int AS open, count(*)::int AS total`;
+
+/** The track record from a tally: resolved calls (voids do not count), the hit rate and its Wilson score. */
+export function trackRecord(t: Pick<Tally, "hits" | "misses" | "open">) {
+  const resolved = t.hits + t.misses;
+  return { hits: t.hits, misses: t.misses, open: t.open, resolved, hitRate: resolved > 0 ? t.hits / resolved : 0, score: wilson(t.hits, resolved) };
+}
+
+interface CallRow {
+  id: string;
+  caller: string;
+  handle: string | null;
+  identifier: string;
+  direction: "up" | "down";
+  horizon_sec: number;
+  note: string | null;
+  called_at: string;
+  opening_index: number;
+  resolves_at: string;
+  closing_index: number | null;
+  outcome: "open" | "hit" | "miss" | "void";
+}
+
+/** A call as the app's `Call` reads it, with its 64-bit columns as numbers. */
+const callJson = (r: CallRow) => ({ ...r, id: Number(r.id), called_at: Number(r.called_at), resolves_at: Number(r.resolves_at) });
+
 export function socialRoutes(d: SocialDeps) {
   const now = d.now ?? Date.now;
   const nowSec = () => Math.floor(now() / 1000);
@@ -121,10 +155,10 @@ export function socialRoutes(d: SocialDeps) {
     const [posts, calls] = await Promise.all([
       d.sql`
         SELECT p.id, p.caller, cl.handle, p.body, p.reply_to, p.call_id, p.created_at FROM posts p JOIN callers cl ON cl.address = p.caller
-         WHERE p.identifier = ${id} ORDER BY p.created_at DESC LIMIT 100`,
+         WHERE p.identifier = ${id} AND p.hidden_at IS NULL ORDER BY p.created_at DESC LIMIT 100`,
       d.sql`
         SELECT c.id, c.caller, cl.handle, c.direction, c.horizon_sec, c.note, c.called_at, c.opening_index, c.resolves_at, c.closing_index, c.outcome
-          FROM calls c JOIN callers cl ON cl.address = c.caller WHERE c.identifier = ${id} ORDER BY c.called_at DESC LIMIT 100`,
+          FROM calls c JOIN callers cl ON cl.address = c.caller WHERE c.identifier = ${id} AND c.hidden_at IS NULL ORDER BY c.called_at DESC LIMIT 100`,
     ]);
     return c.json({ posts, calls });
   });
@@ -169,17 +203,26 @@ export function socialRoutes(d: SocialDeps) {
   });
 
   app.get("/callers/leaderboard", async (c) => {
-    const rows = await d.sql<{ address: string; handle: string | null; linked_account: string | null; hits: number; misses: number; open: number }[]>`
-      SELECT cl.address, cl.handle, cl.linked_account,
-             count(*) FILTER (WHERE c.outcome = 'hit')::int AS hits,
-             count(*) FILTER (WHERE c.outcome = 'miss')::int AS misses,
-             count(*) FILTER (WHERE c.outcome = 'open')::int AS open
-        FROM callers cl JOIN calls c ON c.caller = cl.address
+    const rows = await d.sql<({ address: string; handle: string | null; linked_account: string | null } & Tally)[]>`
+      SELECT cl.address, cl.handle, cl.linked_account, ${tally(d.sql)}
+        FROM callers cl JOIN calls c ON c.caller = cl.address AND c.hidden_at IS NULL
        GROUP BY cl.address`;
-    const ranked = rows
-      .map((r) => ({ ...r, resolved: r.hits + r.misses, hitRate: r.hits + r.misses > 0 ? r.hits / (r.hits + r.misses) : 0, score: wilson(r.hits, r.hits + r.misses) }))
-      .sort((a, b) => b.score - a.score || b.resolved - a.resolved);
+    const ranked = rows.map((r) => ({ ...r, ...trackRecord(r) })).sort((a, b) => b.score - a.score || b.resolved - a.resolved);
     return c.json({ callers: ranked.slice(0, 100) });
+  });
+
+  // One call by its id (share pages and their link cards), with its caller's record.
+  app.get("/calls/:id", async (c) => {
+    const id = c.req.param("id");
+    if (!/^[1-9][0-9]{0,15}$/.test(id)) return c.json({ error: "no such call" }, 404);
+    const row = (
+      await d.sql<CallRow[]>`
+        SELECT c.id, c.caller, cl.handle, c.identifier, c.direction, c.horizon_sec, c.note, c.called_at, c.opening_index, c.resolves_at, c.closing_index, c.outcome
+          FROM calls c JOIN callers cl ON cl.address = c.caller WHERE c.id = ${id} AND c.hidden_at IS NULL`
+    )[0];
+    if (!row) return c.json({ error: "no such call" }, 404);
+    const [t] = await d.sql<Tally[]>`SELECT ${tally(d.sql)} FROM calls c WHERE c.caller = ${row.caller} AND c.hidden_at IS NULL`;
+    return c.json({ call: callJson(row), record: trackRecord(t!) });
   });
 
   app.get("/callers/:address", async (c) => {
@@ -187,12 +230,14 @@ export function socialRoutes(d: SocialDeps) {
     const profile = (await d.sql`SELECT address, handle, bio, linked_account, created_at FROM callers WHERE address = ${address} OR handle = ${address}`)[0];
     // ?optional=1: no profile yet is an answer, not an error (the app asks this way).
     if (!profile) return c.req.query("optional") === "1" ? c.json({ caller: null }) : c.json({ error: "no such caller" }, 404);
-    const calls = await d.sql`
-      SELECT id, identifier, direction, horizon_sec, note, called_at, opening_index, resolves_at, closing_index, outcome FROM calls
-       WHERE caller = ${profile.address} ORDER BY called_at DESC LIMIT 100`;
-    const hits = calls.filter((x) => x.outcome === "hit").length;
-    const misses = calls.filter((x) => x.outcome === "miss").length;
-    return c.json({ caller: profile, stats: { hits, misses, open: calls.filter((x) => x.outcome === "open").length, hitRate: hits + misses ? hits / (hits + misses) : 0, score: wilson(hits, hits + misses) }, calls });
+    // The record counts every call, as the leaderboard does; the list is the newest 100.
+    const [[t], calls] = await Promise.all([
+      d.sql<Tally[]>`SELECT ${tally(d.sql)} FROM calls c WHERE c.caller = ${profile.address} AND c.hidden_at IS NULL`,
+      d.sql`
+        SELECT id, identifier, direction, horizon_sec, note, called_at, opening_index, resolves_at, closing_index, outcome FROM calls
+         WHERE caller = ${profile.address} AND hidden_at IS NULL ORDER BY called_at DESC LIMIT 100`,
+    ]);
+    return c.json({ caller: profile, stats: { ...trackRecord(t!), total: t!.total }, calls });
   });
 
   // The vault: sign in as the identity, then read and write ciphertext.

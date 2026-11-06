@@ -6,13 +6,19 @@ import { Badge, cn, listItem } from "@/components/ui";
 import type { Call, Trend } from "@/lib/api";
 import { ago, countdown } from "@/lib/format";
 import { trendLabel } from "@/features/autopilot/shared/rule-text";
+import { ShareMenu } from "@/features/share/ShareActions";
+import { callSharePath } from "@/features/share/share";
 
 const OUTCOME = { open: { label: "Open", tone: "neutral" }, hit: { label: "Hit", tone: "up" }, miss: { label: "Miss", tone: "down" }, void: { label: "Void", tone: "warn" } } as const;
 
-/** A caller's calls with their outcome: opening and closing index, and when they resolve. */
-export function CallList({ calls, trends }: { calls: Call[]; trends: Trend[] | undefined }) {
+/**
+ * A caller's calls with their outcome: opening and closing index, and when they resolve. On your
+ * own profile (`shareable`) each call has a Share menu for its share page. The list does not clip
+ * its rows, so a menu on the last one can open below it.
+ */
+export function CallList({ calls, trends, shareable = false }: { calls: Call[]; trends: Trend[] | undefined; shareable?: boolean }) {
   return (
-    <ul className="relative divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface" data-testid="call-list">
+    <ul className="relative divide-y divide-line rounded-[var(--radius-card)] border border-line bg-surface" data-testid="call-list">
       <AnimatePresence initial={false} mode="popLayout">
         {calls.map((c) => {
           const o = OUTCOME[c.outcome];
@@ -32,9 +38,10 @@ export function CallList({ calls, trends }: { calls: Call[]; trends: Trend[] | u
                     </Link>
                     <span className="text-text-3"> · {c.horizon_sec >= 604_800 ? "7 days" : "24h"}</span>
                   </p>
-                  <Badge tone={o.tone} className="shrink-0">
-                    {o.label}
-                  </Badge>
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    <Badge tone={o.tone}>{o.label}</Badge>
+                    {shareable ? <ShareMenu compact label="Share this call" text={`I called ${trendLabel(id, trends)} ${c.direction} on Tredio.`} path={callSharePath(id, c.id)} /> : null}
+                  </span>
                 </div>
                 <p className="num mt-1 text-[12.5px] text-text-2">
                   Opened at {c.opening_index.toFixed(2)}

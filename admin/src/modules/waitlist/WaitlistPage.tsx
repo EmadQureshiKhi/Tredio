@@ -1,7 +1,7 @@
 "use client";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Download, Inbox, MailCheck, RefreshCw, Search, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
 import { Dialog } from "@/src/components/ui/Dialog";
@@ -9,25 +9,13 @@ import { inputClass } from "@/src/components/ui/Field";
 import { Notice } from "@/src/components/ui/Notice";
 import { useToast } from "@/src/components/ui/Toasts";
 import { api, ApiError } from "@/src/lib/api";
-import { formatAge, formatDate, formatNumber, shortAddress, useNow } from "@/src/lib/format";
+import { formatAge, formatDate, formatNumber, plural, shortAddress, useDebounced, useNow } from "@/src/lib/format";
 import type { WaitlistRow } from "@/src/types/admin";
 
 /** Rows per page; the backend serves up to 200. */
 const PAGE = 50;
 
 const waitlistKey = (q: string, offset: number) => ["admin", "waitlist", q, offset] as const;
-
-/** The search a moment after typing stops, so each keystroke does not ask the backend. */
-function useDebounced(value: string, ms = 250): string {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), ms);
-    return () => clearTimeout(t);
-  }, [value, ms]);
-  return debounced;
-}
-
-const plural = (n: number, one: string, many = `${one}s`) => `${formatNumber(n)} ${n === 1 ? one : many}`;
 
 function Stat({ label, value, hint, testId }: { label: string; value: number | undefined; hint?: string; testId: string }) {
   return (

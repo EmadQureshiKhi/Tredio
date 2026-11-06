@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { autopilotMarketProblem } from "./markets";
 import type { Side } from "./rules";
 
 /**
@@ -9,9 +10,10 @@ import type { Side } from "./rules";
  * holds.
  *
  * A leader can see when and at what limit followers trade, so a copied opening never pays more
- * than the follower's slippage from both the leader's own fill and the mark, and is skipped once
- * the market has moved further. Open losses count against the daily loss limit, and a follow whose
- * open copies lose its loss cap is closed out and paused.
+ * than the follower's slippage from the mark where it executes and, when the leader trades on that
+ * same network, from the leader's own fill, and is skipped once the market has moved further. Open
+ * losses count against the daily loss limit, and a follow whose open copies lose its loss cap is
+ * closed out and paused. Openings copy only in Autopilot's markets (AUTOPILOT_MARKETS).
  */
 
 export interface Holding {
@@ -83,7 +85,7 @@ export const followSettingsSchema = z
     maxLeverage: z.number().min(1).max(20).default(3),
     /** Stop opening copies for the rest of the UTC day once realized and open losses reach this. */
     maxDailyLossUsdc: z.number().positive().max(1_000_000),
-    /** Worst fill for a copied opening, percent from the leader's fill and from the mark (the tighter wins). */
+    /** Worst fill for a copied opening, percent from the mark and, for a leader on the same network, from the leader's fill (the tighter wins). */
     maxSlippagePct: z.number().min(0.05).max(MAX_COPY_SLIPPAGE_PCT).default(DEFAULT_COPY_SLIPPAGE_PCT),
     /** Close every open copy and pause the follow once they are down this much together, USDC. Defaults to the daily loss limit. */
     maxOpenLossUsdc: z.number().positive().max(1_000_000).optional(),
@@ -118,7 +120,8 @@ export const lossCapReached = (f: FollowSettings, openPnlUsdc: number) => openPn
  * fill, whichever is tighter, and never more than MAX_COPY_SLIPPAGE_PCT. A leader resting orders
  * at the follower's limit gains at most that, and cannot widen it by filling at an off-market price.
  * Once the mark is already past the limit from the leader's fill, the copy would only chase them: it
- * is skipped with the reason.
+ * is skipped with the reason. Without a fill (none known, or one from another network) the mark
+ * alone bounds it.
  */
 export function copyLimit(side: Side, mark: number, leaderFill: number | undefined, requestedPct: number): { worstPrice: number } | { skip: string } {
   const slippagePct = Math.min(requestedPct, MAX_COPY_SLIPPAGE_PCT);
@@ -141,8 +144,15 @@ export type MirrorOrder =
 
 /** Where a follow stands when a change is copied. */
 export interface MirrorContext {
-  /** The market's mark price now. */
+  /** The market's mark price now, on the network the copy executes on. */
   price: number;
+  /**
+   * Whether the leader trades on the network the copy executes on. Only then does the leader's
+   * fill bound the copy: Hyperliquid mainnet and testnet prices drift apart by more than any
+   * slippage, so a mainnet leader's fill says nothing about a fair testnet price, and across
+   * networks the copy is bounded by the mark where it executes alone.
+   */
+  sameNetwork: boolean;
   /** Realized PnL of the follow's copies today (UTC), USDC. */
   realizedTodayUsdc: number;
   /** PnL of the follow's open copies at the mark, USDC. */
@@ -156,7 +166,8 @@ export interface MirrorContext {
 
 /**
  * The follower's order for one leader change, given what the follower holds in that market now.
- * Reductions and closes always copy, so a follower is never left holding the leader's exit.
+ * Reductions and closes always copy, so a follower is never left holding the leader's exit;
+ * openings copy only in Autopilot's markets, within the follow's caps.
  */
 export function mirror(change: Change, f: FollowSettings, held: Holding | null, at: MirrorContext): MirrorOrder {
   const market = change.market;
@@ -165,12 +176,14 @@ export function mirror(change: Change, f: FollowSettings, held: Holding | null, 
     const fraction = change.kind === "close" ? 1 : change.fraction;
     return { action: "reduce", market, side: held.side, size: held.size * fraction };
   }
+  const unsupported = autopilotMarketProblem(market);
+  if (unsupported) return { action: "skip", market, reason: unsupported };
   if (at.realizedTodayUsdc + at.openPnlUsdc <= -f.maxDailyLossUsdc) return { action: "skip", market, reason: "daily loss limit reached" };
   if (lossCapReached(f, at.openPnlUsdc)) return { action: "skip", market, reason: "open copies are at the loss cap" };
   if (held && held.side !== change.side) return { action: "skip", market, reason: "the follower holds the opposite side" };
   const price = at.price;
   if (!(price > 0)) return { action: "skip", market, reason: "no price" };
-  const limit = copyLimit(change.side, price, change.price, f.maxSlippagePct);
+  const limit = copyLimit(change.side, price, at.sameNetwork ? change.price : undefined, f.maxSlippagePct);
   if ("skip" in limit) return { action: "skip", market, reason: limit.skip };
   const leverage = Math.max(1, Math.min(change.leverage, f.maxLeverage, at.maxLeverage));
   let margin = f.mode === "ratio" ? (change.size * f.ratio * price) / leverage : change.kind === "open" ? f.fixedMarginUsdc : 0;

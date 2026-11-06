@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { AUTOPILOT_MARKETS } from "@tredio/autopilot";
 import type { Trend } from "@tredio/contracts";
+import { loadConfig } from "../src/config";
 import { boostedPoints, normalizeCount, toIndexUnits } from "../src/index-method";
 import { METHOD, measure } from "../src/method";
 import { allocate, assetClassOf, type Candidate, decide, freeListing, type LiveTrend, payableSurfacer, reportMarks } from "../src/plan";
@@ -129,6 +131,18 @@ describe("marks", () => {
       // Matched without regard to case, stored under Hyperliquid's own symbol, which orders name.
       { asset: "kPEPE", price: "1230000", asset_index: 3 },
     ]);
+  });
+
+  test("every report marks Autopilot's markets, from this process and from the enclave build", async () => {
+    const env = { ORACLE_ACCOUNT_ID: "tredio-oracle.testnet", ORACLE_PRIVATE_KEY: "ed25519:a", REPORT_SIGNING_KEY: "ed25519:b", BACKEND_TOKEN: "t".repeat(16) };
+    expect(loadConfig(env).MARK_ASSETS).toEqual([...AUTOPILOT_MARKETS]);
+    expect(loadConfig({ ...env, MARK_ASSETS: "btc,eth,sol,near,hype,zec" }).MARK_ASSETS).toEqual([...AUTOPILOT_MARKETS, "ZEC"]);
+    // Leaving one out would leave its rules and copies waiting on the order guard forever.
+    expect(() => loadConfig({ ...env, MARK_ASSETS: "BTC,ETH" })).toThrow("MARK_ASSETS must include Autopilot's markets (BTC, ETH, SOL, NEAR and HYPE)");
+    // The enclave (tee/, Rust) keeps its own list, fixed in its measured build: it must be the same one.
+    const rust = await Bun.file(new URL("../tee/src/main.rs", import.meta.url)).text();
+    const tee = /const MARK_ASSETS: \[&str; \d+\] = \[([^\]]*)\];/.exec(rust)?.[1];
+    expect(tee?.split(",").map((s) => s.trim().replaceAll('"', ""))).toEqual([...AUTOPILOT_MARKETS]);
   });
 });
 

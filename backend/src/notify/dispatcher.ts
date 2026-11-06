@@ -3,7 +3,8 @@ import type { Push, PushPayload, Topic } from "./push";
 
 /**
  * Turns what happened into notifications: Autopilot and copy-trading events from the audit log,
- * and resolved calls. Each stream keeps a cursor, so every event notifies once even across
+ * resolved calls and listed candidates. The audit log keeps a cursor; calls and watches are marked
+ * on their own rows (calls resolve out of id order), so every event notifies once even across
  * restarts.
  */
 
@@ -72,7 +73,7 @@ export class Dispatcher {
     const rows = await this.sql<{ position: string }[]>`SELECT position FROM cursors WHERE name = ${name}`;
     if (rows[0]) return Number(rows[0].position);
     // A new stream starts at the present, not by replaying history.
-    const start = name === "audit" ? await this.sql<{ m: string | null }[]>`SELECT max(id) AS m FROM autopilot_audit` : await this.sql<{ m: string | null }[]>`SELECT max(id) AS m FROM calls WHERE outcome <> 'open'`;
+    const start = await this.sql<{ m: string | null }[]>`SELECT max(id) AS m FROM autopilot_audit`;
     const position = Number(start[0]?.m ?? 0);
     await this.sql`INSERT INTO cursors (name, position) VALUES (${name}, ${position}) ON CONFLICT DO NOTHING`;
     return position;
@@ -93,13 +94,13 @@ export class Dispatcher {
     }
     if (events.length > 0) await this.setCursor("audit", Number(events.at(-1)!.id));
 
-    // Resolved calls notify the caller's linked account (an unlinked identity has no devices here).
-    const callsFrom = await this.cursor("calls");
-    const calls = await this.sql<{ id: string; identifier: string; direction: string; outcome: string; linked_account: string | null }[]>`
-      SELECT c.id, c.identifier, c.direction, c.outcome, cl.linked_account FROM calls c JOIN callers cl ON cl.address = c.caller
-       WHERE c.outcome <> 'open' AND c.id > ${callsFrom} ORDER BY c.id LIMIT 500`;
+    // Resolved calls notify the caller's linked account (an unlinked identity has no devices here);
+    // a call moderation hid stays quiet, and is marked like the rest so a later restore stays quiet too.
+    const calls = await this.sql<{ id: string; identifier: string; direction: string; outcome: string; linked_account: string | null; hidden: boolean }[]>`
+      SELECT c.id, c.identifier, c.direction, c.outcome, cl.linked_account, c.hidden_at IS NOT NULL AS hidden FROM calls c JOIN callers cl ON cl.address = c.caller
+       WHERE c.outcome <> 'open' AND c.notified_at IS NULL ORDER BY c.id LIMIT 500`;
     for (const c of calls) {
-      if (!c.linked_account || c.outcome === "void") continue;
+      if (!c.linked_account || c.outcome === "void" || c.hidden) continue;
       notified += await this.push.notify(c.linked_account, "calls", {
         title: c.outcome === "hit" ? "Your call hit" : "Your call missed",
         body: `${c.identifier}: attention ${c.direction}`,
@@ -107,7 +108,7 @@ export class Dispatcher {
         tag: `call-${c.id}`,
       });
     }
-    if (calls.length > 0) await this.setCursor("calls", Number(calls.at(-1)!.id));
+    if (calls.length > 0) await this.sql`UPDATE calls SET notified_at = now() WHERE id IN ${this.sql(calls.map((c) => c.id))}`;
 
     // "Notify me when it lists": a watched candidate that listed tells each account waiting on it,
     // once, under the markets topic (an account that turned markets off hears nothing).

@@ -7,7 +7,7 @@ import { useMemo, useRef, useState } from "react";
 import { Button, cn, Empty, ErrorNote, listItem, Num, Reveal, Segmented, Skeleton, useMedia } from "@/components/ui";
 import { action, useActivity } from "@/features/portfolio/activity";
 import { useAccount } from "@/lib/account/AccountProvider";
-import { autopilot, type Trend } from "@/lib/api";
+import { hyperliquid, type Trend } from "@/lib/api";
 import { USDC_DECIMALS } from "@/lib/config";
 import { ago, usdc, tokenNumber } from "@/lib/format";
 import { useUsdcBalance, useTrends, useUpcoming } from "@/lib/hooks/queries";
@@ -37,7 +37,8 @@ function matches(t: Trend, f: Filter) {
 export default function Home() {
   const trends = useTrends();
   const upcoming = useUpcoming();
-  const markets = useQuery({ queryKey: ["asset-perp-markets"], queryFn: () => autopilot.markets(), staleTime: 600_000 });
+  // Every perp Hyperliquid lists (a live trend's own coin gets Tredio's mark, so its ticket trades), not only Autopilot's markets.
+  const markets = useQuery({ queryKey: ["asset-perp-markets"], queryFn: () => hyperliquid.markets(), staleTime: 600_000 });
   const tradable = useMemo(() => new Set((markets.data?.markets ?? []).map((m) => m.symbol)), [markets.data]);
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("hot");
