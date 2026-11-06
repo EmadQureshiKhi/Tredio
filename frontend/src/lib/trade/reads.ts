@@ -13,6 +13,8 @@ const points = (raw: number) => raw / INDEX_SCALE;
 export interface IndexView {
   index: number;
   peakIndex: number;
+  /** The peak in registry units (6 decimals), exact, for the coin curve's quote. */
+  peakRaw: number;
   updatedAt: number;
   fresh: boolean;
   status: IndexSnapshot["status"];
@@ -20,7 +22,7 @@ export interface IndexView {
 
 export async function readIndex(trend: string): Promise<IndexView | null> {
   const s = await view<IndexSnapshot | null>(c.registry, "index_of", { id: trend });
-  return s ? { index: points(s.index), peakIndex: points(s.peak_index), updatedAt: s.updated_at, fresh: s.fresh, status: s.status } : null;
+  return s ? { index: points(s.index), peakIndex: points(s.peak_index), peakRaw: s.peak_index, updatedAt: s.updated_at, fresh: s.fresh, status: s.status } : null;
 }
 
 export interface SeriesView {
@@ -205,8 +207,12 @@ export async function readCurve(trend: string): Promise<CurveView | null> {
   return { ...curve, spot: Number(spot) / 1e18 / 1e6, graduationReserve: reserve };
 }
 
-export async function readCurveQuote(trend: string, side: "buy" | "sell", amount: bigint): Promise<{ out: bigint; fee: bigint; spotAfter: number } | null> {
-  const q = await view<CurveQuote | null>(c.coins, side === "buy" ? "quote_buy" : "quote_sell", side === "buy" ? { trend, usdc_in: amount.toString() } : { trend, coins_in: amount.toString() });
+/**
+ * The curve's quote. A buy first raises the floor to the trend's peak attention, so a buy quote
+ * takes the registry's peak; the curve contract before that argument existed ignores it.
+ */
+export async function readCurveQuote(trend: string, side: "buy" | "sell", amount: bigint, peakRaw: number | null = null): Promise<{ out: bigint; fee: bigint; spotAfter: number } | null> {
+  const q = await view<CurveQuote | null>(c.coins, side === "buy" ? "quote_buy" : "quote_sell", side === "buy" ? { trend, usdc_in: amount.toString(), ...(peakRaw !== null ? { peak_index: peakRaw } : {}) } : { trend, coins_in: amount.toString() });
   return q ? { out: BigInt(q.out), fee: BigInt(q.fee), spotAfter: Number(q.spot_after) / 1e18 / 1e6 } : null;
 }
 

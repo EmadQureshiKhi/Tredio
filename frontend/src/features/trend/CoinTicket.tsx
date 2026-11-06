@@ -89,7 +89,8 @@ function OnCurve({ trend }: { trend: Trend }) {
   const [text, setText] = useState("");
   const tx = useTx();
   const amount = parseAmount(text, mode === "buy" ? USDC_DECIMALS : COIN_DECIMALS);
-  const quote = useCurveQuote(trend.id, mode, amount);
+  const live = useRegistryIndex(trend.id);
+  const quote = useCurveQuote(trend.id, mode, amount, live.data?.peakRaw ?? null);
   const progress = c.graduationReserve > 0n ? Math.min(1, Number(c.reserve) / Number(c.graduationReserve)) : 0;
   const out = quote.data?.out;
   const impact = quote.data && c.spot > 0 ? Math.abs(quote.data.spotAfter / c.spot - 1) : 0;

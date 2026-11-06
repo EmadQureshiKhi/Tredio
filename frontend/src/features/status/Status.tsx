@@ -77,7 +77,11 @@ function StateBadge({ ok, testId }: { ok: boolean; testId?: string }) {
 }
 
 function Overall({ s, since, stale }: { s: SystemStatus; since: number; stale: boolean }) {
-  const down = [...s.services.filter((x) => !x.ok).map((x) => serviceInfo(x.name).label), ...(s.oracle.ok ? [] : ["the attention oracle"]), ...(s.chain.ok ? [] : ["the NEAR head"])];
+  // A service that answered but reported a problem (a low balance) is not "not answering": say which is which.
+  const silent = [...s.services.filter((x) => !x.ok && x.latencyMs === null).map((x) => serviceInfo(x.name).label), ...(s.oracle.ok ? [] : ["the attention oracle"]), ...(s.chain.ok ? [] : ["the NEAR head"])];
+  const troubled = s.services.filter((x) => !x.ok && x.latencyMs !== null).map((x) => `${serviceInfo(x.name).label} (${x.issue ?? "reports a problem"})`);
+  const count = silent.length + troubled.length;
+  const problems = [silent.length ? `not answering: ${silent.join(", ")}` : null, troubled.length ? `reporting a problem: ${troubled.join(", ")}` : null].filter(Boolean).join("; ");
   const lastRun = s.oracle.lastRunAgeSec === null ? null : s.oracle.lastRunAgeSec + since;
   return (
     <section aria-label="Overall status" className="relative overflow-hidden rounded-[24px] border border-line bg-surface px-5 py-6 sm:px-8 sm:py-7" data-testid="status-overall" data-ok={s.ok}>
@@ -91,7 +95,7 @@ function Overall({ s, since, stale }: { s: SystemStatus; since: number; stale: b
       <p className="relative mt-3 max-w-2xl text-[14px] leading-[22px] text-text-2">
         {s.ok
           ? `Every service answered and the oracle measured attention ${lastRun === null ? "recently" : `${age(lastRun)} ago`}.`
-          : `${down.length === 1 ? "One part is" : `${down.length} parts are`} not answering: ${down.join(", ")}. Positions and funds stay safe; actions that need ${down.length === 1 ? "it" : "them"} wait until ${down.length === 1 ? "it is" : "they are"} back.`}
+          : `${count === 1 ? "One part is" : `${count} parts are`} ${problems}. Positions and funds stay safe; actions that need ${count === 1 ? "it" : "them"} wait until ${count === 1 ? "it is" : "they are"} back.`}
       </p>
       {stale ? <p className="relative mt-2 text-[12.5px] text-warn">The last check failed; showing the previous result.</p> : null}
     </section>
@@ -183,11 +187,14 @@ function ServicesCard({ s }: { s: SystemStatus }) {
                     <Dot ok={x.ok} />
                     {info.label}
                   </span>
-                  <span className="num text-[12.5px] text-text-3 sm:hidden">{x.ok && x.latencyMs !== null ? `${x.latencyMs} ms` : x.ok ? "" : "no answer"}</span>
+                  <span className="num text-[12.5px] text-text-3 sm:hidden">{x.latencyMs !== null ? `${x.latencyMs} ms` : x.ok ? "" : "no answer"}</span>
                 </div>
-                <p className="min-w-0 flex-1 text-[13px] leading-5 text-text-2">{info.body}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] leading-5 text-text-2">{info.body}</p>
+                  {!x.ok && x.latencyMs !== null ? <p className="mt-1 text-[12.5px] leading-[18px] text-warn">Answered, and reports: {x.issue ?? "a problem"}.</p> : null}
+                </div>
                 <div className="hidden shrink-0 items-center gap-3 sm:flex">
-                  <span className="num w-[64px] text-right text-[12.5px] text-text-3">{x.ok && x.latencyMs !== null ? `${x.latencyMs} ms` : x.ok ? "" : "no answer"}</span>
+                  <span className="num w-[64px] text-right text-[12.5px] text-text-3">{x.latencyMs !== null ? `${x.latencyMs} ms` : x.ok ? "" : "no answer"}</span>
                   <StateBadge ok={x.ok} />
                 </div>
               </li>

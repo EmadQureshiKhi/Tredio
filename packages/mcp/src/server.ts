@@ -337,7 +337,9 @@ export function createServer(d: ServerDeps): McpServer {
     run(async ({ trend, buyUsdc }: { trend: string; buyUsdc?: string }) => {
       const curve = await view<Curve | null>(c.coins, "get_curve", { trend });
       if (!curve) throw new Error(`${trend} has no coin yet`);
-      const [spot, quote] = await Promise.all([view<string>(c.coins, "spot_price", { trend }), buyUsdc ? view<CurveQuote | null>(c.coins, "quote_buy", { trend, usdc_in: toRaw(buyUsdc, USDC_DECIMALS).toString() }) : Promise.resolve(null)]);
+      // A buy first raises the floor to the trend's peak attention, so the quote takes the registry's peak.
+      const peak = buyUsdc ? ((await view<{ peak_index: number } | null>(c.registry, "index_of", { id: trend }))?.peak_index ?? null) : null;
+      const [spot, quote] = await Promise.all([view<string>(c.coins, "spot_price", { trend }), buyUsdc ? view<CurveQuote | null>(c.coins, "quote_buy", { trend, usdc_in: toRaw(buyUsdc, USDC_DECIMALS).toString(), ...(peak !== null ? { peak_index: peak } : {}) }) : Promise.resolve(null)]);
       return {
         factory: c.coins,
         coin: curve.coin,

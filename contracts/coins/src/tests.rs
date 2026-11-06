@@ -152,6 +152,22 @@ fn peak_attention_ratchets_the_floor() {
 }
 
 #[test]
+fn a_buy_quote_with_the_peak_matches_the_buy_after_the_peak_rose() {
+    let mut c = setup();
+    for _ in 0..10 {
+        buy(&mut c, 40 * ONE_USDC, 40_000_000);
+    }
+    let stale = c.quote_buy("topic:openai".into(), U128(5 * ONE_USDC), None).unwrap().out.0;
+    let fresh = c.quote_buy("topic:openai".into(), U128(5 * ONE_USDC), Some(60_000_000)).unwrap().out.0;
+    let sold = c.get_curve("topic:openai".into()).unwrap().math.sold;
+    buy(&mut c, 5 * ONE_USDC, 60_000_000);
+    let got = c.get_curve("topic:openai".into()).unwrap().math.sold - sold;
+    assert_eq!(got, fresh);
+    // The stored-state quote promises more than the buy can give once it raises the floor.
+    assert!(stale > got);
+}
+
+#[test]
 fn sells_burn_and_pay() {
     let mut c = setup();
     buy(&mut c, 10 * ONE_USDC, 40_000_000);

@@ -53,7 +53,7 @@ void loop();
 
 const minBalance = BigInt(Math.round(cfg.MIN_BALANCE_NEAR * 1e6)) * 10n ** 18n;
 const app = new Hono();
-const makerWallet = walletWatch(viewer, "Maker", sender.accountId, { min: minBalance, gasKeys: [sender.publicKey] });
+const makerWallet = walletWatch(viewer, "Market maker", sender.accountId, { min: minBalance, gasKeys: [sender.publicKey] });
 app.get("/live", (c) => c.json({ live: true }));
 app.get("/health", async (c) => {
   const wallet = await makerWallet();

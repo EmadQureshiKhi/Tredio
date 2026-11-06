@@ -66,12 +66,12 @@ export function useCurve(trend: string | undefined) {
 }
 
 /** The curve's own quote for a trade (out and fee). */
-export function useCurveQuote(trend: string | undefined, side: "buy" | "sell", amount: bigint | null) {
+export function useCurveQuote(trend: string | undefined, side: "buy" | "sell", amount: bigint | null, peakRaw: number | null = null) {
   return useQuery({
-    queryKey: ["curve-quote", trend, side, amount?.toString()],
+    queryKey: ["curve-quote", trend, side, amount?.toString(), peakRaw],
     enabled: Boolean(trend) && amount !== null && amount > 0n,
     refetchInterval: 8_000,
-    queryFn: () => readCurveQuote(trend!, side, amount!),
+    queryFn: () => readCurveQuote(trend!, side, amount!, peakRaw),
   });
 }
 

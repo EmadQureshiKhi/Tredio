@@ -363,9 +363,16 @@ impl Coins {
         U128(self.get(&trend).math.spot_wad())
     }
 
-    /// Coins out for `usdc_in` (fee included) at the current state.
-    pub fn quote_buy(&self, trend: String, usdc_in: U128) -> Option<Quote> {
-        let mut m = self.get(&trend).math;
+    /// Coins out for `usdc_in` (fee included). A buy first raises the floor to the trend's peak
+    /// attention, so pass the registry's `peak_index` (from `index_of`) to quote what a buy gets
+    /// now; without it the quote is the stored state, which a peak that rose since the last trade
+    /// prices too low.
+    pub fn quote_buy(&self, trend: String, usdc_in: U128, peak_index: Option<u64>) -> Option<Quote> {
+        let c = self.get(&trend);
+        let mut m = c.math;
+        if let Some(peak) = peak_index {
+            m.raise_floor(self.base_virtual_quote, ratchet_bps(peak, c.peak_at_creation));
+        }
         m.buy(usdc_in.0, 0).ok().map(|t| Quote {
             out: U128(t.out),
             fee: U128(t.fee),

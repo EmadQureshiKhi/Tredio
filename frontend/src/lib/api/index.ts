@@ -392,7 +392,8 @@ export interface FleetWallet {
 export interface SystemStatus {
   ok: boolean;
   network: "testnet" | "mainnet";
-  services: Array<{ name: string; ok: boolean; latencyMs: number | null }>;
+  /** `issue`: why a down service is down, in a few words ("not answering", "balance below 1 NEAR"). */
+  services: Array<{ name: string; ok: boolean; latencyMs: number | null; issue?: string | null }>;
   oracle: { ok: boolean; lastRunAgeSec: number | null; staleTrends: number };
   chain: { ok: boolean; ageSec: number | null; height: number | null };
   fleet: FleetWallet[];

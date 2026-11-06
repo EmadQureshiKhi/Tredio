@@ -70,19 +70,25 @@ export function AmountField({
 /** The ticket's main button, or Sign in when signed out. `passkey` marks a trade the passkey (or the wallet) confirms. */
 export function SubmitButton({ children, tone = "primary", disabled, loading, onClick, testId, passkey }: { children: ReactNode; tone?: ButtonTone; disabled?: boolean; loading?: boolean; onClick: () => void; testId?: string; passkey?: boolean }) {
   const account = useAccount();
+  // On wide screens the trade panel scrolls inside: the button stays pinned to its bottom edge, over a fade, so a long ticket never hides it.
+  const pinned = "lg:sticky lg:bottom-0 lg:z-10 lg:bg-surface lg:pt-1 lg:before:pointer-events-none lg:before:absolute lg:before:inset-x-0 lg:before:-top-5 lg:before:h-5 lg:before:bg-gradient-to-t lg:before:from-surface lg:before:to-transparent";
   // Restoring the session: a neutral placeholder, never a "Sign in" that turns into the trade.
   if (account.status === "loading") return <div className="skeleton h-12 w-full rounded-2xl" aria-hidden />;
   if (!account.authenticated) {
     return (
-      <Button block size="lg" icon={<Fingerprint className="size-[18px]" aria-hidden />} onClick={account.login}>
-        {account.status === "session-expired" ? "Renew session to trade" : "Sign in to trade"}
-      </Button>
+      <div className={pinned}>
+        <Button block size="lg" icon={<Fingerprint className="size-[18px]" aria-hidden />} onClick={account.login}>
+          {account.status === "session-expired" ? "Renew session to trade" : "Sign in to trade"}
+        </Button>
+      </div>
     );
   }
   return (
-    <Button block size="lg" tone={tone} disabled={disabled} loading={loading} onClick={onClick} data-testid={testId} icon={passkey && account.kind === "passkey" ? <Fingerprint className="size-[18px]" aria-hidden /> : undefined}>
-      {children}
-    </Button>
+    <div className={pinned}>
+      <Button block size="lg" tone={tone} disabled={disabled} loading={loading} onClick={onClick} data-testid={testId} icon={passkey && account.kind === "passkey" ? <Fingerprint className="size-[18px]" aria-hidden /> : undefined}>
+        {children}
+      </Button>
+    </div>
   );
 }
 

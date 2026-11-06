@@ -161,6 +161,17 @@ export function describeHealth(body: unknown): Omit<ServiceDetail, "name" | "ok"
   return { lastError, alerts, wallets, treasury, lastWorkAt: num(b.lastWorkAt) };
 }
 
+/**
+ * Why a service is down, in a few public words: it did not answer, or the first alert it raised
+ * ("balance: below 1 NEAR" reads "balance below 1 NEAR"). Errors stay in the admin view.
+ */
+export function publicIssue(s: Pick<ServiceDetail, "ok" | "latencyMs" | "alerts">): string | null {
+  if (s.ok) return null;
+  if (s.latencyMs === null) return "not answering";
+  const alert = s.alerts[0];
+  return alert ? alert.replace(/^([\w-]+): /, "$1 ") : "reports a problem";
+}
+
 /** Every service's health in detail, for the admin view; never throws. */
 export async function serviceDetails(services: readonly ServiceProbe[], fetchImpl: (url: string, init?: RequestInit) => Promise<Response> = fetch): Promise<ServiceDetail[]> {
   return Promise.all(
@@ -207,5 +218,5 @@ export async function status(
     s.wallets.map((w) => ({ service: s.name, label: w.label, account: w.account, balance: w.balance, gasKeys: w.gasKeys.map((k) => ({ publicKey: k.publicKey, balance: k.balance, nonces: k.nonces })) })),
   );
   const ok = details.every((p) => p.ok) && oracle.ok && head.ok;
-  return { ok, network: chain.deployment.network, services: details.map((s) => ({ name: s.name, ok: s.ok, latencyMs: s.latencyMs })), oracle, chain: head, fleet, at: nowSec };
+  return { ok, network: chain.deployment.network, services: details.map((s) => ({ name: s.name, ok: s.ok, latencyMs: s.latencyMs, issue: publicIssue(s) })), oracle, chain: head, fleet, at: nowSec };
 }

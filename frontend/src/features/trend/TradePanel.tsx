@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, m } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimateHeight, Card, cn, Segmented } from "@/components/ui";
 import type { Trend } from "@/lib/api";
 import AssetPerpTicket from "./AssetPerpTicket";
@@ -18,6 +18,42 @@ const BLURB: Record<Tab, string> = {
   assetPerp: "Hyperliquid perpetuals on the asset's own market price, signed by your account through NEAR Chain Signatures.",
 };
 
+/** Where the trend page sticks the panel on wide screens (TrendView's lg:top-[88px]), and the gap kept under it. */
+const STICKY_TOP = 88;
+const BOTTOM_GAP = 24;
+
+/**
+ * On wide screens the panel sticks under the header, capped to the window; before it sticks it
+ * starts lower down the page, so it fits the space left below where it starts. Its end, with the
+ * submit button, is then never below the fold.
+ */
+function useFitToWindow() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const wide = window.matchMedia("(min-width: 1024px)");
+    let frame = 0;
+    const fit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        el.style.maxHeight = wide.matches ? `${Math.max(320, window.innerHeight - Math.max(el.getBoundingClientRect().top, STICKY_TOP) - BOTTOM_GAP)}px` : "";
+      });
+    };
+    fit();
+    window.addEventListener("scroll", fit, { passive: true });
+    window.addEventListener("resize", fit);
+    wide.addEventListener("change", fit);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", fit);
+      window.removeEventListener("resize", fit);
+      wide.removeEventListener("change", fit);
+    };
+  }, []);
+  return ref;
+}
+
 /** Every way to trade a trend, one ticket at a time. */
 export default function TradePanel({ trend, className }: { trend: Trend; className?: string }) {
   const { market } = useAssetPerpMarket(trend.asset ?? trend.ticker);
@@ -29,8 +65,9 @@ export default function TradePanel({ trend, className }: { trend: Trend; classNa
     ...(market ? [{ value: "assetPerp" as const, label: market.symbol }] : []),
   ];
   const current = tab === "assetPerp" && !market ? "outcome" : tab;
+  const panel = useFitToWindow();
   return (
-    <Card className={cn("flex flex-col gap-4 p-4 sm:p-5", className)} data-testid="trade-panel">
+    <Card ref={panel} className={cn("flex flex-col gap-4 p-4 sm:p-5", className)} data-testid="trade-panel">
       <div>
         <Segmented label="How to trade" value={current} onChange={setTab} options={options} />
         <p className="mt-2.5 text-[12.5px] leading-[18px] text-text-3">{BLURB[current]}</p>
