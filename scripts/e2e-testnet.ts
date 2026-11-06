@@ -24,6 +24,16 @@ const mm = senderFor("tredio-mm.testnet");
 const oracleKey = JSON.parse(readFileSync("internal/keys/oracle-bootstrap.json", "utf8")).secret_key as string;
 const trend = process.env.E2E_TREND ?? `topic:e2e-${nowSecs().toString(36)}`;
 
+/** Reads until `done` holds or 20 s pass, then gives the last answer (undefined if every read failed). */
+async function untilFinal<T>(read: () => Promise<T>, done: (v: T) => boolean): Promise<T | undefined> {
+  const until = Date.now() + 20_000;
+  for (;;) {
+    const v = await read().catch(() => undefined);
+    if ((v !== undefined && done(v)) || Date.now() > until) return v;
+    await Bun.sleep(1_000);
+  }
+}
+
 async function report(r: Omit<Report, "run_id" | "observed_at">) {
   const last = await viewer.view<number>(D.contracts.registry, "last_run_id");
   const json = JSON.stringify({ run_id: last + 1, observed_at: nowSecs() - 5, ...r });
@@ -56,21 +66,25 @@ const first: OwnerAction[] = [
 const request = requestJson(ownerRequest(account, "testnet", first));
 const created = await relayer.send(C.accounts.create(passkey.publicKeyHex, (4n * 10n ** 23n).toString(), { request, proof: await passkey.prove(request) }));
 log("account", account, "created in", created.hash);
-const keys = await viewer.rpc<{ keys: { public_key: string; access_key: Record<string, unknown> }[] }>("query", {
-  request_type: "view_access_key_list",
-  finality: "final",
-  account_id: account,
-});
-log("keys", JSON.stringify(keys.keys));
+// Views at `final` lag a just-sent transaction by a block or two, so the reads below wait until they see it.
+const keys = await untilFinal(
+  () => viewer.rpc<{ keys: { public_key: string; access_key: Record<string, unknown> }[] }>("query", { request_type: "view_access_key_list", finality: "final", account_id: account }),
+  (k) => k.keys.length > 0,
+);
+log("keys", JSON.stringify(keys?.keys ?? []));
 
 // 2. The gas key draws test USDC, attaching the gas the account's code needs (300 Tgas on v1, 150 on v2).
 const version = await new AccountVersions((a) => viewer.view<number>(a, "version")).of(account);
+if (upgrade && version < 2) throw new Error(`deployments name v2 account code, but ${account} runs v${version} after its first request`);
 const tgas = sessionCallTgas(version);
 log("account code", `v${version}`, `${tgas} Tgas a session call`);
 const user = new Sender({ network: "testnet", accountId: account, privateKey: session.secretKey, gasKeyLanes: 4 });
 const drip = await user.send(C.account.sessionCall(account, "faucet", tgas));
-const bal = await viewer.view<string>(D.contracts.usdc, "ft_balance_of", { account_id: account });
-log("faucet via gas key", drip.hash, "USDC", Number(bal) / 1e6);
+const bal = await untilFinal(
+  () => viewer.view<string>(D.contracts.usdc, "ft_balance_of", { account_id: account }),
+  (b) => b !== "0",
+);
+log("faucet via gas key", drip.hash, "USDC", Number(bal ?? 0) / 1e6);
 
 // 3. A trend, a series on the book.
 await report({ new_trends: [{ identifier: trend, asset_class: "topic", index: 50_000_000, surfacer: account, smart_money_confirmed: false, review_hash: null, asset: null }], updates: [], marks: [] });

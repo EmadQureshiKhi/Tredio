@@ -135,10 +135,15 @@ describe("account versions", () => {
   test("v2 code joins the allowed hashes and the first request only once deployments names it", async () => {
     const { accountCodeHashes, upgradeToV2 } = await import("../src/index");
     const d = deployment("testnet");
-    expect(accountCodeHashes(d)).toEqual([d.globalCode.account]);
-    expect(upgradeToV2(d)).toBeNull();
+    const { accountV2: _, ...v1Only } = d.globalCode;
+    const v1 = { ...d, globalCode: v1Only };
+    expect(accountCodeHashes(v1)).toEqual([d.globalCode.account]);
+    expect(upgradeToV2(v1)).toBeNull();
     const v2 = { ...d, globalCode: { ...d.globalCode, accountV2: "4reLvkAWfqk5fsqio1KLudk46cqRz9erQdaHkWZKMJDZ" } };
     expect(accountCodeHashes(v2)).toEqual([d.globalCode.account, "4reLvkAWfqk5fsqio1KLudk46cqRz9erQdaHkWZKMJDZ"]);
     expect(upgradeToV2(v2)).toEqual({ upgrade: { code_hash: "4reLvkAWfqk5fsqio1KLudk46cqRz9erQdaHkWZKMJDZ" } });
+    // Testnet has published v2.
+    expect(d.globalCode.accountV2).toMatch(/^[1-9A-HJ-NP-Za-km-z]{43,44}$/);
+    expect(upgradeToV2(d)).toEqual({ upgrade: { code_hash: d.globalCode.accountV2! } });
   });
 });

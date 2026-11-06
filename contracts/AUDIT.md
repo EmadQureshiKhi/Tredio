@@ -206,7 +206,8 @@ Published as a new global contract; each account upgrades with its passkey.
 ## Deployment
 
 `registry`, `book`, `outcomes`, `coins` and `accounts` were redeployed in place on testnet on 2026-11-06 with these fixes (M-5, M-6 and M-7 included); their state read unchanged and the oracle's reports kept landing.
-The account v2 global code is not published yet: publishing it burns about 31.6 NEAR, more than the testnet treasury holds, so accounts still run v1 and H-1 and L-3 stay open for them until they upgrade.
+The account v2 global code was published on testnet on 2026-11-06 (hash `BsFqhAcYESJ5Fyn55Xa6HwPyJaYy3VyEu4ZGh2iTdBMf`, 31.55 NEAR burned), and `deployments/testnet.json` names it as `globalCode.accountV2`.
+New accounts move onto it in their first request; accounts made earlier run v1, where H-1 and L-3 stay open, until their passkey upgrades them from Settings.
 
 | Contract | Change | Redeploy | State migration |
 | --- | --- | --- | --- |

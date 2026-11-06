@@ -1,6 +1,6 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { keepsGasKeys, type OwnerAction, type Session } from "@tredio/contracts";
+import { keepsGasKeys, type OwnerAction, type Session, upgradeToV2 } from "@tredio/contracts";
 import { Check, Copy, Fingerprint, LogOut, Snowflake } from "lucide-react";
 import { useState } from "react";
 import { Avatar } from "@/components/shell/AppShell";
@@ -46,6 +46,7 @@ export function AccountSection() {
           <AddressRow address={s.address} />
           {s.kind === "passkey" ? (
             <>
+              <CodeRow />
               <SessionRow />
               <Sessions />
               <RevokedKeys />
@@ -85,6 +86,48 @@ function AddressRow({ address }: { address: string }) {
         </button>
         <ExplorerLink href={explorerAddress(address)} size="icon" />
       </span>
+    </SettingRow>
+  );
+}
+
+/**
+ * The account's code: accounts made before v2 was published run v1 until their passkey moves them
+ * onto v2 (new accounts move in their first request). The code is published by hash, so no one can
+ * change it afterwards, and only the passkey can switch an account to other code.
+ */
+function CodeRow() {
+  const account = useAccount();
+  const me = account.session!;
+  const qc = useQueryClient();
+  const tx = useTx();
+  const version = useAccountVersion(me.address).data;
+  const upgrade = upgradeToV2(DEPLOYMENT);
+  if (version === undefined) return <Skeleton className="my-4 h-10 rounded-2xl" />;
+  const run = async () => {
+    if (!upgrade) return;
+    if (await tx.run(() => account.ownerExecute([upgrade]), { action: "Upgrade account", done: "Account upgraded to version 2", pending: "Confirm with your passkey" })) {
+      void qc.invalidateQueries({ queryKey: ["account-version"] });
+      void qc.invalidateQueries({ queryKey: ["dormant-keys"] });
+    }
+  };
+  if (version >= 2 || !upgrade) {
+    return (
+      <SettingRow label="Account code" hint="The code your account runs. It is published by hash, so no one can change it, and only your passkey can move the account to other code.">
+        <Badge tone={version >= 2 ? "primary" : undefined}>Version {version}</Badge>
+        <TxStatus tx={tx} filledLabel="Upgraded" className="w-full" />
+      </SettingRow>
+    );
+  }
+  return (
+    <SettingRow
+      label="Account code"
+      hint="Version 2 is out. Renewing or revoking a session keeps the gas its key holds instead of burning it, and each trade reserves half the gas. One passkey prompt moves your account onto it; no one else can."
+    >
+      <Badge tone="warn">Version {version}</Badge>
+      <Button size="sm" tone="secondary" icon={<Fingerprint className="size-4" aria-hidden />} loading={tx.busy} onClick={() => void run()} data-testid="upgrade-account">
+        Upgrade
+      </Button>
+      <TxStatus tx={tx} filledLabel="Upgraded" className="w-full" />
     </SettingRow>
   );
 }
@@ -138,6 +181,7 @@ function Sessions() {
   };
   return (
     <SettingRow
+      top
       label="Other sessions"
       hint={`Keys this account trusts besides this device's: other devices you signed in on, and Autopilot. ${keepsKeys ? "Revoking one ends its session; its key stays on the account, unable to trade, so the gas it holds is not burned." : "Revoking one removes its key from the account."}`}
     >
@@ -182,7 +226,7 @@ function RevokedKeys() {
     setDeleting(null);
   };
   return (
-    <SettingRow label="Revoked keys" hint="Keys of sessions you revoked: still on the account, unable to trade, keeping the gas they hold. Renewing the session on the device that holds one brings it back. Deleting one removes it for good and burns that gas.">
+    <SettingRow top label="Revoked keys" hint="Keys of sessions you revoked: still on the account, unable to trade, keeping the gas they hold. Renewing the session on the device that holds one brings it back. Deleting one removes it for good and burns that gas.">
       <ul className="flex w-full flex-col gap-2 sm:w-[320px]" data-testid="revoked-keys">
         {list.map((key) => (
           <li key={key} className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2">
@@ -247,7 +291,7 @@ function Withdraw() {
     }
   };
   return (
-    <SettingRow label="Withdraw" hint="Send USDC from this account to any NEAR account. Your passkey confirms each withdrawal; a session never can.">
+    <SettingRow top label="Withdraw" hint="Send USDC from this account to any NEAR account. Your passkey confirms each withdrawal; a session never can.">
       <div className="flex w-full flex-col gap-2 sm:w-[320px]">
         <Field label="To" placeholder="name.near or account id" value={to} onChange={(e) => setTo(e.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} error={error} data-testid="withdraw-to" />
         <Field

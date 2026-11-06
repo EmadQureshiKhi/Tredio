@@ -19,10 +19,10 @@ export function Section({ id, title, description, action, children, className }:
   );
 }
 
-/** A label and its content in a settings row, stacked on phones. */
-export function SettingRow({ label, hint, children, className }: { label: ReactNode; hint?: ReactNode; children: ReactNode; className?: string }) {
+/** A label and its content in a settings row, stacked on phones; `top` aligns a tall control (a list, a form) with the label instead of centring the label on it. */
+export function SettingRow({ label, hint, children, className, top = false }: { label: ReactNode; hint?: ReactNode; children: ReactNode; className?: string; top?: boolean }) {
   return (
-    <div className={cn("flex flex-col gap-2 border-t border-line py-4 first:border-t-0 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-6", className)}>
+    <div className={cn("flex flex-col gap-2 border-t border-line py-4 first:border-t-0 first:pt-0 last:pb-0 sm:flex-row sm:justify-between sm:gap-6", top ? "sm:items-start" : "sm:items-center", className)}>
       <div className="min-w-0">
         <p className="font-strong text-[13.5px] text-text">{label}</p>
         {hint ? <p className="mt-0.5 text-[12.5px] leading-[18px] text-text-3">{hint}</p> : null}

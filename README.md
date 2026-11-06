@@ -45,13 +45,14 @@ Each of these is a NEAR primitive doing real work in the product, not a logo on 
    Every candidate the radar finds is reviewed by NEAR AI Cloud's verifiable models.
    An answer without a `provider_tee` signature is refused, and the hash of the signed evidence is written on the trend in the registry.
    The API serves the exact request and response the signature covers, so anyone can recompute both hashes and check the signature without trusting Tredio.
-   Status on testnet: the API key is in place and the radar calls NEAR AI Cloud, but the account has no credits yet (it answers HTTP 402), so today's trends were added by hand and carry no review yet.
+   Status on testnet: the radar's candidates are reviewed by NEAR AI Cloud, with evidence signed in the provider's TEE.
+   The first reviewed candidates are crypto and list only once smart-money inflow confirms them, so the trends live so far were added by hand and carry no review hash yet.
    In the app: the Verified chip on a reviewed trend opens the evidence.
    Code: [`backend/src/ai/nearai.ts`](backend/src/ai/nearai.ts), `GET /v1/reviews/:hash`.
 4. **Hyperliquid perps from a NEAR account.**
    Your account contract builds the Hyperliquid order (msgpack action, connection id, EIP-712 digest) and asks [Chain Signatures](https://docs.near.org/chain-abstraction/chain-signatures) (`v1.signer-prod.testnet`) to sign it with your account's own derived key.
    A session can only sign orders within 2% of a fresh oracle mark and up to 10x leverage, enforced on chain.
-   Status on testnet: accounts run account code v1, whose guard does not yet bind the mark to the signed asset; v2 fixes that ([AUDIT.md](contracts/AUDIT.md), H-1) and is published once the testnet treasury can pay for it.
+   Status on testnet: account code v2, whose guard binds the mark to the signed asset ([AUDIT.md](contracts/AUDIT.md), H-1), is published; new accounts start on it, and older ones upgrade from Settings with one passkey prompt.
    In the app: the Perp tab's Hyperliquid market, on a trend with an asset; today's live trends are topics, and crypto trends (NEAR and Hyperliquid are queued) list once Nansen confirms smart-money inflow.
    Code: [`contracts/account/src/hyperliquid.rs`](contracts/account/src/hyperliquid.rs), [`packages/hyperliquid`](packages/hyperliquid).
 5. **Deposits from any chain.**

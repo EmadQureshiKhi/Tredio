@@ -115,7 +115,7 @@ async function chain() {
     return problems.length ? fail(problems.join("; ")) : ok(`${entries.length} of ${entries.length} accounts hold code`);
   });
 
-  await check(S, "Account code is one global contract", async () => {
+  await check(S, "Accounts run published global code", async () => {
     const [, , codeHash] = await viewer.view<[string, unknown, string, number]>(D.contracts.accounts, "config");
     if (codeHash !== D.globalCode.account) return fail(`factory uses ${codeHash}, deployments say ${D.globalCode.account}`);
     // Accounts are born on the factory's code (v1) and move to v2 with their passkey once deployments names it.
