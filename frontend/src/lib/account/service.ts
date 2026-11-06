@@ -415,7 +415,7 @@ export class AccountService {
     if (!a || a.kind !== "passkey" || !a.credentialId) throw new Error("Sign in first.");
     const request = requestJson(ownerRequest(a.address, NETWORK, actions));
     const r = await assert(rpId(), await requestChallenge(request), a.credentialId);
-    let sent: { hash: string; value: unknown };
+    let sent: { hash: string; value: unknown; outcome?: Outcome };
     try {
       sent = await relayer.ownerExecute({ account: a.address, request, proof: r.proof });
     } catch (e) {
@@ -429,11 +429,12 @@ export class AccountService {
       throw e;
     }
     // The receipts' logs say what the calls did (an order's id, or a refusal that returned the funds).
+    // The relayer sends them with its answer; an older relayer does not, so then the app follows the transaction.
     const by = await relayer.account();
-    const outcome = by ? await follow(sent.hash, by, Date.now() + 20_000).catch(() => null) : null;
+    const outcome = sent.outcome ?? (by ? await follow(sent.hash, by, Date.now() + 20_000).catch(() => null) : null);
     const refused = outcome ? refusalOf(outcome) : null;
     if (refused) throw new TxFailed(refused, sent.hash);
-    return { ...sent, sender: by, outcome };
+    return { hash: sent.hash, value: sent.value, sender: by, outcome };
   }
 
   /** Adds a session for someone else's key (Autopilot's grant), with one prompt, and fills its gas. */

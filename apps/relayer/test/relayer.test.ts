@@ -56,6 +56,10 @@ function fakes(opts: { existing?: Set<string>; owners?: Map<string, string>; ses
   const sender = {
     accountId: "relayer.testnet",
     send: async (call: unknown) => (sent.push({ kind: "call", detail: call }), { hash: "tx1", value: null }),
+    sendOutcome: async (call: unknown) => (
+      sent.push({ kind: "call", detail: call }),
+      { status: { SuccessValue: "" }, transaction: { hash: "tx1" }, receipts_outcome: [{ id: "r1", outcome: { status: { SuccessValue: "" }, logs: ['EVENT_JSON:{"standard":"tredio","version":"1.0.0","event":"order_placed","data":[{"id":"9"}]}'], executor_id: "book.tredio.testnet" } }] }
+    ),
     fundGasKey: async (account: string, pk: string, amount: bigint) => (sent.push({ kind: "fund", detail: { account, pk, amount } }), { transaction: { hash: "tx2" } }),
     sendTx: async () => (sent.push({ kind: "tx", detail: null }), { transaction: { hash: "tx3" } }),
   } as unknown as Sender;
@@ -123,7 +127,10 @@ describe("owner requests and session gas", () => {
     const account = base.derive(pk.ownerKey);
     const f = fakes({ owners: new Map([[account, pk.ownerKey]]) });
     const request = requestJson(ownerRequest(account, "testnet", [{ freeze: {} } as never], NOW));
-    expect((await relayer(f).ownerExecute({ account, request, proof: await pk.prove(request) })).hash).toBe("tx1");
+    const done = await relayer(f).ownerExecute({ account, request, proof: await pk.prove(request) });
+    expect(done.hash).toBe("tx1");
+    // The receipts' logs come back with the answer, so the app reads what happened without another RPC call.
+    expect(done.outcome.receipts_outcome[0]!.outcome.logs[0]).toContain("order_placed");
     await expect(relayer(fakes()).ownerExecute({ account, request, proof: await pk.prove(request) })).rejects.toThrow(/not a Tredio account/);
     await expect(relayer(f).ownerExecute({ account, request, proof: await passkey().prove(request) })).rejects.toBeInstanceOf(RelayError);
   });

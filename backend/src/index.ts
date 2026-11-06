@@ -48,6 +48,8 @@ log.info({ migrations: applied.length, network: cfg.NEAR_NETWORK, rpcEndpoints: 
 
 const store = new Store(sql);
 const chain = new ChainReader(cfg.rpcUrls, cfg.deployment);
+// The first page view should not pay for the first registry read.
+void chain.trends().catch((e: Error) => log.warn({ err: e.message }, "registry warm-up failed"));
 
 const elfaRouting = routeElfaKeys(cfg.ELFA_API_KEYS, cfg.ELFA_PROXIES);
 if (cfg.ELFA_API_KEYS.length > 0) {

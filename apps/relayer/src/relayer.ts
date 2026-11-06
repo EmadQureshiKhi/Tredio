@@ -1,5 +1,5 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
-import { base58Decode, type PasskeyAssertion, type Sender, TxError, type Viewer, ownerKeyHex, verifyPasskey } from "@tredio/chain";
+import { base58Decode, type PasskeyAssertion, returnValue, type Sender, TxError, type Viewer, ownerKeyHex, verifyPasskey } from "@tredio/chain";
 import { type ActivationTicket, activationTicketMessage, calls, type Deployment, type OwnerRequest, requestChallenge } from "@tredio/contracts";
 import { decodeSignedDelegateAction } from "near-kit";
 
@@ -28,6 +28,27 @@ export class RelayError extends Error {
   ) {
     super(message);
   }
+}
+
+/**
+ * The part of an owner request's outcome the app reads: every receipt's status and logs, where
+ * the contracts log what they did (an order's id) or what they refused and refunded. The app
+ * gets it with the answer instead of asking an RPC for the transaction again.
+ */
+export interface OutcomeSummary {
+  status: unknown;
+  transaction: { hash: string };
+  receipts_outcome: Array<{ id: string; outcome: { status: unknown; logs: string[]; executor_id: string } }>;
+}
+
+type Outcome = Awaited<ReturnType<Sender["sendOutcome"]>>;
+
+export function summarize(o: Outcome): OutcomeSummary {
+  return {
+    status: o.status,
+    transaction: { hash: o.transaction?.hash ?? o.transaction_outcome?.id ?? "" },
+    receipts_outcome: (o.receipts_outcome ?? []).map((r) => ({ id: r.id, outcome: { status: r.outcome.status, logs: r.outcome.logs ?? [], executor_id: r.outcome.executor_id } })),
+  };
 }
 
 /** Counts events in a sliding window. */
@@ -201,7 +222,7 @@ export class Relayer {
   }
 
   /** Relays a passkey-signed owner request to a Tredio account. */
-  async ownerExecute(a: { account: string; request: string; proof: PasskeyAssertion }): Promise<{ hash: string; value: unknown }> {
+  async ownerExecute(a: { account: string; request: string; proof: PasskeyAssertion }): Promise<{ hash: string; value: unknown; outcome: OutcomeSummary }> {
     const ownerKey = await this.tredioOwner(a.account);
     if (!ownerKey) throw new RelayError("not a Tredio account", 403);
     const request = await this.checkProof(a.request, a.proof, ownerKey);
@@ -215,9 +236,9 @@ export class Relayer {
     this.spend(GAS_COST_ESTIMATE);
     this.hour.add(`owner:${a.account}`);
     try {
-      const r = await this.d.sender.send(this.C.account.ownerExecute(a.account, a.request, a.proof));
+      const o = await this.d.sender.sendOutcome(this.C.account.ownerExecute(a.account, a.request, a.proof));
       this.stats.ownerCalls++;
-      return r;
+      return { hash: o.transaction?.hash ?? o.transaction_outcome?.id ?? "", value: returnValue(o), outcome: summarize(o) };
     } catch (e) {
       this.fail(e);
     }

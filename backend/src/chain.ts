@@ -3,7 +3,9 @@ import type { Checkpoint, Deployment, RegistryParams, Trend } from "@tredio/cont
 
 /**
  * Read-only NEAR access: the registry's trends, read through RPC with provider failover and
- * cached briefly, since the radar, collector and API all ask for them.
+ * cached briefly, since the radar, collector and API all ask for them. A snapshot past its
+ * freshness window is still served while a refresh runs behind it, so a rate-limited RPC never
+ * holds up a request; only a snapshot too old to show is waited on.
  */
 
 export const STATUS = ["None", "Active", "Cooling", "Retired"] as const;
@@ -41,6 +43,7 @@ export class ChainReader {
     rpcUrls: readonly string[],
     readonly deployment: Deployment,
     private readonly ttlMs = 15_000,
+    private readonly maxStaleMs = 5 * 60_000,
   ) {
     this.viewer = new Viewer(deployment.network, [...rpcUrls]);
   }
@@ -88,10 +91,16 @@ export class ChainReader {
   }
 
   private async snapshot(): Promise<{ trends: ChainTrend[]; lastRunId: bigint }> {
-    if (this.cache && Date.now() - this.cache.at < this.ttlMs) return this.cache;
+    const age = this.cache ? Date.now() - this.cache.at : Infinity;
+    if (this.cache && age < this.ttlMs) return this.cache;
     this.inflight ??= this.load().finally(() => {
       this.inflight = null;
     });
+    if (this.cache && age < this.maxStaleMs) {
+      // The refresh lands in the cache for the next caller; a failed one leaves the snapshot to retry later.
+      this.inflight.catch(() => {});
+      return this.cache;
+    }
     return this.inflight;
   }
 

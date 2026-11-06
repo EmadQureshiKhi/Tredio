@@ -1,4 +1,5 @@
 import type { ActivationTicket, PasskeyProof } from "@tredio/contracts";
+import type { Outcome } from "@/lib/chain/outcome";
 import { RELAYER_URL } from "@/lib/config";
 import { retryAfterSec } from "@/lib/rate-limit";
 
@@ -49,7 +50,7 @@ export const relayer = {
   /** Creates the passkey's account and runs its first owner request (adding the first session). */
   createAccount: (b: { ownerKey: string; request: string; proof: PasskeyProof; ticket: ActivationTicket | null }) => post<{ account: string; hash: string }>("/v1/accounts", b),
   /** Relays a passkey-signed owner request to the account. */
-  ownerExecute: (b: { account: string; request: string; proof: PasskeyProof }) => post<{ hash: string; value: unknown }>("/v1/owner-execute", b),
+  ownerExecute: (b: { account: string; request: string; proof: PasskeyProof }) => post<{ hash: string; value: unknown; outcome?: Outcome }>("/v1/owner-execute", b),
   /** Tops up an active session's gas key when it runs low; `hash` is null when it did not need it. */
   fundSession: (b: { account: string; publicKey: string }) => post<{ hash: string | null; balance: string }>("/v1/sessions/fund", b),
 };
