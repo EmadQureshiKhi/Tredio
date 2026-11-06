@@ -20,6 +20,7 @@ const relayer = new Relayer({
     accountsPerHour: cfg.ACCOUNTS_PER_HOUR,
     accountsPerDay: cfg.ACCOUNTS_PER_DAY,
     ownerCallsPerAccountPerHour: cfg.OWNER_CALLS_PER_ACCOUNT_PER_HOUR,
+    topupsPerSessionPerDay: cfg.TOPUPS_PER_SESSION_PER_DAY,
     topupsPerAccountPerDay: cfg.TOPUPS_PER_ACCOUNT_PER_DAY,
     storageTopupsPerAccountPerDay: cfg.STORAGE_TOPUPS_PER_ACCOUNT_PER_DAY,
     metaPerAccountPerHour: cfg.META_TX_PER_ACCOUNT_PER_HOUR,

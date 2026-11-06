@@ -79,6 +79,8 @@ export interface Limits {
   accountsPerHour: number;
   accountsPerDay: number;
   ownerCallsPerAccountPerHour: number;
+  /** Gas key fundings a day: per session (its first funding included), and across all of an account's sessions. */
+  topupsPerSessionPerDay: number;
   topupsPerAccountPerDay: number;
   storageTopupsPerAccountPerDay: number;
   metaPerAccountPerHour: number;
@@ -292,12 +294,18 @@ export class Relayer {
     if (!key) throw new RelayError("the session's gas key is not on the account", 409);
     const balance = key.balance;
     if (balance >= this.d.sessionGasMin) return { hash: null, balance: balance.toString() };
-    if (this.day.count(`topup:${a.account}`) >= this.d.limits.topupsPerAccountPerDay) {
+    // Each new device's session gets its first funding even when the account's other sessions were refilled today.
+    if (this.day.count(`topup:${a.account}:${a.publicKey}`) >= this.d.limits.topupsPerSessionPerDay) {
       this.stats.refused++;
       throw new RelayError("this session was topped up enough today; try again tomorrow", 429);
     }
+    if (this.day.count(`topup:${a.account}`) >= this.d.limits.topupsPerAccountPerDay) {
+      this.stats.refused++;
+      throw new RelayError("this account's sessions were topped up enough today; try again tomorrow", 429);
+    }
     const amount = this.d.sessionGasTarget - balance;
     this.spend(amount + GAS_COST_ESTIMATE / 10n);
+    this.day.add(`topup:${a.account}:${a.publicKey}`);
     this.day.add(`topup:${a.account}`);
     try {
       const o = await this.d.sender.fundGasKey(a.account, a.publicKey, amount);

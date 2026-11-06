@@ -43,12 +43,21 @@ export function createServer(d: ServerDeps): Hono {
   app.use("*", cors({ origin: (o) => (d.origins.includes(o) ? o : null), allowHeaders: ["content-type"], exposeHeaders: ["retry-after"], maxAge: 600 }));
   app.onError((e, c) => c.json({ error: e instanceof Error ? e.message.slice(0, 200) : "internal error" }, 500));
 
+  // One line per request: the route, the account it acts for (public), how long it took and how it ended.
+  const logRequest = (route: string, account: unknown, started: number, status: number, error?: string) =>
+    console.log(JSON.stringify({ msg: "request", route, account: typeof account === "string" ? account : undefined, ms: Date.now() - started, status, ...(error ? { error: error.slice(0, 200) } : {}) }));
+
   const handle = async (c: Context, schema: z.ZodType, run: (body: never) => Promise<unknown>) => {
+    const started = Date.now();
     const b = schema.safeParse(await c.req.json().catch(() => null));
     if (!b.success) return c.json({ error: b.error.issues[0]?.message ?? "bad request" }, 400);
+    const account = (b.data as { account?: unknown }).account;
     try {
-      return c.json((await run(b.data as never)) as object);
+      const out = await run(b.data as never);
+      logRequest(c.req.path, account, started, 200);
+      return c.json(out as object);
     } catch (e) {
+      logRequest(c.req.path, account, started, e instanceof RelayError ? e.status : 500, e instanceof Error ? e.message : String(e));
       if (e instanceof RelayError) return c.json(e.hash ? { error: e.message, hash: e.hash } : { error: e.message }, e.status, e.status === 429 ? { "Retry-After": "300" } : {});
       throw e;
     }

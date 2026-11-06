@@ -36,7 +36,8 @@ const schema = z.object({
   ACCOUNTS_PER_HOUR: z.coerce.number().int().positive().default(30),
   ACCOUNTS_PER_DAY: z.coerce.number().int().positive().default(150),
   OWNER_CALLS_PER_ACCOUNT_PER_HOUR: z.coerce.number().int().positive().default(30),
-  TOPUPS_PER_ACCOUNT_PER_DAY: z.coerce.number().int().positive().default(6),
+  TOPUPS_PER_SESSION_PER_DAY: z.coerce.number().int().positive().default(3),
+  TOPUPS_PER_ACCOUNT_PER_DAY: z.coerce.number().int().positive().default(12),
   STORAGE_TOPUPS_PER_ACCOUNT_PER_DAY: z.coerce.number().int().positive().default(4),
   META_TX_PER_ACCOUNT_PER_HOUR: z.coerce.number().int().positive().default(120),
   /** NEAR spent on gas and deposits per hour, across everything, before the relayer pauses. */

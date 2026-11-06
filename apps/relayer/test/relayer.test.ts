@@ -74,7 +74,7 @@ function fakes(opts: { existing?: Set<string>; owners?: Map<string, string>; ses
   return { viewer, sender, sent, derive };
 }
 
-const limits = { accountsPerHour: 2, accountsPerDay: 10, ownerCallsPerAccountPerHour: 10, topupsPerAccountPerDay: 1, storageTopupsPerAccountPerDay: 4, metaPerAccountPerHour: 5, nearPerHour: 10n ** 25n };
+const limits = { accountsPerHour: 2, accountsPerDay: 10, ownerCallsPerAccountPerHour: 10, topupsPerSessionPerDay: 1, topupsPerAccountPerDay: 2, storageTopupsPerAccountPerDay: 4, metaPerAccountPerHour: 5, nearPerHour: 10n ** 25n };
 const relayer = (f: ReturnType<typeof fakes>, ticket: string | null = ticketSigner) =>
   new Relayer({ sender: f.sender, viewer: f.viewer, deployment: D, ticketSigner: ticket, createDeposit: 4n * 10n ** 23n, sessionGasTarget: 35n * 10n ** 22n, sessionGasMin: 31n * 10n ** 22n, sessionStorageMin: 15n * 10n ** 22n, sessionStorageTarget: 2n * 10n ** 23n, limits, now: () => NOW });
 
@@ -186,6 +186,9 @@ describe("owner requests and session gas", () => {
     await expect(r.fundSession({ account, publicKey: "ed25519:11111111111111111111111111111111" })).rejects.toMatchObject({ status: 429 });
     const full = fakes({ owners: new Map([[account, pk.ownerKey]]), session: { expires_at: NOW / 1000 + 3600, gas_key: true }, gasKey: 4n * 10n ** 23n });
     expect((await relayer(full).fundSession({ account, publicKey: "ed25519:11111111111111111111111111111111" })).hash).toBeNull();
+    // Another session (a new device) gets its first funding; the account-wide cap then stops a third.
+    await r.fundSession({ account, publicKey: "ed25519:22222222222222222222222222222222" });
+    await expect(r.fundSession({ account, publicKey: "ed25519:33333333333333333333333333333333" })).rejects.toThrow(/account's sessions were topped up enough/);
     const expired = fakes({ owners: new Map([[account, pk.ownerKey]]), session: { expires_at: NOW / 1000 - 1, gas_key: true }, gasKey: 0n });
     await expect(relayer(expired).fundSession({ account, publicKey: "ed25519:11111111111111111111111111111111" })).rejects.toThrow(/not an active session/);
   });
