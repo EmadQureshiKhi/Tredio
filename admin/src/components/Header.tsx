@@ -77,7 +77,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:gap-6 sm:px-6">
         <Logo />
         {session && (
           <div className="hidden lg:block">
@@ -86,14 +86,15 @@ export default function Header() {
         )}
         <div className="flex-1" />
         {session && (
-          <div className="flex items-center gap-2">
+          // On a phone the account name truncates rather than pushing the page sideways.
+          <div className="flex min-w-0 items-center gap-2">
             <span
-              className="flex h-8 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 font-mono text-[13px] text-fg"
+              className="flex h-8 min-w-0 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 font-mono text-[13px] text-fg"
               title={`Signed in as ${session.account} until ${formatDate(session.expiresAt * 1000)}`}
               data-testid="session-account"
             >
-              <span aria-hidden className="size-2 rounded-full bg-ok" />
-              {shortAddress(session.account)}
+              <span aria-hidden className="size-2 shrink-0 rounded-full bg-ok" />
+              <span className="truncate">{shortAddress(session.account)}</span>
             </span>
             <button
               type="button"

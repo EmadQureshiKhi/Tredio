@@ -30,7 +30,7 @@ test("shows the whole system report, worst first, with real data in every sectio
   const severities = await problems.evaluateAll((els) => els.map((e) => e.getAttribute("data-severity")));
   const rank = { critical: 0, warning: 1, info: 2 } as Record<string, number>;
   expect(severities.map((s) => rank[s!])).toEqual([...severities.map((s) => rank[s!]!)].sort((a, b) => a - b));
-  await expect(page.getByTestId("summary-tile")).toHaveCount(8);
+  await expect(page.getByTestId("summary-tile")).toHaveCount(9);
   await expect(page.getByTestId("updated")).toContainText(/Updated (just now|\d+s ago)/);
 
   // Services: every probed service plus the backend and oracle.
