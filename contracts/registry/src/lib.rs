@@ -288,6 +288,7 @@ impl Registry {
     // Owner
     // ---------------------------------------------------------------------------------------
 
+    #[payable]
     pub fn set_oracle(&mut self, oracle: OracleConfig) {
         self.assert_owner();
         oracle.assert_valid();
@@ -295,18 +296,22 @@ impl Registry {
         self.oracle = oracle;
     }
 
+    #[payable]
     pub fn add_consumer(&mut self, account_id: AccountId) {
         self.assert_owner();
         self.consumers.insert(account_id);
     }
 
+    #[payable]
     pub fn remove_consumer(&mut self, account_id: AccountId) {
         self.assert_owner();
         self.consumers.remove(&account_id);
     }
 
+    /// The owner, signing with a full-access key: a function-call key cannot attach the yoctoNEAR.
     fn assert_owner(&self) {
         require!(env::predecessor_account_id() == self.owner, "owner only");
+        near_sdk::assert_one_yocto();
     }
 
     // ---------------------------------------------------------------------------------------

@@ -380,8 +380,14 @@ fn deliveries_that_failed_are_claimed_once() {
     ctx("alice.testnet", vec![]);
     c.claim_owed("topic:openai".into());
     let sent = calls();
-    assert!(sent.iter().any(|(to, m, a)| to == "topic-openai.coins.testnet" && m == "mint" && a["account_id"] == "alice.testnet" && a["amount"] == "123"));
-    assert!(sent.iter().any(|(to, m, a)| to == "usdc.testnet" && m == "ft_transfer" && a["receiver_id"] == "alice.testnet" && a["amount"] == (4 * ONE_USDC).to_string()));
+    assert!(sent.iter().any(|(to, m, a)| to == "topic-openai.coins.testnet"
+        && m == "mint"
+        && a["account_id"] == "alice.testnet"
+        && a["amount"] == "123"));
+    assert!(sent.iter().any(|(to, m, a)| to == "usdc.testnet"
+        && m == "ft_transfer"
+        && a["receiver_id"] == "alice.testnet"
+        && a["amount"] == (4 * ONE_USDC).to_string()));
     assert_eq!(c.owed("topic:openai".into(), acc("alice.testnet")), (U128(0), U128(0)));
     assert!(panics(|| c.claim_owed("topic:openai".into())), "nothing is owed twice");
 }
@@ -394,7 +400,32 @@ fn protocol_fees_sweep_to_the_treasury() {
     assert!(fees > 0, "a buy books protocol fees");
     ctx("anyone.testnet", vec![]);
     c.sweep_protocol_fees();
-    assert!(calls().iter().any(|(to, m, a)| to == "usdc.testnet" && m == "ft_transfer" && a["receiver_id"] == "treasury.testnet" && a["amount"] == fees.to_string()));
+    assert!(calls().iter().any(|(to, m, a)| to == "usdc.testnet"
+        && m == "ft_transfer"
+        && a["receiver_id"] == "treasury.testnet"
+        && a["amount"] == fees.to_string()));
     assert_eq!(c.protocol_fees, 0);
     assert!(panics(|| c.sweep_protocol_fees()), "a second sweep finds nothing");
+}
+
+#[test]
+fn preparing_the_exchange_is_paid_by_the_owner() {
+    let mut c = setup();
+    let attach = |yocto: u128| {
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(acc("owner.testnet"))
+            .current_account_id(acc("coins.testnet"))
+            .attached_deposit(NearToken::from_yoctonear(yocto))
+            .build());
+    };
+    // A function-call key attaches nothing, so it cannot spend the factory's balance on storage.
+    attach(0);
+    assert!(panics(|| c.prepare_exchange()));
+    attach(NearToken::from_millinear(110).as_yoctonear());
+    c.prepare_exchange();
+    let sent = calls();
+    assert!(sent.iter().any(|(to, m, _)| to == "ref-finance-101.testnet" && m == "storage_deposit"));
+    assert!(sent.iter().any(|(to, m, a)| to == "usdc.testnet"
+        && m == "storage_deposit"
+        && a["account_id"] == "ref-finance-101.testnet"));
 }

@@ -415,11 +415,9 @@ pub fn liquidation_index(p: &Position, funding: i128) -> u64 {
     let qe = q * p.entry_index as i128;
     let bps = BPS as i128;
     let mm = MAINTENANCE_MARGIN_BPS as i128;
-    let i = if p.is_long {
-        (qe - bw) / (q / bps * (bps - mm)).max(1)
-    } else {
-        (bw + qe) / (q / bps * (bps + mm)).max(1)
-    };
+    // Multiply before dividing, so the quantity is not first truncated to a multiple of 1e4.
+    let scaled = |m: i128| q.checked_mul(m).map_or(q / bps * m, |x| x / bps).max(1);
+    let i = if p.is_long { (qe - bw) / scaled(bps - mm) } else { (bw + qe) / scaled(bps + mm) };
     i.clamp(0, u64::MAX as i128) as u64
 }
 

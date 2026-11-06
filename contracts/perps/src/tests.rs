@@ -287,9 +287,14 @@ fn transfers() -> Vec<(String, u128)> {
         .filter(|r| r.receiver_id.as_str() == "usdc.testnet")
         .flat_map(|r| r.actions)
         .filter_map(|a| match a {
-            near_sdk::mock::MockAction::FunctionCallWeight { method_name, args, .. } if method_name == b"ft_transfer" => {
+            near_sdk::mock::MockAction::FunctionCallWeight { method_name, args, .. }
+                if method_name == b"ft_transfer" =>
+            {
                 let v: near_sdk::serde_json::Value = near_sdk::serde_json::from_slice(&args).unwrap();
-                Some((v["receiver_id"].as_str().unwrap().to_string(), v["amount"].as_str().unwrap().parse().unwrap()))
+                Some((
+                    v["receiver_id"].as_str().unwrap().to_string(),
+                    v["amount"].as_str().unwrap().parse().unwrap(),
+                ))
             }
             _ => None,
         })
@@ -322,10 +327,37 @@ fn protocol_fees_sweep_to_the_treasury_only() {
     c.protocol_fees = 7 * ONE_USDC;
     ctx("mallory.testnet", T0, 0);
     let _ = c.sweep_protocol_fees();
-    assert_eq!(transfers(), vec![("treasury.testnet".to_string(), 7 * ONE_USDC)], "anyone may sweep; only the treasury is paid");
+    assert_eq!(
+        transfers(),
+        vec![("treasury.testnet".to_string(), 7 * ONE_USDC)],
+        "anyone may sweep; only the treasury is paid"
+    );
     assert_eq!(c.protocol_fees, 0);
     let again = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let _ = c.sweep_protocol_fees();
     }));
     assert!(again.is_err(), "a second sweep finds nothing");
+}
+
+#[test]
+fn the_liquidation_index_is_exact_to_one_unit() {
+    let mut c = setup(10_000 * ONE_USDC);
+    // A margin that leaves the quantity off any round multiple, so early truncation would show.
+    open(&mut c, "alice.testnet", T0, true, 123_456_789, 27_500, 50 * P + 12_345);
+    open(&mut c, "bob.testnet", T0, false, 98_765_432, 21_000, 50 * P + 12_345);
+    for id in [1, 2] {
+        let p = c.get_position(id).unwrap();
+        let (q, b) = (p.qty.0 as i128, p.margin.0 as i128 * UWAD as i128);
+        let (bps, mm) = (BPS as i128, MAINTENANCE_MARGIN_BPS as i128);
+        let exact = if p.is_long {
+            (q * p.entry_index as i128 - b) * bps / (q * (bps - mm))
+        } else {
+            (b + q * p.entry_index as i128) * bps / (q * (bps + mm))
+        };
+        assert!(
+            (liquidation_index(&p, 0) as i128 - exact).abs() <= 1,
+            "position {id}: {} vs {exact}",
+            liquidation_index(&p, 0)
+        );
+    }
 }

@@ -69,10 +69,15 @@ impl Coins {
 #[near]
 impl Coins {
     /// Registers the factory with the exchange and the exchange with USDC, once, before the first
-    /// graduation. Owner only; attach about 0.11 NEAR.
+    /// graduation. Owner only; the owner pays both deposits (0.10125 NEAR), so a function-call key,
+    /// which cannot attach NEAR, cannot spend the factory's balance on them.
     #[payable]
     pub fn prepare_exchange(&mut self) {
         require!(env::predecessor_account_id() == self.owner, "owner only");
+        require!(
+            env::attached_deposit() >= EXCHANGE_STORAGE.saturating_add(FT_STORAGE),
+            "attach the exchange's and USDC's storage deposits (0.10125 NEAR)"
+        );
         self.call(&self.exchange, "storage_deposit", serde_json::json!({}), EXCHANGE_STORAGE).detach();
         self.call(
             &self.usdc,

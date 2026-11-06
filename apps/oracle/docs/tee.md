@@ -29,7 +29,7 @@ The API token the enclave uses is an OutLayer secret that only this build can de
 - One run of the build is recorded in `deployments/testnet-proofs.json` (`outlayerRun`): tx `4WKiUBZ38SWfwT1ptEeHJNvWNX1ywRCK31Pa9gZp39D6`, wasm sha256 `434381e425292a8aaaf9edf0d74d27c0d8bfba3ad82794823e27e3959523b9ff`, built from commit `f2424fa` with rustc 1.98.1.
 - The key OutLayer holds for that build, which signed that run's report, is `ed25519:8qDVQ9AySqUWeWdSJSUfLEpNkxtsrhDUjxyPDGFVWXsk`.
 - The key is bound to the wasm hash, and the build already points at `https://api.tredio.bid`, so hosting the API needs no rebuild and keeps that key.
-- Once the API answers and its token is stored as the build's OutLayer secret, the switch is one `set_oracle` transaction by the registry owner (`{"tee_signer": {"public_key": "ed25519:8qDV..."}}`), then `ORACLE_MODE=outlayer` on the service.
+- Once the API answers and its token is stored as the build's OutLayer secret, the switch is one `set_oracle` transaction by the registry owner (`{"tee_signer": {"public_key": "ed25519:8qDV..."}}`, with one yoctoNEAR attached, so it needs the owner's full-access key), then `ORACLE_MODE=outlayer` on the service.
 - `pnpm verify` prints which of the two keys the registry trusts.
 
 ## Verify a report yourself

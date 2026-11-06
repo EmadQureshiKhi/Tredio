@@ -69,8 +69,11 @@ impl Accounts {
     /// Sets the code hash accounts are born with, before the first account exists. Every
     /// address commits to it, so changing it later would move every passkey to a new, empty
     /// address; accounts upgrade with their passkey instead.
+    #[payable]
     pub fn set_account_code(&mut self, account_code: Base58CryptoHash) {
         require!(env::predecessor_account_id() == self.owner, "owner only");
+        // A full-access key only: a function-call key cannot attach the yoctoNEAR.
+        near_sdk::assert_one_yocto();
         require!(
             self.created == 0,
             "accounts exist: their addresses commit to this code hash, so upgrade them with their passkey instead"
@@ -78,8 +81,11 @@ impl Accounts {
         self.account_code = account_code;
     }
 
+    #[payable]
     pub fn set_protocol(&mut self, protocol: Protocol) {
         require!(env::predecessor_account_id() == self.owner, "owner only");
+        // A full-access key only: a function-call key cannot attach the yoctoNEAR.
+        near_sdk::assert_one_yocto();
         // The protocol is part of the state init an account id derives from, like the code hash.
         require!(
             self.created == 0,
@@ -283,9 +289,11 @@ mod tests {
         }
     }
 
+    /// The owner signing with a full-access key, which attaches the one yoctoNEAR setters require.
     fn setup() -> Accounts {
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id("tredio.testnet".parse().unwrap())
+            .attached_deposit(NearToken::from_yoctonear(1))
             .build());
         Accounts::new(
             "tredio.testnet".parse().unwrap(),
@@ -362,6 +370,16 @@ mod tests {
         // So once an account exists the factory refuses.
         f.created = 1;
         f.set_protocol(moved);
+    }
+
+    #[test]
+    #[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+    fn setters_need_a_full_access_key() {
+        let mut f = setup();
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id("tredio.testnet".parse().unwrap())
+            .build());
+        f.set_account_code(Base58CryptoHash::from([8u8; 32]));
     }
 
     #[test]

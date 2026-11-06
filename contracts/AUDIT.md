@@ -152,6 +152,7 @@ What the team can still do on testnet, stated plainly:
 - Every contract account (`registry`, `accounts`, `book`, `perps`, `outcomes`, `coins`, `curation`, `usdc`) holds a full-access key, so the team can redeploy any contract; the fixes above reached testnet that way.
   Before mainnet these keys would be removed or moved behind a timelocked multisig.
 - The registry's owner sets the oracle key (`set_oracle`); every change is a public transaction and is logged as `oracle_changed`.
+- Every owner-only setter (`set_oracle`, `add_consumer`, `remove_consumer`, `add_minter`, `remove_minter`, `add_source`, `set_coin_code`, `set_account_code`, `set_protocol`) requires one attached yoctoNEAR, and `prepare_exchange` requires the storage deposits it spends, so only the owner's full-access key can call them, never a function-call key (from the Rustle run, [RUSTLE.md](RUSTLE.md)).
 - Until the registry trusts the enclave's key, index reports are signed by a bootstrap key the team holds and never published; a report still must pass the registry's checks (signature, increasing run id, time window, 50% move clamp).
 - A person's account is owned by their passkey alone: no Tredio key can act as its owner, and its code changes only by the passkey's own `upgrade`.
 

@@ -74,13 +74,19 @@ impl Usdc {
         self.mint_to(&account_id, amount.0, "mint");
     }
 
+    #[payable]
     pub fn add_minter(&mut self, account_id: AccountId) {
         require!(env::predecessor_account_id() == self.owner, "owner only");
+        // A full-access key only: a function-call key cannot attach the yoctoNEAR.
+        near_sdk::assert_one_yocto();
         self.minters.insert(account_id);
     }
 
+    #[payable]
     pub fn remove_minter(&mut self, account_id: AccountId) {
         require!(env::predecessor_account_id() == self.owner, "owner only");
+        // A full-access key only: a function-call key cannot attach the yoctoNEAR.
+        near_sdk::assert_one_yocto();
         self.minters.remove(&account_id);
     }
 
@@ -224,6 +230,10 @@ mod tests {
     fn minters_mint_and_others_cannot() {
         ctx("owner.testnet", 1_000);
         let mut c = Usdc::new("owner.testnet".parse().unwrap(), U128(1_000_000), 3_600);
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id("owner.testnet".parse().unwrap())
+            .attached_deposit(NearToken::from_yoctonear(1))
+            .build());
         c.add_minter("faucet.testnet".parse().unwrap());
         ctx("faucet.testnet", 1_000);
         c.mint("bob.testnet".parse().unwrap(), U128(5_000_000));

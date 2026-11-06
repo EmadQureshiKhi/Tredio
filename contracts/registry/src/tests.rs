@@ -36,6 +36,15 @@ fn at(secs: u64, predecessor: &str) {
         .build());
 }
 
+/// The owner signing with a full-access key: owner setters require one attached yoctoNEAR.
+fn as_owner(secs: u64) {
+    testing_env!(VMContextBuilder::new()
+        .block_timestamp(secs * 1_000_000_000)
+        .predecessor_account_id("owner.testnet".parse().unwrap())
+        .attached_deposit(near_sdk::NearToken::from_yoctonear(1))
+        .build());
+}
+
 fn setup() -> Registry {
     at(T0, "owner.testnet");
     let mut r = Registry::new(
@@ -43,6 +52,7 @@ fn setup() -> Registry {
         OracleConfig::TeeSigner { public_key: pk_string(&key()) },
         params(),
     );
+    as_owner(T0);
     r.add_consumer("outcomes.testnet".parse().unwrap());
     r
 }
@@ -275,6 +285,15 @@ fn fair_up_reads_the_latest_index() {
     let p = r.fair_up("topic:a".into(), 50_000_000, T0 + 86_400).0;
     assert!((490_000..=510_000).contains(&p), "{p}");
     assert_eq!(r.fair_up("topic:a".into(), 40_000_000, T0).0, 980_000);
+}
+
+#[test]
+#[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+fn rotating_the_oracle_needs_a_full_access_key() {
+    let mut r = setup();
+    // The owner account, but through a function-call key, which cannot attach the yoctoNEAR.
+    at(T0, "owner.testnet");
+    r.set_oracle(OracleConfig::TeeSigner { public_key: pk_string(&SigningKey::from_bytes(&[1u8; 32])) });
 }
 
 #[test]

@@ -151,8 +151,9 @@ Details and how to rerun each one are in [SECURITY.md](SECURITY.md).
 | Deployed code is this source (`pnpm verify`, `near contract verify`) | 10 of 10 code hashes match byte for byte; the 8 contracts are reproducible builds (SourceScan's Docker image, NEP-330) that NearBlocks can verify once the repository is public |
 | NEAR rules (`pnpm security`) | private callbacks, token receivers check their token, overflow checks, no `unsafe`: all hold |
 | Clippy security lints on the wasm build | 0 panics; every truncating cast, unwrap and slice index reviewed |
+| BlockSec's Rustle, the NEAR static analyzer ([contracts/RUSTLE.md](contracts/RUSTLE.md)) | 0 high, 0 medium; 2 low findings, both fixed |
 | `cargo deny` on the deployed wasm's dependencies | advisories, bans and sources ok |
-| Tests | 165 unit tests (84% line coverage), 16 integration flows on a real NEAR node including a mainnet rehearsal, end to end on testnet |
+| Tests | 169 unit tests (84% line coverage), 16 integration flows on a real NEAR node including a mainnet rehearsal, end to end on testnet |
 
 ```bash
 pnpm security

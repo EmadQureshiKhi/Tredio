@@ -213,11 +213,11 @@ PROTOCOL="{\"usdc\":\"$U\",\"registry\":\"$R\",\"outcomes\":\"$O\",\"book\":\"$B
 deploy accounts accounts "{\"owner\":\"$ROOT\",\"network\":\"$NET\",\"protocol\":$PROTOCOL,\"account_code\":\"$BUILT_ACCOUNT_CODE\"}" config
 
 log "wiring"
-# Every wiring call is idempotent.
-call "$R" add_consumer "{\"account_id\":\"$O\"}"
-call "$C" add_source "{\"account_id\":\"$P\"}"
-call "$C" add_source "{\"account_id\":\"$K\"}"
-[ "$NET" = testnet ] && call "$U" add_minter "{\"account_id\":\"$FAUCET\"}"
+# Every wiring call is idempotent. Owner setters take one yoctoNEAR: only a full-access key signs them.
+call "$R" add_consumer "{\"account_id\":\"$O\"}" '1 yoctoNEAR'
+call "$C" add_source "{\"account_id\":\"$P\"}" '1 yoctoNEAR'
+call "$C" add_source "{\"account_id\":\"$K\"}" '1 yoctoNEAR'
+[ "$NET" = testnet ] && call "$U" add_minter "{\"account_id\":\"$FAUCET\"}" '1 yoctoNEAR'
 for holder in "$O" "$B" "$P" "$C" "$K" "$TREASURY" "$EXCHANGE"; do
   registered=$(view "$U" storage_balance_of "{\"account_id\":\"$holder\"}")
   [ "$registered" = null ] || { echo "$holder holds USDC storage"; continue; }

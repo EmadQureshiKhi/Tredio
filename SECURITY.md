@@ -14,10 +14,11 @@ Results from 2026-11-07, on the code deployed on NEAR testnet under `tredio.test
 | Deployed code is this source | Reproducible builds in SourceScan's Docker image (NEP-330), `near contract verify`, `pnpm verify` | 10 of 10 match byte for byte: the 8 contracts are reproducible builds of commit `d634a0e`, ready for NearBlocks verification once it is public; the global coin and account code match the local build |
 | NEAR rules | `pnpm security` | 6 of 6 hold: overflow checks, no `unsafe`, 30 of 30 callbacks private, 6 of 6 token receivers check their token, no `signer_account_id`, no joint promise returned |
 | Static analysis | Clippy's security lints on the wasm32 build | 0 panics; every truncating cast, unwrap and slice index reviewed (below) |
+| Static analysis built for NEAR | BlockSec's Rustle, every detector, ported to LLVM 22 ([contracts/RUSTLE.md](contracts/RUSTLE.md)) | 0 high, 0 medium; 2 low findings, both fixed and gone on a second run; the rest triaged as false positives or by design |
 | Dependencies of the deployed wasm | `cargo deny` with [contracts/deny.toml](contracts/deny.toml) | advisories ok, bans ok, sources ok |
 | Every dependency, tests included | `cargo audit` (RustSec, 1,422 advisories) | 436 crates: 3 advisories, none in a way that touches the deployed contracts (below) |
 | Oracle enclave dependencies | `cargo audit` on `apps/oracle/tee` | 87 crates, no advisories |
-| Unit tests | `cargo test --workspace` | 165 pass |
+| Unit tests | `cargo test --workspace` | 169 pass |
 | Test coverage | `pnpm coverage:contracts` (`cargo llvm-cov`, unit tests) | 84.0% of lines, 74.0% of functions, 81.6% of regions (below) |
 | Integration tests on a real NEAR node | `cargo test -p tredio-sandbox-tests` (near-workspaces, nearcore sandbox) | 16 flows pass |
 | Mainnet rehearsal | the same sandbox, with Circle's USDC and Rhea imported from mainnet ([MAINNET.md](MAINNET.md)) | the mainnet plan deploys and trades through to a graduation into Rhea |
@@ -90,7 +91,7 @@ These are the mistakes NEAR contracts most often get wrong, checked on every dep
 | No `signer_account_id` in contract logic | The signer is not the caller in a chain of calls; access checks use `predecessor_account_id` | 0 uses |
 | No joint promise returned | Returning `a.and(b)` from a method is refused by the runtime | every `.and()` ends in a `.then()` |
 
-The audit adds the checks a script cannot make: one-yocto deposits on owner calls, state written before a transfer and restored in its callback, storage paid by whoever uses it, and the gas each callback reserves ([AUDIT.md](contracts/AUDIT.md), "What was judged fine").
+The audit adds the checks a script cannot make: one-yocto deposits on owner calls (owner setters gained theirs from the Rustle run below), state written before a transfer and restored in its callback, storage paid by whoever uses it, and the gas each callback reserves ([AUDIT.md](contracts/AUDIT.md), "What was judged fine").
 
 ### Clippy's security lints
 
@@ -120,6 +121,14 @@ No caller can reach that: every string it encodes is a constant (`"Gtc"`, `"orde
 | RUSTSEC-2022-0054 (unmaintained) | `wee_alloc` 0.4.5 | near-sdk's default wasm allocator | Accepted in [deny.toml](contracts/deny.toml): no known vulnerability, and a contract's memory lives for one call, so the allocator's known leak cannot build up |
 
 `cargo deny` also allows exactly one git source, NEAR's own `near/intents` repository at a pinned revision, for the NEP-245 multi-token types.
+
+## Rustle
+
+[BlockSec's Rustle](https://github.com/blocksecteam/rustle) is the static analyzer built for NEAR contracts: about thirty detectors for unhandled promises, missing `#[private]`, reentrancy, unchecked math, missing one-yocto deposits, rounding, storage and NEP interfaces.
+Its last release targets Rust 1.67 and LLVM 15, which cannot build near-sdk 5, so it was ported to LLVM 22 (the LLVM of rustc 1.98.1) and to near-sdk 5's code shapes, and checked against its own 30 examples before it ran here.
+It found nothing at high or medium severity.
+Its two true findings, both low, are fixed: owner-only setters now require one attached yoctoNEAR (so only a full-access key can call them), and the liquidation index multiplies before it divides.
+[contracts/RUSTLE.md](contracts/RUSTLE.md) has the port, the counts per detector and contract, and a triage of every finding with file and line.
 
 ## Test coverage
 
@@ -173,7 +182,6 @@ Each finding got a failing test first, then the fix.
 ## Not covered yet
 
 - No independent audit firm has reviewed the contracts; the audit above is a self-audit.
-- BlockSec's Rustle, a static analyzer built for NEAR contracts, has not been run yet: it needs its own toolchain installed, which waits on approval.
 - The off-chain services (relayer, keeper, market maker, oracle runner, indexer, API, app) are outside the contract audit; their tests run in CI and `pnpm verify`.
 - The testnet contract accounts keep full-access keys so the team can redeploy; before mainnet they are removed or moved behind a timelocked multisig ([AUDIT.md](contracts/AUDIT.md), "Trust assumptions").
 - NearBlocks shows the "verified" badge only after SourceScan rebuilds from the public repository, which waits for the code to be pushed.

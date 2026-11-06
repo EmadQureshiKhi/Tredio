@@ -73,8 +73,11 @@ impl Curation {
         }
     }
 
+    #[payable]
     pub fn add_source(&mut self, account_id: AccountId) {
         require!(env::predecessor_account_id() == self.owner, "owner only");
+        // A full-access key only: a function-call key cannot attach the yoctoNEAR.
+        near_sdk::assert_one_yocto();
         self.sources.insert(account_id);
     }
 
@@ -173,6 +176,11 @@ mod tests {
             "usdc.testnet".parse().unwrap(),
             "treasury.testnet".parse().unwrap(),
         );
+        // Owner setters take one yoctoNEAR, which only a full-access key can attach.
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id("owner.testnet".parse().unwrap())
+            .attached_deposit(NearToken::from_yoctonear(1))
+            .build());
         c.add_source("perps.testnet".parse().unwrap());
         c
     }

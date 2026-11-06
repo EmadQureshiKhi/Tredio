@@ -244,10 +244,19 @@ impl Mainnet {
         .await?;
 
         // Wiring, as the deploy script does it.
-        run(root.call(registry.id(), "add_consumer").args_json(json!({ "account_id": outcomes.id() })))
-            .await?;
+        // Owner setters take one yoctoNEAR, so only a full-access key can call them.
+        let yocto = NearToken::from_yoctonear(1);
+        run(root
+            .call(registry.id(), "add_consumer")
+            .args_json(json!({ "account_id": outcomes.id() }))
+            .deposit(yocto))
+        .await?;
         for source in [perps.id(), coins.id()] {
-            run(root.call(curation.id(), "add_source").args_json(json!({ "account_id": source }))).await?;
+            run(root
+                .call(curation.id(), "add_source")
+                .args_json(json!({ "account_id": source }))
+                .deposit(yocto))
+            .await?;
         }
         let bounds: Value = usdc.view("storage_balance_bounds").await?.json()?;
         let usdc_storage = NearToken::from_yoctonear(u128_of(&bounds["min"]));

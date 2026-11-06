@@ -204,6 +204,7 @@ impl Stack {
         ok(root
             .call(registry.id(), "add_consumer")
             .args_json(json!({ "account_id": outcomes.id() }))
+            .deposit(NearToken::from_yoctonear(1))
             .transact()
             .await?)
         .await?;
@@ -211,6 +212,7 @@ impl Stack {
             ok(root
                 .call(curation.id(), "add_source")
                 .args_json(json!({ "account_id": source }))
+                .deposit(NearToken::from_yoctonear(1))
                 .transact()
                 .await?)
             .await?;

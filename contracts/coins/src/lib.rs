@@ -223,8 +223,11 @@ impl Coins {
     }
 
     /// Points future coins at a newly published global coin code. Existing coins keep theirs.
+    #[payable]
     pub fn set_coin_code(&mut self, coin_code: Base58CryptoHash) {
         require!(env::predecessor_account_id() == self.owner, "owner only");
+        // A full-access key only: a function-call key cannot attach the yoctoNEAR.
+        near_sdk::assert_one_yocto();
         self.coin_code = coin_code;
     }
 
