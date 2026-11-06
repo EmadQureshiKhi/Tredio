@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <title>Tredio scenes</title>
 <!--
-  Tredio's rendered pictures: link cards, the X banner, the hero poster and the website's UI
-  scenes. Each scene is a URL hash (#og-site, #track-defi...); export.sh screenshots them at their
+  Tredio's rendered pictures: link cards, the X banner and the website's example market scenes.
+  Each scene is a URL hash (#og-site, #example-near...); export.sh screenshots them at their
   own size with headless Chrome. Every number here is illustrative, not live market data.
 -->
 <style>
@@ -57,7 +57,6 @@ html, body { width: 100vw; height: 100vh; overflow: hidden; background: var(--bg
 <body>
 <div id="stage"></div>
 <script>
-const LOGO = {"lens": "M0 21.02Q45.04 -21.02 90.07 21.02Q45.04 63.05 0 21.02ZM45.04 11.63A9.38 9.38 0 1 0 45.04 30.4A9.38 9.38 0 1 0 45.04 11.63Z", "stem": "M36.03 39.03H54.04V69.06A9.01 9.01 0 0 1 36.03 69.06Z", "word": "M142.3 74.78Q138.6 74.78 135.35 73.33Q132.1 71.88 130.2 68.63Q128.3 65.38 128.3 60.08V12.58L139.5 6.38V56.98Q139.5 61.18 140.75 63.43Q142 65.68 145.3 65.68Q146.3 65.68 147.65 65.43Q149 65.18 150.5 64.78V73.38Q148.5 74.08 146.45 74.43Q144.4 74.78 142.3 74.78ZM118.9 33.18V24.58H150.5V33.18ZM158.4 73.88V24.58H169.6V37.88L167.5 38.18Q168 33.88 170.4 30.63Q172.8 27.38 176.25 25.53Q179.7 23.68 183.1 23.68Q185.5 23.68 187.7 24.28Q189.9 24.88 192.3 26.28L186.9 36.28Q185.8 35.58 184.05 35.13Q182.3 34.68 180.7 34.68Q178.6 34.68 176.55 35.48Q174.5 36.28 172.9 37.93Q171.3 39.58 170.5 42.18Q170 43.58 169.75 45.83Q169.5 48.08 169.5 52.08V73.88ZM217.3 74.78Q211.1 74.78 206.55 72.78Q202 70.78 199.1 67.18Q196.2 63.58 194.8 59.03Q193.4 54.48 193.4 49.58Q193.4 44.68 194.75 40.03Q196.1 35.38 198.9 31.68Q201.7 27.98 206.1 25.83Q210.5 23.68 216.5 23.68Q222.2 23.68 226.45 25.63Q230.7 27.58 233.5 31.03Q236.3 34.48 237.65 38.88Q239 43.28 239 48.28Q239 48.98 238.95 50.28Q238.9 51.58 238.7 52.88H204.5Q204.9 58.78 208.5 61.88Q212.1 64.98 217.7 64.98Q221.8 64.98 225.2 63.68Q228.6 62.38 231.4 59.58L237.5 66.98Q234.4 69.78 231.3 71.48Q228.2 73.18 224.85 73.98Q221.5 74.78 217.3 74.78ZM228.1 47.28Q228.3 46.48 228.35 45.68Q228.4 44.88 228.4 44.08Q228.4 41.88 227.65 39.88Q226.9 37.88 225.4 36.33Q223.9 34.78 221.7 33.83Q219.5 32.88 216.7 32.88Q212.8 32.88 210.15 34.58Q207.5 36.28 206.05 38.93Q204.6 41.58 204.3 44.68H231.7ZM267 74.78Q260.4 74.78 255.55 71.43Q250.7 68.08 248.1 62.28Q245.5 56.48 245.5 49.18Q245.5 41.18 248.35 35.48Q251.2 29.78 256.1 26.73Q261 23.68 267 23.68Q271.2 23.68 274.75 25.38Q278.3 27.08 280.75 30.33Q283.2 33.58 284.2 38.28L281.6 38.38V4.18H292.7V73.88H281.6V60.18L284.6 59.48Q283.3 64.88 280.65 68.23Q278 71.58 274.5 73.18Q271 74.78 267 74.78ZM269.7 64.58Q273.6 64.58 276.5 62.68Q279.4 60.78 281 57.28Q282.6 53.78 282.6 49.18Q282.6 44.58 281 41.13Q279.4 37.68 276.5 35.73Q273.6 33.78 269.7 33.78Q265.8 33.78 262.85 35.68Q259.9 37.58 258.25 41.08Q256.6 44.58 256.6 49.18Q256.6 53.78 258.25 57.28Q259.9 60.78 262.85 62.68Q265.8 64.58 269.7 64.58ZM303.6 73.88V24.58H314.7V73.88ZM303.1 16.48V4.18H315.2V16.48ZM347.8 74.78Q340.8 74.78 335.2 71.48Q329.6 68.18 326.45 62.38Q323.3 56.58 323.3 49.18Q323.3 41.78 326.45 35.98Q329.6 30.18 335.15 26.93Q340.7 23.68 347.8 23.68Q355 23.68 360.45 26.93Q365.9 30.18 369.1 35.98Q372.3 41.78 372.3 49.18Q372.3 56.58 369.15 62.38Q366 68.18 360.45 71.48Q354.9 74.78 347.8 74.78ZM347.9 64.98Q352 64.98 355 63.08Q358 61.18 359.6 57.58Q361.2 53.98 361.2 49.18Q361.2 44.28 359.6 40.73Q358 37.18 355 35.28Q352 33.38 347.9 33.38Q343.6 33.38 340.6 35.33Q337.6 37.28 336 40.78Q334.4 44.28 334.4 49.18Q334.4 53.98 336 57.58Q337.6 61.18 340.6 63.08Q343.6 64.98 347.9 64.98Z", "glens": "M0 14Q30 -14 60 14Q30 42 0 14ZM30 7.75A6.25 6.25 0 1 0 30 20.25A6.25 6.25 0 1 0 30 7.75Z", "gstem": "M24 26H36V46A6 6 0 0 1 24 46Z"};
 /* ---------- helpers ---------- */
 const $ = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; };
 const stage = document.getElementById("stage");
@@ -111,8 +110,7 @@ function chart({ values, w, h, color = "var(--primary)", stroke = 3, min, max, a
   </svg>`;
 }
 
-const glyph = (h, color = "var(--primary)") => `<svg height="${h}" viewBox="0 0 60 52" style="display:block;flex:none"><path fill="${color}" fill-rule="evenodd" d="${LOGO.glens}"/><path fill="${color}" d="${LOGO.gstem}"/></svg>`;
-const lockup = (h, color = "var(--text)", glyphColor = "var(--primary)") => `<svg height="${h}" viewBox="0 0 372.3 78.06" style="display:block;flex:none"><path fill="${glyphColor}" fill-rule="evenodd" d="${LOGO.lens}"/><path fill="${glyphColor}" d="${LOGO.stem}"/><path fill="${color}" d="${LOGO.word}"/></svg>`;
+const lockup = (h, color = "var(--text)", glyphColor = "var(--primary)") => `<svg height="${h}" viewBox="0 0 361.93 72" style="display:block;flex:none"><path fill="${glyphColor}" d="M0 1.24C23.37 7.15 43.98 -4.55 57.94 2.13V15.53H37.55L34.26 70.83H14.66C14.66 70.83 12.35 27.38 30.99 15.53H0C0 15.5 0 5.81 0 1.24Z"/><path fill="${color}" d="M68.86 70.83V2.13H98.06Q109.07 2.13 114.06 3.98Q119.05 5.83 122.05 10.57Q125.05 15.3 125.05 21.39Q125.05 29.12 120.5 34.16Q115.96 39.2 106.91 40.51Q111.41 43.13 114.34 46.27Q117.27 49.41 122.24 57.43L130.62 70.83H114.04L104.01 55.88Q98.66 47.87 96.7 45.78Q94.73 43.7 92.53 42.92Q90.32 42.15 85.54 42.15H82.73V70.83H68.86ZM82.73 31.18H92.99Q102.98 31.18 105.46 30.34Q107.94 29.5 109.35 27.44Q110.75 25.37 110.75 22.28Q110.75 18.81 108.9 16.68Q107.05 14.55 103.68 13.99Q101.99 13.75 93.56 13.75H82.73V31.18ZM138.12 70.83V2.13H189.06V13.75H151.99V28.98H186.48V40.56H151.99V59.25H190.37V70.83H138.12ZM202.09 2.13H227.44Q236.01 2.13 240.51 3.44Q246.56 5.22 250.87 9.77Q255.18 14.31 257.43 20.9Q259.68 27.48 259.68 37.14Q259.68 45.62 257.57 51.76Q254.99 59.25 250.21 63.89Q246.6 67.41 240.47 69.38Q235.87 70.83 228.19 70.83H202.09V2.13ZM215.96 13.75V59.25H226.31Q232.13 59.25 234.7 58.6Q238.08 57.75 240.3 55.74Q242.53 53.72 243.93 49.11Q245.34 44.49 245.34 36.53Q245.34 28.56 243.93 24.3Q242.53 20.03 240 17.64Q237.47 15.25 233.58 14.41Q230.67 13.75 222.19 13.75H215.96ZM271.02 70.83V2.13H284.89V70.83H271.02ZM295.29 36.9Q295.29 26.4 298.43 19.28Q300.78 14.03 304.83 9.86Q308.88 5.69 313.71 3.68Q320.13 0.96 328.52 0.96Q343.7 0.96 352.81 10.38Q361.93 19.8 361.93 36.57Q361.93 53.21 352.89 62.6Q343.84 72 328.7 72Q313.38 72 304.34 62.65Q295.29 53.3 295.29 36.9ZM309.59 36.43Q309.59 48.1 314.97 54.12Q320.36 60.14 328.66 60.14Q336.95 60.14 342.27 54.17Q347.59 48.19 347.59 36.25Q347.59 24.44 342.41 18.62Q337.23 12.82 328.66 12.82Q320.08 12.82 314.83 18.7Q309.59 24.58 309.59 36.43Z"/></svg>`;
 const check = `<span class="ok"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.4 5 8.8l4.6-5.6"/></svg></span>`;
 
 // A trend's round avatar: initials on a soft gradient.
@@ -223,21 +221,6 @@ function coinCard({ k = "heat", name = "Heatwave", ticker = "HEAT", price = "0.0
   </div>`;
 }
 
-function reviewCard({ w = 620, s = 1 }) {
-  const item = (t) => `<div class="row" style="gap:${12 * s}px;font-size:${17 * s}px">${check}<span>${t}</span></div>`;
-  return `<div class="card" style="width:${w * s}px;padding:${28 * s}px;font-size:${16 * s}px">
-    <div class="row" style="justify-content:space-between"><span class="eyebrow" style="font-size:${13 * s}px">AI review</span><span class="chip up" style="font-size:${14 * s}px">${check.replace('class="ok"', 'class="ok" style="background:none"')}Verified</span></div>
-    <div class="row" style="margin-top:${20 * s}px;justify-content:space-between">${trendHead("heat", "Heatwave", "Candidate from the radar", s)}<span class="chip up" style="font-size:${16 * s}px;height:${38 * s}px">List it</span></div>
-    <div class="col" style="gap:${14 * s}px;margin-top:${26 * s}px">${item("A real-world event, rising across sources")}${item("Not a duplicate of a live trend")}${item("Safe to list: no person or harm targeted")}</div>
-    <div class="hr" style="margin:${24 * s}px 0"></div>
-    <div class="col" style="gap:${10 * s}px;font-size:${14 * s}px">
-      <div class="row" style="justify-content:space-between"><span class="t3">Reviewed on</span><span class="m">NEAR AI Cloud</span></div>
-      <div class="row" style="justify-content:space-between"><span class="t3">Model</span><span class="m">Verifiable, in a TEE</span></div>
-      <div class="row" style="justify-content:space-between"><span class="t3">Attestation</span><span class="mono t2">8fK2r9…Qw4nTz</span></div>
-    </div>
-  </div>`;
-}
-
 function oracleCard({ w = 420, s = 1 }) {
   return `<div class="card" style="width:${w * s}px;padding:${24 * s}px;font-size:${15 * s}px">
     <div class="row" style="justify-content:space-between"><span class="eyebrow">Oracle report</span><span class="chip pri" style="font-size:${13 * s}px">OutLayer TEE</span></div>
@@ -246,41 +229,6 @@ function oracleCard({ w = 420, s = 1 }) {
       <div class="row" style="justify-content:space-between"><span class="t3">Index</span><span class="m num">51.7</span></div>
       <div class="row" style="justify-content:space-between"><span class="t3">Sources</span><span class="m">6 of 6</span></div>
       <div class="row" style="justify-content:space-between"><span class="t3">Recorded on</span><span class="m">NEAR testnet</span></div>
-    </div>
-  </div>`;
-}
-
-function passkeyCard({ w = 420, s = 1 }) {
-  const scan = `<svg width="${86 * s}" height="${86 * s}" viewBox="0 0 86 86" fill="none" stroke="var(--primary)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M6 26V14a8 8 0 0 1 8-8h12M60 6h12a8 8 0 0 1 8 8v12M80 60v12a8 8 0 0 1-8 8H60M26 80H14a8 8 0 0 1-8-8V60"/>
-    <circle cx="43" cy="38" r="9"/><path d="M43 47v18M43 55h8M43 61h5"/></svg>`;
-  return `<div class="card col" style="width:${w * s}px;padding:${30 * s}px;align-items:center;text-align:center;font-size:${16 * s}px">
-    <div class="row" style="gap:${10 * s}px">${glyph(20 * s)}<span class="t2" style="font-size:${15 * s}px">app.tredio.bid</span></div>
-    <div style="margin-top:${26 * s}px">${scan}</div>
-    <div class="m" style="font-size:${24 * s}px;margin-top:${22 * s}px;letter-spacing:-.01em">Sign in with your passkey</div>
-    <div class="t2" style="font-size:${16 * s}px;margin-top:${8 * s}px;line-height:1.45">Face ID, a fingerprint or a security key.<br>No seed phrase, no extension.</div>
-    <div class="btn pri" style="width:100%;height:${54 * s}px;margin-top:${26 * s}px;font-size:${17 * s}px">Continue</div>
-  </div>`;
-}
-
-function sessionCard({ w = 440, s = 1 }) {
-  const row = (a, b, cls = "") => `<div class="row" style="justify-content:space-between;font-size:${16 * s}px"><span class="t3">${a}</span><span class="m num ${cls}">${b}</span></div>`;
-  return `<div class="card" style="width:${w * s}px;padding:${26 * s}px;font-size:${16 * s}px">
-    <div class="row" style="justify-content:space-between"><span class="eyebrow">Trading session</span><span class="chip up" style="font-size:${14 * s}px"><span class="dot"></span>Active</span></div>
-    <div class="m" style="font-size:${30 * s}px;margin-top:${16 * s}px;letter-spacing:-.02em">7 days, no prompts</div>
-    <div class="col" style="gap:${13 * s}px;margin-top:${20 * s}px">${row("Network fees", "Sponsored", "up")}${row("Daily limit", "250 USDC")}${row("Prices", "Anchored to the index")}${row("Expires", "12 Nov, 18:40")}</div>
-    <div style="margin-top:${20 * s}px"><div class="row" style="justify-content:space-between;font-size:${14 * s}px;margin-bottom:${8 * s}px"><span class="t3">Used today</span><span class="num t2">42 / 250 USDC</span></div><div class="bar" style="height:${8 * s}px"><i style="width:17%"></i></div></div>
-  </div>`;
-}
-
-function depositCard({ w = 420, s = 1 }) {
-  let dots = "";
-  for (let i = 0; i < 38; i++) { const a = (i / 38) * Math.PI * 2; dots += `<circle cx="${50 + Math.cos(a) * 40}" cy="${50 + Math.sin(a) * 40}" r="2.4" fill="rgba(255,255,255,${0.35 + (i % 3) * 0.2})"/>`; }
-  return `<div class="card" style="width:${w * s}px;padding:${26 * s}px;font-size:${16 * s}px">
-    <div class="row" style="justify-content:space-between"><span class="eyebrow">Deposit</span><span class="chip" style="font-size:${13 * s}px">Mainnet</span></div>
-    <div class="row" style="gap:${20 * s}px;margin-top:${18 * s}px">
-      <svg width="${100 * s}" height="${100 * s}" viewBox="0 0 100 100">${dots}<circle cx="50" cy="50" r="22" fill="var(--primary-soft)" stroke="var(--primary)" stroke-width="1.5"/><text x="50" y="56" text-anchor="middle" fill="var(--text)" font-family="Hanken" font-weight="500" font-size="17">38</text></svg>
-      <div class="col" style="gap:${6 * s}px"><div class="m" style="font-size:${22 * s}px;letter-spacing:-.01em">USDC from 38 chains</div><div class="t2" style="font-size:${15 * s}px;line-height:1.45">Through NEAR Intents, confidentially, straight to your account.</div></div>
     </div>
   </div>`;
 }
@@ -299,67 +247,6 @@ function orderBook({ w = 420, s = 1 }) {
   </div>`;
 }
 
-function hlCard({ w = 420, s = 1 }) {
-  return `<div class="card" style="width:${w * s}px;padding:${24 * s}px;font-size:${15 * s}px">
-    <div class="row" style="justify-content:space-between"><span class="eyebrow">Asset perp</span><span class="chip" style="font-size:${13 * s}px">Hyperliquid</span></div>
-    <div class="row" style="justify-content:space-between;margin-top:${16 * s}px"><span class="m" style="font-size:${22 * s}px">NEAR-PERP</span><span class="chip up" style="font-size:${14 * s}px">Long 5x</span></div>
-    <div class="col" style="gap:${11 * s}px;margin-top:${16 * s}px">
-      <div class="row" style="justify-content:space-between"><span class="t3">Signed by</span><span class="m">Chain Signatures</span></div>
-      <div class="row" style="justify-content:space-between"><span class="t3">From</span><span class="m">Your NEAR account</span></div>
-      <div class="row" style="justify-content:space-between"><span class="t3">Guard</span><span class="m">Within 2% of mark</span></div>
-    </div>
-  </div>`;
-}
-
-function callCard({ w = 460, s = 1 }) {
-  return `<div class="card" style="width:${w * s}px;padding:${24 * s}px;font-size:${16 * s}px">
-    <div class="row" style="justify-content:space-between"><div class="row" style="gap:${12 * s}px">${avatar("orbit", 40 * s)}<div class="col" style="gap:${3 * s}px"><span class="m" style="font-size:${18 * s}px">orbit.caller</span><span class="t3" style="font-size:${14 * s}px">Hit rate 68% · 41 calls</span></div></div><span class="chip pri" style="font-size:${13 * s}px">Call</span></div>
-    <div class="serif" style="font-size:${26 * s}px;line-height:1.25;margin-top:${18 * s}px">AI agents keeps climbing into the weekend. UP on the 7-day round.</div>
-    <div class="row" style="gap:${10 * s}px;margin-top:${18 * s}px">${avatar("ai", 28 * s)}<span class="m" style="font-size:${15 * s}px">AI agents</span><span class="chip up" style="font-size:${13 * s}px">UP · 7d</span><span class="t3 num" style="font-size:${14 * s}px;margin-left:auto">78.4</span></div>
-    <div class="row" style="gap:${10 * s}px;margin-top:${20 * s}px"><div class="btn pri" style="flex:1;height:${46 * s}px;font-size:${15 * s}px">Copy trades</div><div class="btn ghost" style="flex:1;height:${46 * s}px;font-size:${15 * s}px">Follow</div></div>
-  </div>`;
-}
-
-function leaderboard({ w = 420, s = 1 }) {
-  const rows = [["1", "orbit", "orbit.caller", "68%"], ["2", "vinyl", "vinyl.signals", "64%"], ["3", "rain", "rain.watch", "61%"], ["4", "near", "north.feed", "59%"]];
-  return `<div class="card" style="width:${w * s}px;padding:${22 * s}px;font-size:${15 * s}px">
-    <div class="row" style="justify-content:space-between"><span class="eyebrow">Leaderboard</span><span class="t3" style="font-size:${13 * s}px">Hit rate, 30 days</span></div>
-    <div class="col" style="margin-top:${12 * s}px">${rows.map(([n, k, name, hr], i) => `<div class="row" style="gap:${12 * s}px;height:${52 * s}px;${i ? "border-top:1px solid var(--line)" : ""}"><span class="t3 num" style="width:${16 * s}px">${n}</span>${avatar(k, 30 * s)}<span class="m">${name}</span><span class="m num up" style="margin-left:auto">${hr}</span></div>`).join("")}</div>
-  </div>`;
-}
-
-function mcpCard({ w = 560, s = 1 }) {
-  const k = (t) => `<span style="color:#c0b9f6">${t}</span>`, v = (t) => `<span style="color:#e0ff98">${t}</span>`, c = (t) => `<span class="t3">${t}</span>`;
-  return `<div class="card" style="width:${w * s}px;padding:0;overflow:hidden;font-size:${15 * s}px">
-    <div class="row" style="gap:${8 * s}px;padding:${14 * s}px ${18 * s}px;border-bottom:1px solid var(--line);background:var(--surface-2)"><i class="dot" style="color:#3a3a40;font-size:${18 * s}px"></i><i class="dot" style="color:#3a3a40;font-size:${18 * s}px"></i><i class="dot" style="color:#3a3a40;font-size:${18 * s}px"></i><span class="t3" style="margin-left:${10 * s}px;font-size:${13 * s}px">agent · Tredio MCP server</span></div>
-    <pre class="mono" style="padding:${20 * s}px ${22 * s}px;font-size:${15 * s}px;line-height:1.7;color:var(--text-2);white-space:pre">${c("// tool call")}
-${k("get_index")}({ trend: ${v('"ai-agents"')} })
-${c("→")} { index: ${v("78.4")}, change24h: ${v("+8.2")},
-    attested: ${v("true")}, round: ${v('"7d"')} }
-
-${c("// x402: pay per call")}
-GET /v1/trends/ai-agents
-${c("→")} ${k("402")} pay ${v("0.01 USDC")} ${c("· paid · 200 OK")}</pre>
-  </div>`;
-}
-
-function autopilotCard({ w = 440, s = 1 }) {
-  const row = (a, b) => `<div class="row" style="justify-content:space-between;font-size:${15 * s}px"><span class="t3">${a}</span><span class="m">${b}</span></div>`;
-  return `<div class="card" style="width:${w * s}px;padding:${24 * s}px;font-size:${15 * s}px">
-    <div class="row" style="justify-content:space-between"><span class="eyebrow">Autopilot rule</span><span class="chip up" style="font-size:${13 * s}px"><span class="dot"></span>Running</span></div>
-    <div class="m" style="font-size:${22 * s}px;line-height:1.3;margin-top:${14 * s}px">If AI agents rises 5 points in an hour, buy UP</div>
-    <div class="col" style="gap:${11 * s}px;margin-top:${16 * s}px">${row("Wallet", "Policy wallet")}${row("Per trade", "Up to 25 USDC")}${row("Daily cap", "100 USDC")}${row("Stop-loss", "-15%")}</div>
-  </div>`;
-}
-
-function roundCard({ label = "24h round", open = 63.2, now = 71.4, closes = "06:12:40", values, w = 560, s = 1, k = "near", name = "NEAR" }) {
-  return `<div class="card" style="width:${w * s}px;padding:${26 * s}px;font-size:${16 * s}px">
-    <div class="row" style="justify-content:space-between">${trendHead(k, name, label, s)}<div class="col" style="align-items:flex-end;gap:${4 * s}px"><span class="eyebrow">Closes in</span><span class="m num" style="font-size:${24 * s}px">${closes}</span></div></div>
-    <div style="margin:${20 * s}px -${6 * s}px 0">${chart({ values, w: (w - 40) * s, h: 150 * s, open, stroke: 3 * s, pad: 10 * s })}</div>
-    <div class="row" style="justify-content:space-between;margin-top:${14 * s}px;font-size:${15 * s}px"><span class="t3">Opened <span class="m num" style="color:var(--text)">${open.toFixed(1)}</span></span><span class="t3">Now <span class="m num up">${now.toFixed(1)}</span></span></div>
-  </div>`;
-}
-
 function listRow(k, name, idx, d, s = 1, w = 360) {
   return `<div class="card row" style="width:${w * s}px;padding:${16 * s}px ${18 * s}px;gap:${14 * s}px;border-radius:${18 * s}px">${avatar(k, 40 * s)}<div class="col" style="gap:${3 * s}px"><span class="m" style="font-size:${18 * s}px">${name}</span><span class="t3" style="font-size:${13 * s}px">Attention index</span></div><div class="col" style="margin-left:auto;align-items:flex-end;gap:${5 * s}px"><span class="m num" style="font-size:${22 * s}px">${idx}</span><span class="num ${d >= 0 ? "up" : "down"}" style="font-size:${13 * s}px">${d >= 0 ? "▲" : "▼"} ${Math.abs(d).toFixed(1)}</span></div></div>`;
 }
@@ -369,14 +256,11 @@ const NEAR_DAY = series(40, 58, 71.4, 3.2, 7);
 const AI_WEEK = series(44, 41, 78.4, 4, 21);
 const WIDE = series(70, 30, 86, 5, 11);
 
-const livePill = (size = 15) => `<span class="chip lime" style="font-size:${size}px;height:${size * 2.1}px;padding:0 ${size * 0.9}px"><span class="dot"></span>Live on NEAR testnet</span>`;
-
 /* ---------- scenes ---------- */
 const scenes = {
   "og-site"() {
     backdrop({ glowX: "82%", glowY: "10%", glowSize: 900, strength: 0.26 });
     place(lockup(34), "left:64px;top:56px");
-    place(livePill(15), "right:64px;top:52px");
     place(`<div class="serif" style="font-size:84px;line-height:1;letter-spacing:-.02em;width:640px">Trade the world&rsquo;s attention.</div>`, "left:64px;top:160px");
     place(`<div class="t2" style="font-size:25px;line-height:1.45;width:580px">An AI radar finds trends, a TEE oracle scores them 0&nbsp;to&nbsp;100 on NEAR, and you trade the index with Face&nbsp;ID.</div>`, "left:64px;top:368px");
     place(upDownCard({ values: NEAR_DAY, open: 63.2, s: 0.66, chartH: 140 }), "right:64px;top:118px");
@@ -400,35 +284,7 @@ const scenes = {
     place(`<div style="opacity:.55">${chart({ values: WIDE, w: 1560, h: 260, stroke: 3, dot: false, pad: 0 })}</div>`, "left:-30px;bottom:-20px");
     place(lockup(44), "left:50%;top:92px;transform:translateX(-50%)");
     place(`<div class="serif" style="font-size:66px;line-height:1;letter-spacing:-.02em;white-space:nowrap">Trade the world&rsquo;s attention.</div>`, "left:50%;top:176px;transform:translateX(-50%)");
-    place(`<div class="row" style="gap:12px">${livePill(17)}<span class="chip" style="font-size:17px;height:36px;padding:0 16px">tredio.bid</span></div>`, "left:50%;top:290px;transform:translateX(-50%)");
-  },
-
-  "hero-poster"() {
-    backdrop({ glowX: "50%", glowY: "38%", glowSize: 1500, strength: 0.25 });
-    place(`<div style="opacity:.5">${chart({ values: WIDE, w: 2000, h: 360, stroke: 4, dot: false, pad: 0 })}</div>`, "left:-40px;bottom:-30px");
-    place(lockup(46), "left:96px;top:84px");
-    place(livePill(20), "right:96px;top:80px");
-    place(upDownCard({ values: NEAR_DAY, open: 63.2, s: 1.18, chartH: 160 }), "left:330px;top:190px");
-    place(`<div class="col" style="gap:20px">${listRow("ai", "AI agents", "78.4", 8.2, 1.3, 400)}${listRow("heat", "Heatwave", "51.7", -2.3, 1.3, 400)}${listRow("orbit", "Orbit launch", "44.9", 3.1, 1.3, 400)}${listRow("vinyl", "Vinyl revival", "38.2", 1.4, 1.3, 400)}</div>`, "left:1100px;top:250px");
-  },
-
-  "about-review"() {
-    backdrop({ glowX: "48%", glowY: "18%", glowSize: 1700, strength: 0.26 });
-    const arrow = `<svg width="110" height="40" viewBox="0 0 110 40" style="flex:none"><path d="M4 20h96m-12-11 12 11-12 11" fill="none" stroke="rgba(164,155,240,.7)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 10"/></svg>`;
-    fit(`<div class="row" style="gap:36px;align-items:center">${reviewCard({})}${arrow}<div class="col" style="gap:24px">${oracleCard({ w: 440 })}${listRow("heat", "Heatwave", "51.7", 6.4, 1, 440)}</div></div>`, [0.14, 0.09, 0.86, 0.62]);
-    fadeBottom(0.5, 0.8);
-  },
-
-  "about-markets"() {
-    backdrop({ glowX: "50%", glowY: "14%", glowSize: 1800, strength: 0.26 });
-    fit(`<div class="row" style="gap:40px;align-items:flex-start">${upDownCard({ values: NEAR_DAY, open: 63.2, chartH: 150 })}${perpCard({})}${coinCard({ curveH: 150 })}</div>`, [0.14, 0.09, 0.86, 0.64]);
-    fadeBottom(0.5, 0.82);
-  },
-
-  "about-account"() {
-    backdrop({ glowX: "50%", glowY: "16%", glowSize: 1800, strength: 0.26 });
-    fit(`<div class="row" style="gap:40px;align-items:flex-start">${passkeyCard({})}${sessionCard({})}<div class="col" style="gap:24px">${depositCard({})}${listRow("near", "Balance", "250.00", 0, 1, 420).replace("Attention index", "USDC on NEAR testnet").replace('<span class="num up" style="font-size:13px">▲ 0.0</span>', '<span class="t3" style="font-size:13px">Test USDC</span>')}</div></div>`, [0.14, 0.09, 0.86, 0.64]);
-    fadeBottom(0.5, 0.82);
+    place(`<span class="chip" style="font-size:17px;height:36px;padding:0 16px">tredio.bid</span>`, "left:50%;top:290px;transform:translateX(-50%)");
   },
 
   "example-near"() {
@@ -451,53 +307,6 @@ const scenes = {
     fit(`<div class="row" style="gap:36px;align-items:center">${coinCard({ curveH: 200 })}<div class="col" style="gap:22px">${oracleCard({})}${listRow("heat", "Heatwave", "51.7", 6.4, 1, 420)}</div></div>`, [0.1, 0.09, 0.9, 0.91]);
   },
 
-  "track-memecoins"() {
-    backdrop({ glowX: "50%", glowY: "30%", glowSize: 1200, strength: 0.3, color: "224,255,152" });
-    fit(coinCard({ curveH: 210 }), [0.13, 0.16, 0.87, 0.84]);
-  },
-
-  "track-social"() {
-    backdrop({ glowX: "40%", glowY: "24%", glowSize: 1200, strength: 0.32 });
-    fit(`<div class="col" style="gap:0">${callCard({})}<div style="align-self:flex-end;margin-top:20px;margin-right:-120px">${leaderboard({})}</div></div>`, [0.12, 0.15, 0.88, 0.85]);
-  },
-
-  "track-defi"() {
-    backdrop({ glowX: "55%", glowY: "26%", glowSize: 1200, strength: 0.32 });
-    fit(`<div class="row" style="gap:28px;align-items:center">${orderBook({})}<div class="col" style="gap:22px">${hlCard({})}<div class="card" style="width:420px;padding:22px 24px;font-size:16px"><div class="row" style="justify-content:space-between"><span class="eyebrow">Attention perp</span><span class="chip up" style="font-size:14px">Long 3x</span></div><div class="row" style="justify-content:space-between;margin-top:14px"><span class="t3">NEAR index</span><span class="m num up" style="font-size:24px">+18.4%</span></div></div>${listRow("near", "NEAR", "71.4", 5.6, 1, 420)}</div></div>`, [0.12, 0.16, 0.88, 0.84]);
-  },
-
-  "track-agents"() {
-    backdrop({ glowX: "45%", glowY: "24%", glowSize: 1200, strength: 0.32 });
-    fit(`<div class="col" style="gap:0">${mcpCard({})}<div style="align-self:flex-end;margin-top:20px;margin-right:-90px">${autopilotCard({})}</div></div>`, [0.12, 0.15, 0.88, 0.85]);
-  },
-
-  "stats-rounds"() {
-    backdrop({ glowX: "50%", glowY: "20%", glowSize: 1300, strength: 0.28 });
-    fit(`<div class="row" style="gap:40px;align-items:flex-start">${roundCard({ values: NEAR_DAY })}${roundCard({ label: "7d round", open: 52.6, now: 78.4, closes: "3d 04:18", values: AI_WEEK, k: "ai", name: "AI agents" })}</div>`, [0.06, 0.1, 0.94, 0.9]);
-  },
-
-  "stats-deposits"() {
-    backdrop({ glowX: "50%", glowY: "30%", glowSize: 1300, strength: 0.28 });
-    // 38 chains on a ring, flowing through NEAR Intents into one balance.
-    let ring = "";
-    for (let i = 0; i < 38; i++) {
-      const a = (i / 38) * Math.PI * 2 - Math.PI / 2;
-      ring += `<circle cx="${230 + Math.cos(a) * 190}" cy="${230 + Math.sin(a) * 190}" r="${i % 4 === 0 ? 9 : 6.5}" fill="rgba(250,250,250,${0.3 + ((i * 7) % 5) * 0.12})"/>`;
-      ring += `<line x1="${230 + Math.cos(a) * 176}" y1="${230 + Math.sin(a) * 176}" x2="${230 + Math.cos(a) * 70}" y2="${230 + Math.sin(a) * 70}" stroke="rgba(164,155,240,.16)" stroke-width="1.5"/>`;
-    }
-    const ringEl = `<div style="position:relative;width:460px;height:460px;flex:none"><svg width="460" height="460" viewBox="0 0 460 460">${ring}<circle cx="230" cy="230" r="70" fill="rgba(164,155,240,.14)" stroke="#a49bf0" stroke-width="2"/></svg><div class="col" style="position:absolute;inset:0;align-items:center;justify-content:center;gap:4px"><span class="m num" style="font-size:52px;letter-spacing:-.03em;line-height:1">38</span><span class="t2" style="font-size:17px">chains</span></div></div>`;
-    const arrow = `<svg width="200" height="40" viewBox="0 0 200 40" style="flex:none"><path d="M4 20h180m-14-12 14 12-14 12" fill="none" stroke="#a49bf0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 12"/></svg>`;
-    const card = `<div class="card col" style="width:560px;padding:32px;gap:18px">
-      <div class="row" style="justify-content:space-between"><span class="eyebrow" style="font-size:14px">Deposit</span><span class="chip" style="font-size:14px">Mainnet</span></div>
-      <div class="m" style="font-size:30px;letter-spacing:-.01em">Through NEAR Intents</div>
-      <div class="hr"></div>
-      <div class="row" style="justify-content:space-between;font-size:18px"><span class="t3">You receive</span><span class="m num" style="font-size:34px">250.00 <span class="t3" style="font-size:20px">USDC</span></span></div>
-      <div class="row" style="justify-content:space-between;font-size:18px"><span class="t3">On</span><span class="m">Your NEAR account</span></div>
-      <div class="row" style="justify-content:space-between;font-size:18px"><span class="t3">Route</span><span class="m">Confidential</span></div>
-      <div class="btn pri" style="height:56px;font-size:18px;margin-top:6px">Deposit</div>
-    </div>`;
-    fit(`<div class="row" style="gap:28px;align-items:center">${ringEl}${arrow}${card}</div>`, [0.06, 0.1, 0.94, 0.9]);
-  },
 };
 
 const name = location.hash.slice(1) || "og-site";

@@ -46,7 +46,7 @@ function Sidebar({ pathname }: { pathname: string }) {
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-[236px] flex-col border-r border-line bg-bg px-4 py-5 lg:flex" style={{ viewTransitionName: "site-sidebar" }}>
       <Link href="/" className="flex h-9 items-center px-2 text-text" aria-label="Tredio home">
-        <Wordmark className="h-[18px] w-auto" />
+        <Wordmark className="h-[15px] w-auto" />
       </Link>
       <nav aria-label="Main" className="mt-7 flex flex-col gap-0.5">
         {NAV.map(({ href, label, icon: Icon }) => {

@@ -369,13 +369,6 @@ const Hero = () => {
         {/* TEXT LAYER */}
         <div className="absolute inset-0 h-screen w-full flex items-center max-lg:flex-col max-lg:items-start max-lg:justify-between max-lg:pt-[clamp(84px,18vw,120px)] max-lg:pb-[10vw] text-[#101417] justify-between z-20 px-[3vw] max-lg:px-[5vw]">
           <div>
-            <p className="hero-cta mb-[1.1vw] inline-flex items-center gap-[0.5vw] rounded-full border border-[#101417]/25 bg-[#101417]/[0.06] px-[clamp(10px,0.75vw,14px)] py-[clamp(4px,0.3vw,6px)] font-body text-[clamp(10px,0.7vw,13px)] font-semibold uppercase tracking-[0.16em] max-lg:mb-4 max-lg:gap-2 max-lg:border-white/30 max-lg:bg-black/40 max-lg:text-white max-lg:backdrop-blur-sm">
-              <span aria-hidden="true" className="relative flex size-[clamp(6px,0.45vw,8px)]">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#16A34A] opacity-60 motion-reduce:animate-none max-lg:bg-[#4ADE80]" />
-                <span className="relative inline-flex size-full rounded-full bg-[#16A34A] max-lg:bg-[#4ADE80]" />
-              </span>
-              Live on NEAR testnet
-            </p>
             <h1 className="text-[2.5vw] max-lg:text-[clamp(36px,10vw,64px)] max-lg:[@media(min-width:600px)_and_(max-height:920px)]:text-[clamp(32px,6vw,48px)] max-lg:text-white max-lg:[text-shadow:0_1px_14px_rgba(0,0,0,0.5)] font-third leading-[1.1] hero-text max-lg:text-left">
               Trade the World&apos;s <br /> Attention
             </h1>

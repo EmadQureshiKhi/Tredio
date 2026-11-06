@@ -84,15 +84,8 @@ scenes() {
   cp "$root/landing-page/src/app/opengraph-image.jpg" "$root/landing-page/src/app/twitter-image.jpg"
   cp "$out/og-app.png" "$root/frontend/app/opengraph-image.png"
   cp "$out/og-app.png" "$root/frontend/app/twitter-image.png"
-  # The hero poster, shown until the product film is in place.
-  mkdir -p "$root/landing-page/public/assets/video"
-  scene hero-poster 1920 1080 "$tmp/hero-poster.png"
-  webp "$tmp/hero-poster.png" "$root/landing-page/public/assets/video/hero-poster.webp" 88
-  # Website pictures.
-  for s in about-review:2400:1350 about-markets:2400:1350 about-account:2400:1350 \
-    example-near:1600:1000 example-agents:1600:1000 example-heatwave:1600:1000 \
-    track-memecoins:1200:1200 track-social:1200:1200 track-defi:1200:1200 track-agents:1200:1200 \
-    stats-rounds:1600:1066 stats-deposits:1600:1066; do
+  # The example market scenes on the website (its other pictures are photos, see landing-page/ASSETS.md).
+  for s in example-near:1600:1000 example-agents:1600:1000 example-heatwave:1600:1000; do
     IFS=: read -r name w h <<< "$s"
     scene "$name" "$w" "$h" "$tmp/$name.png"
     webp "$tmp/$name.png" "$img/$name.webp"

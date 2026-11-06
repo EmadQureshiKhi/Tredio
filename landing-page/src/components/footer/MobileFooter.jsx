@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { CONTACT_EMAIL, LEGAL_LINKS, NAV_ITEMS } from "@/config/links";
-import { LOCKUP_LENS, LOCKUP_STEM, LOCKUP_VIEWBOX, LOCKUP_WORD } from "@/components/brand/Logo";
+import { LOCKUP_T, LOCKUP_VIEWBOX, LOCKUP_WORD } from "@/components/brand/Logo";
 
 export default function MobileFooter() {
   return (
@@ -15,7 +15,6 @@ export default function MobileFooter() {
         <div className="space-y-1 text-[15px] text-gray-300">
           <p>Attention markets on NEAR</p>
           <p>Settled in USDC</p>
-          <p>Live on NEAR testnet</p>
         </div>
         <a
           href={`mailto:${CONTACT_EMAIL}`}
@@ -59,8 +58,7 @@ export default function MobileFooter() {
 
       <div className="mt-12 flex flex-col items-center gap-6">
         <svg viewBox={LOCKUP_VIEWBOX} className="h-auto w-[clamp(200px,62vw,320px)] text-white" aria-hidden="true">
-          <path d={LOCKUP_LENS} fill="#9C93E8" fillRule="evenodd" />
-          <path d={LOCKUP_STEM} fill="#9C93E8" />
+          <path d={LOCKUP_T} fill="#9C93E8" />
           <path d={LOCKUP_WORD} fill="currentColor" />
         </svg>
         <p className="text-[12px] uppercase tracking-[0.12em] text-white/60">&copy; 2026 Tredio</p>

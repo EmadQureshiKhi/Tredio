@@ -99,8 +99,8 @@ export default function Navbar() {
     <header id="site-header">
       {/* The logo, centred, drawn in the inverse of whatever is behind it. */}
       <div className="w-full flex items-center origin-top nav-menu-item-first justify-center fixed top-0 z-9999 h-[clamp(40px,3vw,56px)] mix-blend-exclusion invert pointer-events-none max-sm:h-[46px]">
-        <Link href="/" aria-label="Tredio home" className="flex h-[clamp(18px,1.35vw,26px)] items-center pointer-events-auto max-sm:h-[20px]">
-          <Image src="/assets/svg/tredio-icon-logo.svg" alt="" width={372} height={78} priority className="h-full w-auto invert" />
+        <Link href="/" aria-label="Tredio home" className="flex h-[clamp(14px,1.05vw,20px)] items-center pointer-events-auto max-sm:h-[16px]">
+          <Image src="/assets/svg/tredio-icon-logo.svg" alt="" width={362} height={72} priority className="h-full w-auto invert" />
         </Link>
       </div>
 

@@ -343,27 +343,30 @@ export default function About() {
             ref={textRef}
             className="absolute left-[35%] w-[60%] min-h-[20vw] top-[75%] -translate-y-1/2 flex flex-col justify-between gap-3 text-white pointer-events-none max-sm:left-[5vw] max-sm:w-[90vw] max-sm:top-[60%] max-sm:gap-[3vw]"
           >
-            {/* Main Heading */}
-            <div className="slide-line">
-              <h2 className="text-[3.5vw] font-semibold w-[90%] leading-[1.1] about-slider-text max-sm:text-[6.5vw] max-sm:w-full">
-                {slides[currentSlide].heading}
-              </h2>
-            </div>
+            {/* Main Heading. Keyed by slide: SplitText rewrites these nodes, so each slide gets fresh ones
+                rather than React updating text that SplitText has already replaced. */}
+            <React.Fragment key={currentSlide}>
+              <div className="slide-line">
+                <h2 className="text-[3.5vw] font-semibold w-[90%] leading-[1.1] about-slider-text max-sm:text-[6.5vw] max-sm:w-full">
+                  {slides[currentSlide].heading}
+                </h2>
+              </div>
 
-            {/* Description */}
-            {/* The second label sits at the same place on every slide: the first column is as wide as the
-                longest category plus a gap, and the description keeps to one line at the right. */}
-            <div className="grid grid-cols-[11.5vw_auto_1fr] items-baseline max-sm:flex max-sm:flex-col max-sm:items-start max-sm:gap-[1.5vw]">
-              <p className="text-[2vw] font-display about-slider-text max-sm:text-[4.5vw]">
-                {slides[currentSlide].label}
-              </p>
-              <p className="text-[2vw] font-display about-slider-text max-sm:text-[4.5vw]">
-                {slides[currentSlide].detail}
-              </p>
-              <p className="justify-self-end whitespace-nowrap text-[1.2vw] text-gray-200 about-slider-text max-sm:justify-self-auto max-sm:whitespace-normal max-sm:text-[3.5vw] max-sm:leading-[1.3]">
-                {slides[currentSlide].description}
-              </p>
-            </div>
+              {/* Description */}
+              {/* The second label sits at the same place on every slide: the first column is as wide as the
+                  longest category plus a gap, and the description keeps to one line at the right. */}
+              <div className="grid grid-cols-[11.5vw_auto_1fr] items-baseline max-sm:flex max-sm:flex-col max-sm:items-start max-sm:gap-[1.5vw]">
+                <p className="text-[2vw] font-display about-slider-text max-sm:text-[4.5vw]">
+                  {slides[currentSlide].label}
+                </p>
+                <p className="text-[2vw] font-display about-slider-text max-sm:text-[4.5vw]">
+                  {slides[currentSlide].detail}
+                </p>
+                <p className="justify-self-end whitespace-nowrap text-[1.2vw] text-gray-200 about-slider-text max-sm:justify-self-auto max-sm:whitespace-normal max-sm:text-[3.5vw] max-sm:leading-[1.3]">
+                  {slides[currentSlide].description}
+                </p>
+              </div>
+            </React.Fragment>
           </div>
         )}
 

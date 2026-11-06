@@ -94,7 +94,6 @@ const Footer = () => {
             <div className="text-[clamp(13px,1vw,18px)] leading-[1.6] text-gray-300 mt-auto">
               <p>Attention markets on NEAR</p>
               <p>Settled in USDC</p>
-              <p>Live on NEAR testnet</p>
               <a href={`mailto:${CONTACT_EMAIL}`} className="mt-[0.8vw] inline-block text-white underline decoration-white/30 underline-offset-4 transition-colors hover:decoration-[#9C93E8]">
                 {CONTACT_EMAIL}
               </a>
@@ -215,7 +214,7 @@ const Footer = () => {
                   x="528"
                   y="0"
                   width="1300"
-                  height="266"
+                  height="304"
                   fill="url(#fadeGradient)"
                 />
               </mask>

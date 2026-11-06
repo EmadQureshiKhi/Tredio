@@ -1,5 +1,5 @@
 // Home page copy, shared by the desktop and phone layouts so both always say the same thing.
-// Pictures in public/assets/img are Tredio's own renders unless ASSETS.md lists them.
+// Where each picture in public/assets/img comes from is in ASSETS.md.
 
 // How it works: the slider after the hero (phones show it as its own slider).
 export const HOW_IT_WORKS = [
@@ -11,7 +11,7 @@ export const HOW_IT_WORKS = [
     description: "Eight data sources feed it, around the clock.",
   },
   {
-    image: "/assets/img/about-review.webp",
+    image: "/assets/img/crypto-act-narrative.jpg",
     heading: "A verifiable model on NEAR AI Cloud reviews the trend and signs its verdict.",
     label: "Review",
     detail: "NEAR AI Cloud",
@@ -25,14 +25,14 @@ export const HOW_IT_WORKS = [
     description: "The registry accepts reports signed by its one oracle key only.",
   },
   {
-    image: "/assets/img/about-markets.webp",
+    image: "/assets/img/topics-trend-every-day.jpg",
     heading: "Take a side on where the attention goes: Up or Down, a perp, or its coin.",
     label: "Markets",
     detail: "USDC",
     description: "Outcome series, perps up to 3x and trend coins.",
   },
   {
-    image: "/assets/img/about-account.webp",
+    image: "/assets/img/attention-eye.jpg",
     heading: "Sign in with Face ID. One prompt opens a week of gas-free trading.",
     label: "Account",
     detail: "Passkey",
@@ -49,8 +49,8 @@ export const TRACKS = [
     title: "A trend big enough to talk about gets a coin of its own.",
     description:
       "Every listed trend can launch a coin on a bonding curve. Its floor rises with the trend's peak attention, and when the curve fills, the coin graduates into a Rhea Finance pool.",
-    image: "/assets/img/track-memecoins.webp",
-    alt: "A trend coin card on its bonding curve, 72% of the way to graduation",
+    image: "/assets/img/token-cards.jpg",
+    alt: "Coin cards in pastel colours fanned out in a circle on black",
   },
   {
     id: "02",
@@ -59,8 +59,8 @@ export const TRACKS = [
     title: "Your calls build a record. Good records get followed.",
     description:
       "Post calls on trends and the leaderboard keeps score by hit rate. Followers copy your trades within their own limits, and whoever surfaced a trend first earns a share of its fees.",
-    image: "/assets/img/track-social.webp",
-    alt: "A call card with its hit rate beside a short leaderboard",
+    image: "/assets/img/ai-thumbnails.jpg",
+    alt: "Hundreds of small portrait thumbnails scattered in clusters across a white page",
   },
   {
     id: "03",
@@ -69,8 +69,8 @@ export const TRACKS = [
     title: "Attention is the underlying. Everything else is a market.",
     description:
       "Up/Down series trade on Tredio's own order book and settle in USDC. Attention perps go up to 3x, and Hyperliquid perps on the asset behind a trend run from your NEAR account through Chain Signatures.",
-    image: "/assets/img/track-defi.webp",
-    alt: "An order book for an Up/Down series beside an attention perp ticket",
+    image: "/assets/img/topics-tiles.jpg",
+    alt: "A field of dark glass tiles rising in blocks under a soft light",
   },
   {
     id: "04",
@@ -79,8 +79,8 @@ export const TRACKS = [
     title: "Agents read the index and trade by the rules you set.",
     description:
       "An MCP server and a pay-per-call x402 API give agents the index and the markets. Autopilot trades your rules through a revocable session on your own account, under an on-chain price and leverage guard.",
-    image: "/assets/img/track-agents.webp",
-    alt: "An agent's tool call reading a trend's index, and an Autopilot rule with its limits",
+    image: "/assets/img/topics-cells.jpg",
+    alt: "Glowing violet and blue cells spread across black, each one on its own",
   },
 ];
 
@@ -132,8 +132,8 @@ export const NUMBERS = [
     sup: "h",
     heading: "24-hour and 7-day rounds",
     content: "Every Up/Down series asks one question: will the index close above where it opened?",
-    image: "/assets/img/stats-rounds.webp",
-    alt: "Two round cards, 24 hours and 7 days, each counting down to its close",
+    image: "/assets/img/market-opens.webp",
+    alt: "World map with clocks in several time zones",
   },
   {
     number: "1",
@@ -153,7 +153,7 @@ export const NUMBERS = [
     number: "38",
     heading: "Chains you can deposit from",
     content: "On mainnet, NEAR Intents brings USDC in from 38 chains, confidentially, straight to your account.",
-    image: "/assets/img/stats-deposits.webp",
-    alt: "Deposits from many chains converging through NEAR Intents into one USDC balance",
+    image: "/assets/img/topics-wave.jpg",
+    alt: "A wave of violet and lime particles flowing across a dark field",
   },
 ];

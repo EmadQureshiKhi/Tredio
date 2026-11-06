@@ -8,7 +8,16 @@ function Mark({ item }) {
   if (!item.logo) {
     return <span className="font-third text-[clamp(20px,1.7vw,30px)] leading-none tracking-[-0.01em] text-white">{item.name}</span>;
   }
-  const { src, ratio, scale = 1, minWidth = 0 } = item.logo;
+  const { src, ratio, scale = 1, minWidth = 0, withName = false } = item.logo;
+  if (withName) {
+    // A symbol on its own says nothing yet, so it sits at the name's cap height plus a little, beside the name.
+    return (
+      <span className="flex items-center gap-[0.45em] font-third text-[clamp(20px,1.7vw,30px)] leading-none tracking-[-0.01em] text-white">
+        <Image src={src} alt="" width={Math.round(40 * ratio)} height={40} className="h-[1.3em] w-auto" />
+        {item.name}
+      </span>
+    );
+  }
   const width = Math.max(minWidth, Math.round(Math.sqrt(LOGO_AREA * ratio) * scale));
   return (
     <Image

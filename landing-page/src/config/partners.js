@@ -1,9 +1,8 @@
 // The "Built with" section: what Tredio runs on and where its attention data comes from.
-// Logo files live in public/assets/logos, each taken unmodified from the vendor's own brand kit;
-// sources and terms are in ASSETS.md. A vendor without a published kit, or whose terms ask for
-// written permission before its logo is shown, appears by name only (no `logo`).
+// Logo files live in public/assets/logos, each taken unmodified from the vendor's own brand kit or site;
+// sources and terms are in ASSETS.md.
 // `ratio` is the logo file's width / height, so every logo can be sized to the same optical area;
-// `scale` corrects for padding and visual weight inside each file.
+// `scale` corrects for padding and visual weight inside each file; `withName` sets a symbol-only mark beside the name.
 export const STACK = [
   {
     name: "NEAR",
@@ -25,6 +24,7 @@ export const STACK = [
   {
     name: "OutLayer",
     role: "TEE attention oracle",
+    logo: { src: "/assets/logos/outlayer.png", ratio: 1257 / 214, scale: 0.9 },
     href: "https://outlayer.ai",
   },
   {
@@ -36,6 +36,7 @@ export const STACK = [
   {
     name: "Rhea Finance",
     role: "Where trend coins graduate",
+    logo: { src: "/assets/logos/rhea.svg", ratio: 34 / 31, withName: true },
     href: "https://rhea.finance",
   },
 ];
@@ -43,7 +44,12 @@ export const STACK = [
 // Attention data sources. CoinGecko's attribution guide asks for its logos to link to its sites with
 // "Data powered by" beside them; Wikimedia allows its marks only as a link to a Wikimedia site.
 export const DATA_SOURCES = [
-  { name: "Elfa", role: "Social mentions", href: "https://www.elfa.ai" },
+  {
+    name: "Elfa",
+    role: "Social mentions",
+    logo: { src: "/assets/logos/elfa.svg", ratio: 76 / 26, scale: 0.92 },
+    href: "https://www.elfa.ai",
+  },
   {
     name: "Nansen",
     role: "Smart-money data powered by Nansen",
@@ -68,5 +74,10 @@ export const DATA_SOURCES = [
     logo: { src: "/assets/logos/wikipedia-wordmark.svg", ratio: 119 / 18, scale: 0.78 },
     href: "https://www.wikipedia.org/",
   },
-  { name: "Bluesky", role: "Posts and trending topics", href: "https://bsky.app" },
+  {
+    name: "Bluesky",
+    role: "Posts and trending topics",
+    logo: { src: "/assets/logos/bluesky.svg", ratio: 1148 / 252, scale: 0.86 },
+    href: "https://bsky.app",
+  },
 ];
