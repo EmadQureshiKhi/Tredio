@@ -189,7 +189,8 @@ export class Sender {
   /** The key this sender signs with. */
   readonly publicKey: string;
   readonly network: Network;
-  private readonly near: Near;
+  /** One client per RPC provider: signing reads the key's nonce and a recent block, and a rate-limited provider hands over. */
+  private readonly clients: Near[];
   private readonly lanes: number;
   private readonly busy: boolean[];
   private readonly waiters: Array<(lane: number) => void> = [];
@@ -200,12 +201,14 @@ export class Sender {
     this.publicKey = publicKeyOf(o.privateKey);
     this.network = o.network;
     this.rpcUrls = o.rpcUrls ?? DEFAULT_RPCS[o.network];
-    const rpcUrl = this.rpcUrls[0]!;
-    this.near = new Near({
-      network: { networkId: o.network, rpcUrl },
-      privateKey: o.privateKey as PrivateKey,
-      defaultSignerId: o.accountId,
-    });
+    this.clients = this.rpcUrls.map(
+      (rpcUrl) =>
+        new Near({
+          network: { networkId: o.network, rpcUrl },
+          privateKey: o.privateKey as PrivateKey,
+          defaultSignerId: o.accountId,
+        }),
+    );
     this.lanes = o.gasKeyLanes ?? 0;
     this.busy = Array.from({ length: this.lanes }, () => false);
   }
@@ -243,15 +246,29 @@ export class Sender {
    */
   async sendTx(build: (tx: TransactionBuilder) => TransactionBuilder, waitUntil: "EXECUTED_OPTIMISTIC" | "FINAL" = "EXECUTED_OPTIMISTIC"): Promise<FinalExecutionOutcome> {
     const run = async (lane: number | null) => {
-      let tx = build(this.near.transaction(this.accountId));
-      if (lane !== null) tx = tx.useGasKey(lane);
+      // Signing reads the key's nonce and a recent block; nothing has gone out yet, so a provider that
+      // rate-limits it hands over to the next, for a couple of rounds like Viewer's reads.
+      let tx: TransactionBuilder | null = null;
+      let signError: unknown = null;
+      for (let round = 0; round < FAILOVER_ROUNDS && !tx; round++) {
+        if (round > 0) await new Promise((r) => setTimeout(r, FAILOVER_BACKOFF_MS * 3 ** (round - 1) * (0.75 + Math.random() / 2)));
+        for (const near of this.clients) {
+          let t = build(near.transaction(this.accountId));
+          if (lane !== null) t = t.useGasKey(lane);
+          try {
+            await t.sign();
+            tx = t;
+            break;
+          } catch (e) {
+            signError = e;
+            if (!isTransient(e)) break;
+          }
+        }
+        if (signError && !tx && !isTransient(signError)) break;
+      }
+      if (!tx) throw new TxError(`could not sign: ${String((signError as Error)?.message ?? signError)}`);
       // Signed once: a broadcast that fails in transit is retried with the same bytes elsewhere and
       // confirmed by hash, so a transaction runs at most once and is never reported failed when it ran.
-      try {
-        await tx.sign();
-      } catch (e) {
-        throw new TxError(`could not sign: ${String((e as Error).message ?? e)}`);
-      }
       const hash = tx.getHash() ?? undefined;
       let o: FinalExecutionOutcome;
       try {
@@ -334,7 +351,7 @@ export class Sender {
 
   /** The underlying near-kit client, for actions call descriptors do not cover. */
   get client(): Near {
-    return this.near;
+    return this.clients[0]!;
   }
 }
 

@@ -40,6 +40,7 @@ import {
   type StoredSession,
   storedSessionMeta,
 } from "./store";
+import { sessionsToRetire } from "./session-room";
 import { accountVersion, accountVersions } from "./version";
 import { connectWallet, disconnectWallet, restoreWallet, type WalletAccount, walletSend, walletSignMessage } from "./wallet";
 import { assert, type Assertion, candidateOwnerKeys, createPasskey, type PrfOutputs } from "./webauthn";
@@ -332,6 +333,19 @@ export class AccountService {
     return null;
   }
 
+  /** The account's keys to retire so one more session fits (session-room.ts), read on chain; none when the read fails. */
+  private async sessionsToRetire(account: string, version: AccountVersion, keep: string): Promise<string[]> {
+    try {
+      const [sessions, dormant] = await Promise.all([
+        view<Array<[string, { expires_at: number }]>>(account, "sessions"),
+        keepsGasKeys(version) ? view<string[]>(account, "dormant_keys") : Promise.resolve([] as string[]),
+      ]);
+      return sessionsToRetire(sessions.map(([publicKey, s]) => ({ publicKey, expiresAt: s.expires_at })), dormant, nowSec(), keep);
+    } catch {
+      return [];
+    }
+  }
+
   /**
    * Adds a session to the account (one prompt) and asks the relayer to fill its gas. Signing in
    * makes a new key: the account keeps any earlier sessions, so other devices stay signed in.
@@ -351,8 +365,13 @@ export class AccountService {
     const version = await accountVersion(account);
     const key = (renewing && keepsGasKeys(version) ? await this.storedKey(renewing) : null) ?? newKeyPair();
     const expiresAt = nowSec() + SESSION_DAYS * 86_400;
+    // At the session limit the same prompt first retires what it must (deleting keys on v2, so the slots really free up).
+    const retire = await this.sessionsToRetire(account, version, key.publicKey);
     const request = requestJson(
-      ownerRequest(account, NETWORK, [ownerActions.addSession({ publicKey: key.publicKey, label: SESSION_LABEL, scope: SESSION_SCOPE, expiresAt, dailyLimit: SESSION_DAILY_LIMIT, gasFunding: 0n })]),
+      ownerRequest(account, NETWORK, [
+        ...retire.map((k) => ownerActions.revokeSession(k, keepsGasKeys(version))),
+        ownerActions.addSession({ publicKey: key.publicKey, label: SESSION_LABEL, scope: SESSION_SCOPE, expiresAt, dailyLimit: SESSION_DAILY_LIMIT, gasFunding: 0n }),
+      ]),
     );
     const a = await assert(rpId(), await requestChallenge(request), credentialId);
     try {
