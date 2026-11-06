@@ -58,7 +58,7 @@ Not rehearsed: Chain Signatures signing (it needs the MPC network), live 1Click 
    Other names work: put them in `deployments/mainnet.json` before deploying.
 2. **Oracle key.**
    Build the enclave for mainnet (`NEAR_NETWORK=mainnet apps/oracle/tee/build.sh`), upload it, and read its signing key from OutLayer (apps/oracle/docs/tee.md).
-   The deploy script refuses the testnet key.
+   A report's signature names no network, so the mainnet key must be a different key: the deploy script refuses the testnet one.
 3. **Commit, push and build.**
    Mainnet deploys only the reproducible build of a clean HEAD (`contracts/scripts/build.sh --reproducible`), so push that commit to the public repository first: the code will name it.
 4. **Deploy.**
@@ -69,7 +69,8 @@ Not rehearsed: Chain Signatures signing (it needs the MPC network), live 1Click 
    `NEAR_NETWORK=mainnet pnpm verify --rebuild` does the same check locally.
 6. **Services.**
    Set `NEAR_NETWORK=mainnet` in every service's `.env`, with the mainnet service accounts and keys, give them gas keys (`NEAR_NETWORK=mainnet bun scripts/gas-keys.ts <account>`), and set `ACTIVATION_TICKET_KEY` on the API and `ACTIVATION_TICKET_SIGNER` on the relayer.
-   Build the app and the admin console with `NEXT_PUBLIC_NEAR_NETWORK=mainnet`.
+   Give the indexer the relayer's account (`RELAYER_ACCOUNT_ID`), since only testnet's is built in.
+   Build the app and the admin console with `NEXT_PUBLIC_NEAR_NETWORK=mainnet`, and update the public copy that names testnet ids (`frontend/public/llms.txt`, `skills/tredio/SKILL.md`, the website).
 7. **Fund.**
    NEAR for the service accounts, and USDC for the market maker, the perps pool and the Autopilot bot (below).
 8. **Harden before opening.**

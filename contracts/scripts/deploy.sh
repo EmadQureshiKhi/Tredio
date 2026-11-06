@@ -17,7 +17,6 @@
 # the reproducible build of that commit (scripts/build.sh --reproducible <commit>); mainnet takes only
 # the reproducible build of HEAD.
 set -euo pipefail
-shopt -s inherit_errexit
 cd "$(dirname "$0")/.."
 
 NET=${1:?usage: scripts/deploy.sh testnet|mainnet}
@@ -70,7 +69,10 @@ rpc() { # method params
     fi
     sleep $((i * 3))
   done
-  die "$RPC kept failing on $1 $2"
+  # Reads run inside $(...), whose exit would not stop the script (bash 3.2 has no inherit_errexit): stop it directly.
+  echo "$RPC kept failing on $1 $2" >&2
+  kill -TERM $$
+  exit 1
 }
 account() { rpc query "{\"request_type\":\"view_account\",\"finality\":\"final\",\"account_id\":\"$1\"}"; }
 exists() { local a; a=$(account "$1"); jq -e '.result.amount' >/dev/null <<<"$a"; }
@@ -221,9 +223,12 @@ for holder in "$O" "$B" "$P" "$C" "$K" "$TREASURY" "$EXCHANGE"; do
   [ "$registered" = null ] || { echo "$holder holds USDC storage"; continue; }
   call "$U" storage_deposit "{\"account_id\":\"$holder\",\"registration_only\":true}" '0.00125 NEAR'
 done
-call "$B" storage_deposit "{\"account_id\":\"$TREASURY\"}" '0.05 NEAR'
+# Storage deposits add to a balance, so each is paid only once.
+registered=$(view "$B" storage_balance_of "{\"account_id\":\"$TREASURY\"}")
+[ "$registered" != null ] || call "$B" storage_deposit "{\"account_id\":\"$TREASURY\"}" '0.05 NEAR'
 # The book holds outcome tokens for its traders: one balance per account and token.
-call "$O" storage_deposit "{\"account_id\":\"$B\"}" '1 NEAR'
+registered=$(view "$O" storage_balance_of "{\"account_id\":\"$B\"}")
+[ "$registered" != null ] || call "$O" storage_deposit "{\"account_id\":\"$B\"}" '1 NEAR'
 # The coin factory registers with the exchange once; the exchange's own record says whether it did.
 prepared=$(view "$EXCHANGE" storage_balance_of "{\"account_id\":\"$K\"}")
 if [ "$prepared" = null ]; then call "$K" prepare_exchange '{}' '0.11 NEAR' '150.0 Tgas'; else echo "$K is registered with $EXCHANGE"; fi
@@ -236,13 +241,15 @@ ACCOUNT_V2=$(planned .globalCode.accountV2)
 [ -z "${PUBLISH_ACCOUNT_CODE:-}" ] || [ "$BUILT_ACCOUNT_CODE" = "$FACTORY_CODE" ] || ACCOUNT_V2=$BUILT_ACCOUNT_CODE
 
 log "deployments/$NET.json"
+# The RPC the app and services read first stays as recorded; RPC only picks where this script reads.
+RECORDED_RPC=$(planned .rpc)
 mkdir -p ../deployments
 jq -n \
   --arg network "$NET" --arg root "$ROOT" --arg treasury "$TREASURY" \
   --arg usdc "$U" --arg registry "$R" --arg outcomes "$O" --arg book "$B" --arg perps "$P" \
   --arg curation "$C" --arg coins "$K" --arg accounts "$A" --arg exchange "$EXCHANGE" --arg signer "$SIGNER" \
   --arg coin_code "$COIN_CODE" --arg account_code "$FACTORY_CODE" --arg account_v2 "$ACCOUNT_V2" --arg oracle_key "$ORACLE_PUBLIC_KEY" \
-  --arg rpc "$RPC" --arg deployed_at "$(planned .deployedAt)" --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg start_block "$START_BLOCK" \
+  --arg rpc "${RECORDED_RPC:-$RPC}" --arg deployed_at "$(planned .deployedAt)" --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg start_block "$START_BLOCK" \
   --argjson test_window "$TEST_WINDOW" --argjson taker_fee "$TAKER_FEE_BPS" --arg max_oi "$MAX_OI" --arg virtual_quote "$VIRTUAL_QUOTE" --arg grad_reserve "$GRAD_RESERVE" \
   '{network:$network, rpc:$rpc, deployedAt:(if $deployed_at == "" then $now else $deployed_at end), root:$root, treasury:$treasury}
     + (if $start_block == "" then {} else {startBlock:($start_block|tonumber)} end)

@@ -148,7 +148,7 @@ Details and how to rerun each one are in [SECURITY.md](SECURITY.md).
 | Check | Result |
 | --- | --- |
 | Self-audit ([contracts/AUDIT.md](contracts/AUDIT.md)) | 11 findings, 10 fixed with a test each, 1 open by design |
-| Deployed code is this source (`pnpm verify`) | 10 of 10 code hashes match the local build byte for byte |
+| Deployed code is this source (`pnpm verify`, `near contract verify`) | 10 of 10 code hashes match byte for byte; the 8 contracts are reproducible builds (SourceScan's Docker image, NEP-330) that NearBlocks can verify once the repository is public |
 | NEAR rules (`pnpm security`) | private callbacks, token receivers check their token, overflow checks, no `unsafe`: all hold |
 | Clippy security lints on the wasm build | 0 panics; every truncating cast, unwrap and slice index reviewed |
 | `cargo deny` on the deployed wasm's dependencies | advisories, bans and sources ok |

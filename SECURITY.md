@@ -6,12 +6,12 @@ The contract audit itself, finding by finding, is in [contracts/AUDIT.md](contra
 
 ## At a glance
 
-Results from 2026-11-06, on the code deployed on NEAR testnet under `tredio.testnet`.
+Results from 2026-11-07, on the code deployed on NEAR testnet under `tredio.testnet`.
 
 | Check | Tool | Result |
 | --- | --- | --- |
 | Line-by-line audit | `near-contract-audit` checklist and manual review ([AUDIT.md](contracts/AUDIT.md)) | 11 findings (1 high, 7 medium, 3 low): 10 fixed with a test each, 1 open by design (M-4) |
-| Deployed code is this source | `pnpm verify`: the on-chain code hash against the local build | 10 of 10 match byte for byte (8 contracts, the global coin code and account code v2) |
+| Deployed code is this source | Reproducible builds in SourceScan's Docker image (NEP-330), `near contract verify`, `pnpm verify` | 10 of 10 match byte for byte: the 8 contracts are reproducible builds of commit `d634a0e`, ready for NearBlocks verification once it is public; the global coin and account code match the local build |
 | NEAR rules | `pnpm security` | 6 of 6 hold: overflow checks, no `unsafe`, 30 of 30 callbacks private, 6 of 6 token receivers check their token, no `signer_account_id`, no joint promise returned |
 | Static analysis | Clippy's security lints on the wasm32 build | 0 panics; every truncating cast, unwrap and slice index reviewed (below) |
 | Dependencies of the deployed wasm | `cargo deny` with [contracts/deny.toml](contracts/deny.toml) | advisories ok, bans ok, sources ok |
@@ -44,26 +44,34 @@ cd contracts && cargo test --workspace && cargo test -p tredio-sandbox-tests
 ## The deployed code is this source
 
 On an EVM chain a block explorer shows "verified source".
-On NEAR the same proof is simpler: an account's `code_hash` is the SHA-256 of the wasm it runs, and a contract published as global code is addressed by that hash.
-`pnpm verify` rebuilds nothing on chain: it hashes the wasm `pnpm build:contracts` made from this checkout and compares it with what testnet reports.
+On NEAR an account's `code_hash` is the SHA-256 of the wasm it runs, and global code is addressed by that hash, so the proof is a build that hashes the same.
 
-| Contract | Account | Size | Code hash (base58 SHA-256) |
-| --- | --- | --- | --- |
-| `usdc` (testnet mock) | `usdc.tredio.testnet` | 182 KB | `GJyBRzsUnYRE3DCCNeZ6nN7M7FoE1qt6GYq62grwP1q` |
-| `registry` | `registry.tredio.testnet` | 250 KB | `S98QE75mEu9GrLR9KGaZd2pFiduJNtamJxsYof8fykJ` |
-| `outcomes` | `outcomes.tredio.testnet` | 293 KB | `F8s7aDSSqkgUAQBxzyUzebBwJRwBbQWTqRBaTUkftVdb` |
-| `book` | `book.tredio.testnet` | 302 KB | `Gb1KUYKQtJHqkTBhoapquPbSBfrgX2mGeyrX4Y9MGMsu` |
-| `perps` | `perps.tredio.testnet` | 275 KB | `5Yvm9KUohekYKujDzohTP11YKtXH61poNFbF4cEdaKw9` |
-| `curation` | `curation.tredio.testnet` | 170 KB | `GcHPRuj488ZSKhHUoZ25hoVBahTmczNLbHnuyK5JeYwy` |
-| `coins` | `coins.tredio.testnet` | 274 KB | `9XXtTL4YLHwcjib6hcYJ6nLQ8aCgiXtCYS84dHmECJP8` |
-| `accounts` | `accounts.tredio.testnet` | 189 KB | `9KBGZxjKAJapbmUfFV5cA3qozz9wd5tgTQYhCHcXUEs2` |
-| `coin` (global code, every trend coin) | by hash | 157 KB | `DsgtQXqNL8Jat89BX27i8S34fGu7L2MHxcLTL7BcYV8s` |
-| `account` v2 (global code, every passkey account) | by hash | 315 KB | `BsFqhAcYESJ5Fyn55Xa6HwPyJaYy3VyEu4ZGh2iTdBMf` |
+- **Reproducible builds.**
+  The eight contract accounts run wasm that `contracts/scripts/build.sh --reproducible` built in SourceScan's pinned Docker image (`sourcescan/cargo-near:0.22.0-rust-1.98.1`, by digest) from commit `d634a0e` of this repository, redeployed on 2026-11-07 with no change to their state.
+  Each records the repository, the commit and the build command (NEP-330 `contract_source_metadata`), so NearBlocks' contract tab can rebuild it from the public source and mark it verified, and anyone can rebuild it with Docker alone.
+- **Checked here before it is public.**
+  `near contract verify --use-contract-source-code-path <checkout of d634a0e> deployed-at registry.tredio.testnet network-config testnet now` rebuilt `registry` the way SourceScan does and answered that the code on chain and the code built from the repository are the same.
+  Without `--use-contract-source-code-path` it fetches the source from GitHub, which works once the commit is pushed.
+- **Global code.**
+  The coin code and account code v1 and v2 were published from the local build (rustc 1.98.1, cargo-near 0.22.0) before reproducible builds existed here.
+  Republishing burns ten times the storage price (31.55 NEAR for the account code), so testnet keeps them, and `pnpm verify` compares them with `pnpm build:contracts`.
+  On mainnet every artifact, global code included, is a reproducible build ([MAINNET.md](MAINNET.md)).
+- **`pnpm verify`** checks each: the commit a contract names is in this repository and its contract source is unchanged since, and its code hashes like that commit's reproducible build (`--rebuild` makes the builds it is missing).
 
-- Built with rustc 1.98.1 and cargo-near 0.22.0 (`cargo near build non-reproducible-wasm`); another toolchain produces different bytes, so a third party needs the same versions.
-- `perps` was redeployed on 2026-11-06 so that all eight match: the only difference was a storage-ledger fix in the shared crate (a storage withdrawal that could underflow now clamps to zero), with no state change.
+| Contract | Account | Build | Size | Code hash (base58 SHA-256) |
+| --- | --- | --- | --- | --- |
+| `usdc` (testnet only) | `usdc.tredio.testnet` | reproducible | 182 KB | `D6Mnyv2UTXMFUfsw5Mtc85cFXqfv6qdtzZG47omYcWwJ` |
+| `registry` | `registry.tredio.testnet` | reproducible | 251 KB | `BUUPDeupeUtmBsxpgwB1RE3SZUiMULbNwUm8hsXouUB` |
+| `outcomes` | `outcomes.tredio.testnet` | reproducible | 294 KB | `878oduptqJWH2MBZGKHrBAHuyM4JFWxvq8NrfhL7f7TE` |
+| `book` | `book.tredio.testnet` | reproducible | 303 KB | `8JWcJxXPfW7ZcRtsaL7kGMfMpdhy9jf5uTeZeNTd7GHP` |
+| `perps` | `perps.tredio.testnet` | reproducible | 276 KB | `9K79MFbFzc1Zphn3enTot489GSfe9GLqsufuLEfPwq4E` |
+| `curation` | `curation.tredio.testnet` | reproducible | 172 KB | `4a2cx5RKMGoCFNak267yuLjCdFEYgK1H4PAJaoAoTQAw` |
+| `coins` | `coins.tredio.testnet` | reproducible | 275 KB | `H1jazKjK4q4NRiK7vq9SpmJw3RHncWdLC56M782qT8X1` |
+| `accounts` | `accounts.tredio.testnet` | reproducible | 191 KB | `9EvhicGrLGNCqMddaQw8PxfebPNmLCMvX66qSVZ9Kc8L` |
+| `coin` (global code, every trend coin) | by hash | local | 157 KB | `DsgtQXqNL8Jat89BX27i8S34fGu7L2MHxcLTL7BcYV8s` |
+| `account` v2 (global code, every passkey account) | by hash | local | 315 KB | `BsFqhAcYESJ5Fyn55Xa6HwPyJaYy3VyEu4ZGh2iTdBMf` |
+
 - Accounts made before account code v2 was published still run v1 (`J1GvtY5x...`, kept as `contracts/tests/fixtures/account_v1.wasm`) until their passkey upgrades them in Settings.
-- Next step for mainnet: a containerized reproducible build (`cargo near build reproducible-wasm`) with NEP-330 source metadata, so NearBlocks' SourceScan can verify the code from the public repository without trusting our toolchain.
 
 ## Static analysis
 
@@ -168,6 +176,7 @@ Each finding got a failing test first, then the fix.
 - BlockSec's Rustle, a static analyzer built for NEAR contracts, has not been run yet: it needs its own toolchain installed, which waits on approval.
 - The off-chain services (relayer, keeper, market maker, oracle runner, indexer, API, app) are outside the contract audit; their tests run in CI and `pnpm verify`.
 - The testnet contract accounts keep full-access keys so the team can redeploy; before mainnet they are removed or moved behind a timelocked multisig ([AUDIT.md](contracts/AUDIT.md), "Trust assumptions").
+- NearBlocks shows the "verified" badge only after SourceScan rebuilds from the public repository, which waits for the code to be pushed.
 
 ## Reporting a vulnerability
 
