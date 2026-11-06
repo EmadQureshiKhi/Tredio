@@ -5,6 +5,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { base58Encode, type Sender, type Viewer } from "@tredio/chain";
 import { activationTicketMessage, deployment, ownerRequest, requestChallenge, requestJson } from "@tredio/contracts";
 import { RelayError, Relayer, Window } from "../src/relayer";
+import { TxError } from "@tredio/chain";
 
 const D = deployment("testnet");
 const NOW = 1_793_900_000_000;
@@ -140,6 +141,15 @@ describe("owner requests and session gas", () => {
     expect(done.outcome.receipts_outcome[0]!.outcome.logs[0]).toContain("order_placed");
     await expect(relayer(fakes()).ownerExecute({ account, request, proof: await pk.prove(request) })).rejects.toThrow(/not a Tredio account/);
     await expect(relayer(f).ownerExecute({ account, request, proof: await passkey().prove(request) })).rejects.toBeInstanceOf(RelayError);
+  });
+
+  test("says plainly when its own wallet runs dry", async () => {
+    const account = fakes().derive("p256:x");
+    const f = fakes({ session: { expires_at: NOW / 1000 + 3600, gas_key: true }, gasKey: 10n ** 20n, owners: new Map([[account, "p256:x"]]) });
+    (f.sender as unknown as { fundGasKey: () => Promise<never> }).fundGasKey = async () => {
+      throw new TxError('Server error: {"InvalidTxError":{"NotEnoughBalanceForDeposit":{"signer_id":"relayer.testnet"}}}');
+    };
+    await expect(relayer(f).fundSession({ account, publicKey: "ed25519:x" })).rejects.toThrow(/low on NEAR and is being refilled/);
   });
 
   test("makes room for a new session key on an account low on NEAR, at most a few times a day", async () => {

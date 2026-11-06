@@ -1,7 +1,7 @@
 # Tredio
 
 > Tredio turns what the internet is talking about into markets on NEAR.
-> An AI radar finds trends, a model on NEAR AI Cloud reviews each one and signs its verdict, and an oracle running in an OutLayer TEE scores each listed trend's attention from 0 to 100 and records it on NEAR.
+> An AI radar finds trends, a model on NEAR AI Cloud reviews each one and signs its verdict, and an oracle scores each listed trend's attention from 0 to 100 and records it on NEAR, where the registry contract accepts only reports signed by the oracle key.
 > People and agents trade that index: Up/Down outcome series settled in USDC, attention perps up to 3x, trend coins on bonding curves that graduate into Rhea Finance pools, and Hyperliquid perps on the asset behind a trend.
 > Tredio is live on NEAR testnet; every balance there is a test asset with no monetary value.
 
@@ -15,7 +15,7 @@
 ## API
 
 Base URL: `https://api.tredio.bid`.
-Index values have 6 decimals (1000000 is one point) and USDC amounts have 6 decimals.
+The API answers index values in points (51.86 is 51.86 points); on chain they have 6 decimals (1000000 is one point), as do USDC amounts.
 
 - `GET /v1/status`: health of the oracle, markets and services.
 - `GET /v1/trends`: live trends with their current attention index.
@@ -27,19 +27,22 @@ Index values have 6 decimals (1000000 is one point) and USDC amounts have 6 deci
 
 ## For agents
 
-- MCP: Tredio's MCP server exposes the index, trends and markets as tools for agents.
-- x402: paid routes answer `402 Payment Required` with a price in USDC; pay and repeat the request to get the data.
-- Autopilot: an owner can let rules or an agent trade from a policy wallet, inside per-trade and daily limits signed with their passkey.
-- Every index value is computed in a trusted execution environment and recorded on NEAR, so an agent can check where a number came from instead of trusting the API.
+- MCP: `packages/mcp` in the repository is a read-only MCP server (stdio) with tools for trends, markets, accounts, AI reviews and `verify_index`, which checks the registry's checkpoint and the oracle's signature itself.
+- Skill: `skills/tredio/SKILL.md` in the repository teaches an agent to read, verify and trade Tredio safely.
+- x402: `GET /v1/x402` lists the paid routes (`GET /v1/x402/trends/{identifier}/history` for 0.01 USDC: every checkpoint and source reading; `POST /v1/x402/backtests` for 0.02 USDC).
+  They follow x402 v2's NEAR `exact` scheme: the route answers 402 with `PAYMENT-REQUIRED`, the agent signs one USDC `ft_transfer` as a NEP-366 delegate action and sends it in `PAYMENT-SIGNATURE`, and Tredio's relayer submits it, so the agent needs no NEAR for gas.
+- Autopilot: an owner can let rules trade Hyperliquid through a revocable session on their own account, inside per-trade and daily limits the account contract enforces.
+- Verification: every index value on NEAR carries the oracle's ed25519 signature, so an agent can check a number on chain instead of trusting the API.
+  The oracle's build runs in an OutLayer TEE; on testnet the registry still trusts its bootstrap key until the API the enclave reads is public.
 
 ## How it works
 
 1. Radar: Elfa, Bluesky, Nansen, CoinGecko, GeckoTerminal, Wikipedia and other public sources propose trends.
 2. Review: a verifiable model on NEAR AI Cloud checks each candidate; the signed attestation is stored with the listing.
-3. Oracle: inside an OutLayer TEE, the oracle computes the attention index and writes it to Tredio's registry contract on NEAR, which accepts attested reports only.
+3. Oracle: the oracle computes the attention index with a published method (its build runs in an OutLayer TEE with a key bound to the build) and writes it to Tredio's registry contract on NEAR, which accepts signed reports only.
 4. Markets: each trend gets 24-hour and 7-day Up/Down series on Tredio's own order book, an attention perp and a trend coin; Hyperliquid perps on the underlying asset are placed from the user's NEAR account through Chain Signatures.
 5. Accounts: passkey accounts on NEAR, with no seed phrase; one prompt opens a week-long session whose network fees a relayer pays.
-6. Deposits: on mainnet, NEAR Intents brings USDC in from 38 chains.
+6. Deposits: on mainnet, NEAR Intents 1Click brings USDC in from other chains; testnet shows dry quotes.
 
 ## Contact
 

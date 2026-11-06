@@ -36,10 +36,10 @@
 - `curation.tredio.testnet`: fees owed to whoever surfaced a trend.
 - `usdc.tredio.testnet`: test USDC (6 decimals) with a faucet.
 
-Index values on NEAR have 6 decimals (1000000 is one point), and so do USDC amounts.
+Index values on NEAR have 6 decimals (1000000 is one point), and so do USDC amounts; the API answers index values in points.
 Every contract and account can be read on NearBlocks (testnet.nearblocks.io).
 
 ## API
 
 The app reads Tredio's API for trends, history, calls and leaderboards; `GET /v1/status` reports its health and `GET /v1/trends` lists live trends.
-The website's llms.txt (https://tredio.bid/llms.txt) describes the API and the agent integrations.
+The website's llms.txt (https://tredio.bid/llms.txt) describes the API and the agent integrations: the MCP server, the agent skill and the x402 paid routes.

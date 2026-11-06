@@ -188,6 +188,8 @@ export class Relayer {
     const message = e instanceof Error ? e.message : String(e);
     this.stats.lastError = message.slice(0, 300);
     if (e instanceof RelayError) throw e;
+    // The relayer's own wallet running dry is not the person's failure: say so instead of passing the node's JSON on.
+    if (/NotEnoughBalance|NotEnoughBalanceForDeposit/.test(message) && message.includes(this.d.sender.accountId)) throw new RelayError("Tredio's relayer is low on NEAR and is being refilled; try again in a few minutes", 503);
     throw new RelayError(e instanceof TxError ? `the transaction failed: ${message.slice(0, 200)}` : "the relayer could not send the transaction; try again", 502, e instanceof TxError ? e.hash : undefined);
   }
 
