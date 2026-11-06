@@ -31,13 +31,16 @@ importers:
         version: 1.3.1(@types/react@19.2.14)
       near-kit:
         specifier: 0.20.2
-        version: 0.20.2
+        version: 0.20.2(@hot-labs/near-connect@0.12.0)
       typescript:
         specifier: 5.9.3
         version: 5.9.3
 
   admin:
     dependencies:
+      '@hot-labs/near-connect':
+        specifier: 0.12.0
+        version: 0.12.0
       '@tanstack/react-query':
         specifier: ^5.100.9
         version: 5.100.9(react@19.2.4)
@@ -54,6 +57,12 @@ importers:
         specifier: 19.2.4
         version: 19.2.4(react@19.2.4)
     devDependencies:
+      '@noble/curves':
+        specifier: 2.2.0
+        version: 2.2.0
+      '@noble/hashes':
+        specifier: 2.0.1
+        version: 2.0.1
       '@playwright/test':
         specifier: 1.64.0
         version: 1.64.0
@@ -80,6 +89,43 @@ importers:
         version: 4.2.4
       typescript:
         specifier: ^5
+        version: 5.9.3
+
+  apps/autopilot:
+    dependencies:
+      '@noble/curves':
+        specifier: 2.2.0
+        version: 2.2.0
+      '@noble/hashes':
+        specifier: 2.0.1
+        version: 2.0.1
+      '@tredio/autopilot':
+        specifier: workspace:*
+        version: link:../../packages/autopilot
+      '@tredio/chain':
+        specifier: workspace:*
+        version: link:../../packages/chain
+      '@tredio/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts-ts
+      '@tredio/hyperliquid':
+        specifier: workspace:*
+        version: link:../../packages/hyperliquid
+      hono:
+        specifier: 4.12.18
+        version: 4.12.18
+      postgres:
+        specifier: 3.4.9
+        version: 3.4.9
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@types/bun':
+        specifier: 1.3.1
+        version: 1.3.1(@types/react@19.2.14)
+      typescript:
+        specifier: 5.9.3
         version: 5.9.3
 
   apps/indexer:
@@ -120,7 +166,7 @@ importers:
         version: 4.12.18
       near-kit:
         specifier: 0.20.2
-        version: 0.20.2
+        version: 0.20.2(@hot-labs/near-connect@0.12.0)
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -151,7 +197,7 @@ importers:
         version: 4.12.18
       near-kit:
         specifier: 0.20.2
-        version: 0.20.2
+        version: 0.20.2(@hot-labs/near-connect@0.12.0)
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -185,7 +231,7 @@ importers:
         version: 4.12.18
       near-kit:
         specifier: 0.20.2
-        version: 0.20.2
+        version: 0.20.2(@hot-labs/near-connect@0.12.0)
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -216,7 +262,7 @@ importers:
         version: 4.12.18
       near-kit:
         specifier: 0.20.2
-        version: 0.20.2
+        version: 0.20.2(@hot-labs/near-connect@0.12.0)
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -247,7 +293,7 @@ importers:
         version: 4.12.18
       near-kit:
         specifier: 0.20.2
-        version: 0.20.2
+        version: 0.20.2(@hot-labs/near-connect@0.12.0)
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -290,7 +336,7 @@ importers:
         version: 4.12.18
       near-kit:
         specifier: 0.20.2
-        version: 0.20.2
+        version: 0.20.2(@hot-labs/near-connect@0.12.0)
       pino:
         specifier: 10.3.1
         version: 10.3.1
@@ -316,18 +362,30 @@ importers:
 
   frontend:
     dependencies:
+      '@hot-labs/near-connect':
+        specifier: 0.12.0
+        version: 0.12.0
+      '@noble/curves':
+        specifier: 2.2.0
+        version: 2.2.0
+      '@noble/hashes':
+        specifier: 2.0.1
+        version: 2.0.1
       '@number-flow/react':
         specifier: 0.6.2
         version: 0.6.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@scure/bip39':
-        specifier: 1.6.0
-        version: 1.6.0
       '@tanstack/react-query':
         specifier: 5.100.9
         version: 5.100.9(react@19.2.4)
       '@tredio/autopilot':
         specifier: file:../packages/autopilot
         version: link:../packages/autopilot
+      '@tredio/contracts':
+        specifier: file:../packages/contracts-ts
+        version: link:../packages/contracts-ts
+      '@tredio/hyperliquid':
+        specifier: file:../packages/hyperliquid
+        version: link:../packages/hyperliquid
       framer-motion:
         specifier: 14.0.0
         version: 14.0.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -337,6 +395,9 @@ importers:
       lucide-react:
         specifier: 1.14.0
         version: 1.14.0(react@19.2.4)
+      near-kit:
+        specifier: 0.20.2
+        version: 0.20.2(@hot-labs/near-connect@0.12.0)
       next:
         specifier: 16.3.8
         version: 16.3.8(@babel/core@7.29.13)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.0)(@types/node@20.19.39)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -453,7 +514,7 @@ importers:
         version: link:../contracts-ts
       near-kit:
         specifier: 0.20.2
-        version: 0.20.2
+        version: 0.20.2(@hot-labs/near-connect@0.12.0)
     devDependencies:
       '@types/bun':
         specifier: 1.3.1
@@ -639,6 +700,9 @@ packages:
 
   '@freedomofpress/tuf-browser@0.1.11':
     resolution: {integrity: sha512-d76ohB/AS5+zI+lnbiFMX/BIK3nT18hZ8q3Na6X4vyYaSYjXkeknzhAnbx1da+8ObWLwsaZLue46haEch28qtQ==}
+
+  '@hot-labs/near-connect@0.12.0':
+    resolution: {integrity: sha512-aBb1UPGr43tHPsj/uk3fEwCn83Y7+cO6Ct8B6G/dm9EkTwXh9/xntXyWhQ6fA1eSt2WtYqSczOCENXlrBAXZqg==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1408,17 +1472,11 @@ packages:
   '@rushstack/eslint-patch@1.16.1':
     resolution: {integrity: sha512-TvZbIpeKqGQQ7X0zSCvPH9riMSFQFSggnfBjFZ1mEoILW+UuXCKwOoPcgjMwiUtRqFZ8jWhPJc4um14vC6I4ag==}
 
-  '@scure/base@1.2.6':
-    resolution: {integrity: sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg==}
-
   '@scure/base@2.4.0':
     resolution: {integrity: sha512-thZ1TuJwFwBblOhgsjDKvvGirBxNp+wSvY/DR6tJBJOTDhdAAcHJ8Vbr2eFnqaxeca4+t0i9KBf+uHYGWwZORg==}
 
   '@scure/bip32@2.4.0':
     resolution: {integrity: sha512-i3DS0CptAocyvqE4n3SUkpzeQK4vJMFwWLofTwRiiKo2aWojBOfyMCgfKw9HVpO6fSY5AK86sHS/Uzn8kK9Few==}
-
-  '@scure/bip39@1.6.0':
-    resolution: {integrity: sha512-+lF0BbLiJNwVlev4eKelw1WWLaiKXw7sSl8T6FvBlWkdX+94aGJ4o8XjUdlyhTCjd8c+B3KT3JfS8P0bLRNU6A==}
 
   '@scure/bip39@2.4.0':
     resolution: {integrity: sha512-82dxFbZUYboyOf0AXiydsQrFQ5Q4h9mX+O2UkE91ROYmsc0BKMGZLwDmy96Jpa2+vrtoxomjUhy1RPIgH/r2nA==}
@@ -3702,6 +3760,8 @@ snapshots:
     transitivePeerDependencies:
       - '@noble/curves'
 
+  '@hot-labs/near-connect@0.12.0': {}
+
   '@humanfs/core@0.19.2':
     dependencies:
       '@humanfs/types': 0.15.0
@@ -4318,8 +4378,6 @@ snapshots:
 
   '@rushstack/eslint-patch@1.16.1': {}
 
-  '@scure/base@1.2.6': {}
-
   '@scure/base@2.4.0': {}
 
   '@scure/bip32@2.4.0':
@@ -4327,11 +4385,6 @@ snapshots:
       '@noble/curves': 2.4.0
       '@noble/hashes': 2.4.0
       '@scure/base': 2.4.0
-
-  '@scure/bip39@1.6.0':
-    dependencies:
-      '@noble/hashes': 1.8.0
-      '@scure/base': 1.2.6
 
   '@scure/bip39@2.4.0':
     dependencies:
@@ -5863,7 +5916,7 @@ snapshots:
 
   natural-compare@1.4.0: {}
 
-  near-kit@0.20.2:
+  near-kit@0.20.2(@hot-labs/near-connect@0.12.0):
     dependencies:
       '@napi-rs/keyring': 1.3.0
       '@noble/curves': 2.2.0
@@ -5875,6 +5928,8 @@ snapshots:
       '@zorsh/zorsh': 0.5.2
       tar: 7.5.22
       zod: 4.6.5
+    optionalDependencies:
+      '@hot-labs/near-connect': 0.12.0
 
   next@15.5.9(@opentelemetry/api@1.10.0)(@playwright/test@1.64.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
     dependencies:
