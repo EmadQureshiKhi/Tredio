@@ -52,7 +52,7 @@ Each of these is a NEAR primitive doing real work in the product, not a logo on 
    Your account contract builds the Hyperliquid order (msgpack action, connection id, EIP-712 digest) and asks [Chain Signatures](https://docs.near.org/chain-abstraction/chain-signatures) (`v1.signer-prod.testnet`) to sign it with your account's own derived key.
    A session can only sign orders within 2% of a fresh oracle mark and up to 10x leverage, enforced on chain.
    Status on testnet: accounts run account code v1, whose guard does not yet bind the mark to the signed asset; v2 fixes that ([AUDIT.md](contracts/AUDIT.md), H-1) and is published once the testnet treasury can pay for it.
-   In the app: the Perp tab's Hyperliquid market, on a trend with an asset (NEAR, HYPE).
+   In the app: the Perp tab's Hyperliquid market, on a trend with an asset; today's live trends are topics, and crypto trends (NEAR and Hyperliquid are queued) list once Nansen confirms smart-money inflow.
    Code: [`contracts/account/src/hyperliquid.rs`](contracts/account/src/hyperliquid.rs), [`packages/hyperliquid`](packages/hyperliquid).
 5. **Deposits from any chain.**
    Deposits and withdrawals go through [NEAR Intents 1Click](https://docs.near-intents.org), so USDC on another chain lands in your NEAR account in one step.
