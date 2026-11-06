@@ -20,7 +20,7 @@ Fixes are in the code in this repository; they reach testnet only when the contr
 - Each finding got a test first, run against the audited code to see it fail, then the fix.
   Tests are unit tests (near-sdk mocked blockchain) or sandbox tests (`near-workspaces` on a local nearcore node), including real gas-key transactions sent over JSON-RPC.
 - Verification: `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --check`, the sandbox suite (`cargo test -p tredio-sandbox-tests`) and a release build with `contracts/scripts/build.sh`.
-- Test counts: 126 unit tests and 7 sandbox tests before; 158 unit tests and 15 sandbox tests after (M-5 and M-6 added one each).
+- Test counts: 126 unit tests and 7 sandbox tests before; 159 unit tests and 15 sandbox tests after (M-5, M-6 and M-7 added one each).
 
 ## Findings
 
@@ -38,6 +38,7 @@ Severity reflects impact and how easily it can be triggered on testnet as deploy
 | L-3 | Low | account | A session whose key could not be added stays recorded | Fixed in code; open on testnet until accounts run v2 |
 | M-5 | Medium | coins | A buy quote ignores the floor ratchet the buy applies first | Fixed |
 | M-6 | Medium | accounts | `set_protocol` moves every passkey to a new address | Fixed |
+| M-7 | Medium | coins | The factory never registers on its coins, so no coin can be sold back | Fixed |
 
 ### H-1: the Hyperliquid guard checks a mark that is not bound to the asset it signs
 
@@ -136,6 +137,14 @@ Severity reflects impact and how easily it can be triggered on testnet as deploy
 - Fix: the protocol is fixed once any account exists, as the code hash is.
 - Test: `accounts` `the_birth_protocol_is_fixed_once_accounts_exist` (shows the address moves, then that the factory refuses).
 
+### M-7: the factory never registers on its coins, so no coin can be sold back
+
+- Location: `coins/src/lib.rs`, the coin creation batch.
+- Found by the live browser test of a coin sell on testnet.
+- A sell sends coins to the factory with `ft_transfer_call`, and a NEP-141 refuses a transfer to an account it has not registered; the factory created each coin but never registered on it, so every sell failed with "The account coins.tredio.testnet is not registered".
+- Fix: the creation batch registers the factory on the new coin; the two live coins were registered by hand.
+- Test: `coins` `the_factory_registers_on_each_coin_it_creates`.
+
 ## Trust assumptions
 
 What the team can still do on testnet, stated plainly:
@@ -196,7 +205,7 @@ Published as a new global contract; each account upgrades with its passkey.
 
 ## Deployment
 
-`registry`, `book`, `outcomes`, `coins` and `accounts` were redeployed in place on testnet on 2026-11-06 with these fixes (M-5 and M-6 included); their state read unchanged and the oracle's reports kept landing.
+`registry`, `book`, `outcomes`, `coins` and `accounts` were redeployed in place on testnet on 2026-11-06 with these fixes (M-5, M-6 and M-7 included); their state read unchanged and the oracle's reports kept landing.
 The account v2 global code is not published yet: publishing it burns about 31.6 NEAR, more than the testnet treasury holds, so accounts still run v1 and H-1 and L-3 stay open for them until they upgrade.
 
 | Contract | Change | Redeploy | State migration |
