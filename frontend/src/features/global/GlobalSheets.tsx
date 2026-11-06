@@ -92,7 +92,8 @@ function DepositSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
                     {button.label}
                   </p>
                 ) : (
-                  <Button block loading={tx.busy} disabled={info.data?.available === false || button.tone !== "ready"} onClick={() => void drip()} data-testid="faucet-claim" data-state={button.tone}>
+                  // Until the faucet says when this account may draw, the button waits: a draw inside the cooldown only fails.
+                  <Button block loading={tx.busy || !info.data} disabled={!info.data || info.data.available === false || button.tone !== "ready"} onClick={() => void drip()} data-testid="faucet-claim" data-state={info.data ? button.tone : "loading"}>
                     {button.label}
                   </Button>
                 )}

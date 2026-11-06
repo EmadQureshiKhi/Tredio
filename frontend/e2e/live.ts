@@ -130,3 +130,25 @@ export async function withIdentity(page: Page, ready: Locator) {
   await expect(unlock, "the caller key read as locked after a page load on a device that holds it").toBeHidden();
   await expect(ready).toBeVisible();
 }
+
+/** Test USDC through the session, unless the faucet's cooldown says this account drew it already. */
+export async function fundWithFaucet(page: Page) {
+  await page.goto("/portfolio");
+  await page.getByRole("button", { name: "Add funds" }).first().click();
+  const sheet = page.getByTestId("deposit-sheet");
+  await expect(sheet).toBeVisible();
+  const claim = sheet.getByTestId("faucet-claim");
+  await expect(claim).toHaveAttribute("data-state", /ready|success|waiting/);
+  if ((await claim.getAttribute("data-state")) === "ready") {
+    await claim.click();
+    await landed(sheet.getByTestId("faucet-tx"));
+  }
+  await expect(sheet.getByTestId("deposit-balance")).toHaveText(/[1-9]/, { timeout: 30_000 });
+  await page.keyboard.press("Escape");
+}
+
+/** Waits for a ticket's transaction to land and fails with the reason the app shows when it does not. */
+export async function landed(status: Locator) {
+  await expect(status).toHaveAttribute("data-stage", /^(filled|final|failed)$/, { timeout: 90_000 });
+  if ((await status.getAttribute("data-stage")) === "failed") throw new Error(`the transaction did not go through: ${await status.innerText()}`);
+}

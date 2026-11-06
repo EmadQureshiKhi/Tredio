@@ -13,6 +13,8 @@ import { decodeSignedDelegateAction } from "near-kit";
  *   the relayer nothing.
  * - Topping up a session's gas key: an active session of a Tredio account whose gas key fell
  *   below the minimum.
+ * - Room for a new session key: an owner request that adds a session, on an account whose NEAR
+ *   beyond its storage fell below what a key needs (each device and renewal adds one).
  * - Meta-transactions (NEP-366) from NEAR wallets: function calls to Tredio contracts only, with
  *   the methods the app uses and no more than a yoctoNEAR attached.
  *
@@ -78,6 +80,7 @@ export interface Limits {
   accountsPerDay: number;
   ownerCallsPerAccountPerHour: number;
   topupsPerAccountPerDay: number;
+  storageTopupsPerAccountPerDay: number;
   metaPerAccountPerHour: number;
   /** yoctoNEAR the relayer may spend per hour (deposits plus an estimate of gas). */
   nearPerHour: bigint;
@@ -97,6 +100,8 @@ export function metaAllowlist(d: Deployment): Map<string, Set<string>> {
 
 /** Gas (in yoctoNEAR at the 0.1 Ggas price) a relayed transaction may burn at most: 300 Tgas. */
 const GAS_COST_ESTIMATE = 3n * 10n ** 22n;
+/** yoctoNEAR per byte of account storage. */
+const STORAGE_PRICE = 10n ** 19n;
 const ONE_YOCTO = 1n;
 
 export interface RelayerDeps {
@@ -108,6 +113,9 @@ export interface RelayerDeps {
   createDeposit: bigint;
   sessionGasTarget: bigint;
   sessionGasMin: bigint;
+  /** NEAR an account must hold beyond its storage before a session key is added, and what the relayer tops it up to. */
+  sessionStorageMin: bigint;
+  sessionStorageTarget: bigint;
   limits: Limits;
   now?: () => number;
 }
@@ -235,10 +243,37 @@ export class Relayer {
     }
     this.spend(GAS_COST_ESTIMATE);
     this.hour.add(`owner:${a.account}`);
+    if (request.actions.some((x) => typeof x === "object" && x !== null && "add_session" in x)) await this.fundStorage(a.account);
     try {
       const o = await this.d.sender.sendOutcome(this.C.account.ownerExecute(a.account, a.request, a.proof));
       this.stats.ownerCalls++;
       return { hash: o.transaction?.hash ?? o.transaction_outcome?.id ?? "", value: returnValue(o), outcome: summarize(o) };
+    } catch (e) {
+      this.fail(e);
+    }
+  }
+
+  /**
+   * A session key takes storage on the account, and a passkey account holds only what the relayer
+   * gave it at creation: before a request that adds a session, its NEAR beyond storage goes back to
+   * the target when it is below the minimum, or the key would fail with LackBalanceForState.
+   */
+  private async fundStorage(account: string): Promise<void> {
+    const state = await this.d.viewer.rpc<{ amount: string; storage_usage: number }>("query", { request_type: "view_account", finality: "final", account_id: account }).catch(() => {
+      throw new RelayError("could not read the chain; try again", 503);
+    });
+    const free = BigInt(state.amount) - BigInt(state.storage_usage) * STORAGE_PRICE;
+    if (free >= this.d.sessionStorageMin) return;
+    if (this.day.count(`storage:${account}`) >= this.d.limits.storageTopupsPerAccountPerDay) {
+      this.stats.refused++;
+      throw new RelayError("this account added many sessions today; revoke one in Settings or try again tomorrow", 429);
+    }
+    const amount = this.d.sessionStorageTarget - free;
+    this.spend(amount + GAS_COST_ESTIMATE / 10n);
+    this.day.add(`storage:${account}`);
+    try {
+      await this.d.sender.sendTx((tx) => tx.transfer(account, `${amount} yocto` as never));
+      this.stats.topups++;
     } catch (e) {
       this.fail(e);
     }

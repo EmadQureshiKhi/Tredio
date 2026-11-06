@@ -15,8 +15,23 @@ export const baseIdentifier = (identifier: string) => identifier.replace(VERSION
 /** 1 for the first listing, 2 for "equity:dal.2". */
 export const listingNumber = (identifier: string) => Number(identifier.match(VERSION)?.[1] ?? 1);
 
-/** The name a trend goes by: its display name, or its identifier without the listing number. */
-export const trendName = (t: { displayName: string | null; identifier: string }) => t.displayName ?? baseIdentifier(t.identifier);
+const TICKER_CLASSES = new Set(["crypto", "equity", "commodity", "fx"]);
+
+/** A readable name from the identifier alone, for a trend listed without one: "topic:world-cup" is "World Cup", "equity:dal.2" is "DAL". */
+export function nameFromIdentifier(identifier: string): string {
+  const [assetClass = "", ...rest] = baseIdentifier(identifier).split(":");
+  const slug = rest.join(":");
+  if (!slug) return assetClass;
+  if (TICKER_CLASSES.has(assetClass)) return slug.toUpperCase();
+  return slug
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((w) => w[0]!.toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+/** The name a trend goes by: its display name, or one read from its identifier. */
+export const trendName = (t: { displayName: string | null; identifier: string }) => t.displayName ?? nameFromIdentifier(t.identifier);
 
 /** The newest listing of the topic `identifier` names, live ones first. */
 export function newestListing<T extends { identifier: string; status: string; createdAt: number }>(trends: readonly T[], identifier: string): T | undefined {

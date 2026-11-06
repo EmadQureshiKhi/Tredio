@@ -320,7 +320,10 @@ function Trade({ trend, series: s, up, down, fresh, initialSide, onFilled, onFin
             <Row label="Average price" value={quote && quote.filled > 0n ? cents(quote.averagePrice) : "-"} />
           </>
         )}
-        {kind === "market" ? <Row label="Fills within" value={fair !== null ? `${cents(Math.max(0, fair - 0.1))} to ${cents(Math.min(1, fair + 0.1))}` : "0.10 of the implied price"} tone="muted" /> : null}
+        {kind === "market" ? (
+          // The session's anchor is one-sided: a buy never pays more than 0.10 above the implied price, a sell never takes less than 0.10 below it.
+          <Row label={buy ? "Pays at most" : "Sells for at least"} value={fair !== null ? `${cents(anchor / 1000)} per ${sideName}` : buy ? "0.10 above the implied price" : "0.10 below the implied price"} tone="muted" />
+        ) : null}
         <Row label={kind === "market" ? "Fee and slippage limit" : "Taker fee if it crosses"} value={kind === "market" ? `${Number(TAKER_FEE_BPS) / 100}% · 1%` : `${Number(TAKER_FEE_BPS) / 100}%`} tone="muted" />
       </div>
       {kind === "market" && !fresh ? <Note tone="warn">The attention index is between reports, so market trades wait for the next one, usually within a minute. Limit orders still rest on the book.</Note> : null}

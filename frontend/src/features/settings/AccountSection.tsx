@@ -222,7 +222,7 @@ function Withdraw() {
         <Button tone="secondary" icon={<Fingerprint className="size-4" aria-hidden />} disabled={!amount || !validTo || tooMuch || Boolean(error)} loading={tx.busy} onClick={() => void send()} data-testid="withdraw-submit">
           Withdraw
         </Button>
-        <TxStatus tx={tx} filledLabel="Sent" />
+        <TxStatus tx={tx} filledLabel="Sent" testId="withdraw-tx" />
       </div>
     </SettingRow>
   );

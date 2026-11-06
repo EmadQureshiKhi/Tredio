@@ -10,7 +10,9 @@ describe("listings", () => {
     expect(baseIdentifier("topic:web3.0")).toBe("topic:web3.0");
     expect(listingNumber("equity:dal.2")).toBe(2);
     expect(listingNumber("equity:dal")).toBe(1);
-    expect(trendName(t("equity:dal.2", "active", 2))).toBe("equity:dal");
+    expect(trendName(t("equity:dal.2", "active", 2))).toBe("DAL");
+    expect(trendName(t("topic:world-cup", "active", 1))).toBe("World Cup");
+    expect(trendName(t("person:sam_altman", "active", 1))).toBe("Sam Altman");
     expect(trendName(t("equity:dal.2", "active", 2, "Delta Air Lines"))).toBe("Delta Air Lines");
   });
 

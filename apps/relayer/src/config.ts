@@ -27,6 +27,9 @@ const schema = z.object({
   /** A session gas key is topped up to this when it falls below SESSION_GAS_MIN_NEAR. */
   SESSION_GAS_TARGET_NEAR: nearAmount.default(near("0.35")),
   SESSION_GAS_MIN_NEAR: nearAmount.default(near("0.31")),
+  /** Before a session key is added, the account's NEAR beyond storage is topped up to the target when below the minimum (a gas key needs about 0.12). */
+  SESSION_STORAGE_MIN_NEAR: nearAmount.default(near("0.15")),
+  SESSION_STORAGE_TARGET_NEAR: nearAmount.default(near("0.2")),
   /** Below this balance the relayer reports itself unhealthy (the top-up service refills it). */
   MIN_BALANCE_NEAR: nearAmount.default(near("2")),
   /** Budgets (in memory, reset on restart). */
@@ -34,6 +37,7 @@ const schema = z.object({
   ACCOUNTS_PER_DAY: z.coerce.number().int().positive().default(150),
   OWNER_CALLS_PER_ACCOUNT_PER_HOUR: z.coerce.number().int().positive().default(30),
   TOPUPS_PER_ACCOUNT_PER_DAY: z.coerce.number().int().positive().default(6),
+  STORAGE_TOPUPS_PER_ACCOUNT_PER_DAY: z.coerce.number().int().positive().default(4),
   META_TX_PER_ACCOUNT_PER_HOUR: z.coerce.number().int().positive().default(120),
   /** NEAR spent on gas and deposits per hour, across everything, before the relayer pauses. */
   NEAR_PER_HOUR: nearAmount.default(near("15")),

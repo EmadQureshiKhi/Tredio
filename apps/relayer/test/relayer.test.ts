@@ -32,7 +32,7 @@ const ticketFor = (ownerKey: string, account: string, expiresAt = NOW / 1000 + 6
 });
 
 /** A chain where `existing` accounts exist and each owner key derives to `0u` + 52 a's with its last char. */
-function fakes(opts: { existing?: Set<string>; owners?: Map<string, string>; session?: { expires_at: number; gas_key: boolean } | null; gasKey?: bigint } = {}) {
+function fakes(opts: { existing?: Set<string>; owners?: Map<string, string>; session?: { expires_at: number; gas_key: boolean } | null; gasKey?: bigint; account?: { amount: bigint; storage: number } } = {}) {
   const sent: Array<{ kind: string; detail: unknown }> = [];
   const derive = (ownerKey: string) => `0u${ownerKey.slice(-1).toLowerCase().repeat(52)}`;
   const viewer = {
@@ -48,6 +48,7 @@ function fakes(opts: { existing?: Set<string>; owners?: Map<string, string>; ses
       throw new Error(`unexpected view ${method}`);
     },
     rpc: async (_m: string, p: { account_id: string }) => {
+      if (opts.account && opts.owners?.has(p.account_id)) return { amount: opts.account.amount.toString(), storage_usage: opts.account.storage };
       if (opts.existing?.has(p.account_id)) return {};
       throw new Error(`UNKNOWN_ACCOUNT ${p.account_id}`);
     },
@@ -61,14 +62,20 @@ function fakes(opts: { existing?: Set<string>; owners?: Map<string, string>; ses
       { status: { SuccessValue: "" }, transaction: { hash: "tx1" }, receipts_outcome: [{ id: "r1", outcome: { status: { SuccessValue: "" }, logs: ['EVENT_JSON:{"standard":"tredio","version":"1.0.0","event":"order_placed","data":[{"id":"9"}]}'], executor_id: "book.tredio.testnet" } }] }
     ),
     fundGasKey: async (account: string, pk: string, amount: bigint) => (sent.push({ kind: "fund", detail: { account, pk, amount } }), { transaction: { hash: "tx2" } }),
-    sendTx: async () => (sent.push({ kind: "tx", detail: null }), { transaction: { hash: "tx3" } }),
+    sendTx: async (build: (tx: unknown) => unknown) => {
+      const actions: unknown[] = [];
+      const tx = { transfer: (to: string, amount: string) => (actions.push({ transfer: { to, amount } }), tx) };
+      build(tx);
+      sent.push({ kind: "tx", detail: actions });
+      return { transaction: { hash: "tx3" } };
+    },
   } as unknown as Sender;
   return { viewer, sender, sent, derive };
 }
 
-const limits = { accountsPerHour: 2, accountsPerDay: 10, ownerCallsPerAccountPerHour: 2, topupsPerAccountPerDay: 1, metaPerAccountPerHour: 5, nearPerHour: 10n ** 25n };
+const limits = { accountsPerHour: 2, accountsPerDay: 10, ownerCallsPerAccountPerHour: 10, topupsPerAccountPerDay: 1, storageTopupsPerAccountPerDay: 4, metaPerAccountPerHour: 5, nearPerHour: 10n ** 25n };
 const relayer = (f: ReturnType<typeof fakes>, ticket: string | null = ticketSigner) =>
-  new Relayer({ sender: f.sender, viewer: f.viewer, deployment: D, ticketSigner: ticket, createDeposit: 4n * 10n ** 23n, sessionGasTarget: 35n * 10n ** 22n, sessionGasMin: 31n * 10n ** 22n, limits, now: () => NOW });
+  new Relayer({ sender: f.sender, viewer: f.viewer, deployment: D, ticketSigner: ticket, createDeposit: 4n * 10n ** 23n, sessionGasTarget: 35n * 10n ** 22n, sessionGasMin: 31n * 10n ** 22n, sessionStorageMin: 15n * 10n ** 22n, sessionStorageTarget: 2n * 10n ** 23n, limits, now: () => NOW });
 
 describe("creating accounts", () => {
   test("creates an account with a valid ticket and a proof of its first request", async () => {
@@ -133,6 +140,30 @@ describe("owner requests and session gas", () => {
     expect(done.outcome.receipts_outcome[0]!.outcome.logs[0]).toContain("order_placed");
     await expect(relayer(fakes()).ownerExecute({ account, request, proof: await pk.prove(request) })).rejects.toThrow(/not a Tredio account/);
     await expect(relayer(f).ownerExecute({ account, request, proof: await passkey().prove(request) })).rejects.toBeInstanceOf(RelayError);
+  });
+
+  test("makes room for a new session key on an account low on NEAR, at most a few times a day", async () => {
+    const pk = passkey();
+    const account = fakes().derive(pk.ownerKey);
+    const add = (n: number) => requestJson(ownerRequest(account, "testnet", [{ add_session: { public_key: `ed25519:${"1".repeat(43)}`, n } } as never], NOW + n));
+    const send = async (r: Relayer, n: number) => {
+      const request = add(n);
+      return r.ownerExecute({ account, request, proof: await pk.prove(request) });
+    };
+    // 2750 bytes of storage cost 0.0275 NEAR, so 0.02875 leaves 0.00125 free: the top-up brings it back to 0.2.
+    const low = fakes({ owners: new Map([[account, pk.ownerKey]]), account: { amount: 28_750_000_000_000_000_000_000n, storage: 2750 } });
+    const r = relayer(low);
+    await send(r, 1);
+    const transfer = low.sent.find((x) => x.kind === "tx")?.detail as Array<{ transfer: { to: string; amount: string } }>;
+    expect(transfer[0]!.transfer).toEqual({ to: account, amount: "198750000000000000000000 yocto" });
+    expect(low.sent.at(-1)!.kind).toBe("call");
+    for (let i = 2; i <= 4; i++) await send(r, i);
+    await expect(send(r, 5)).rejects.toThrow(/many sessions today/);
+
+    // An account with room, or a request that adds no session, costs nothing extra.
+    const roomy = fakes({ owners: new Map([[account, pk.ownerKey]]), account: { amount: 5n * 10n ** 23n, storage: 2750 } });
+    await send(relayer(roomy), 1);
+    expect(roomy.sent.filter((x) => x.kind === "tx")).toHaveLength(0);
   });
 
   test("tops a low session gas key up to the target, once a day", async () => {

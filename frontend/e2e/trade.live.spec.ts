@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "@playwright/test";
-import { expect, LIVE, passkeyUses, test } from "./live";
+import { expect, fundWithFaucet, landed, LIVE, passkeyUses, test } from "./live";
 
 /**
  * Trading on the live Testnet stack with the worker's passkey account: test USDC from the faucet,
@@ -18,30 +18,13 @@ test.skip(!LIVE, "live Testnet spec: run with playwright.live.config.ts");
 
 const TREND = process.env.E2E_TREND ?? "topic:world-cup";
 
-/** Waits for a ticket's transaction to land and fails with the reason the app shows when it does not. */
-async function landed(status: import("@playwright/test").Locator) {
-  await expect(status).toHaveAttribute("data-stage", /^(filled|final|failed)$/, { timeout: 90_000 });
-  if ((await status.getAttribute("data-stage")) === "failed") throw new Error(`the trade did not go through: ${await status.innerText()}`);
-}
-
 test("test USDC, an Up buy and an attention perp, with no passkey prompt, then the portfolio", async ({ live, account }) => {
   const { page } = live;
   expect(account).toMatch(/^0u[0-9a-z]+$/);
   const prompts = await passkeyUses(live);
 
   // Test USDC through the session (the faucet allows one draw per cooldown).
-  await page.goto("/portfolio");
-  await page.getByRole("button", { name: "Add funds" }).first().click();
-  const sheet = page.getByTestId("deposit-sheet");
-  await expect(sheet).toBeVisible();
-  const claim = sheet.getByTestId("faucet-claim");
-  await expect(claim).toHaveAttribute("data-state", /ready|success/);
-  if ((await claim.getAttribute("data-state")) === "ready") {
-    await claim.click();
-    await expect(sheet.getByTestId("faucet-claim")).toHaveAttribute("data-state", "success", { timeout: 90_000 });
-  }
-  await expect(sheet.getByTestId("deposit-balance")).toHaveText(/[1-9]/, { timeout: 30_000 });
-  await page.keyboard.press("Escape");
+  await fundWithFaucet(page);
 
   // An Up buy for 2 USDC on the order book, anchored to the attention-implied price.
   await page.goto(`/t/${TREND}`);
