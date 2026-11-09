@@ -1,4 +1,4 @@
-import { type Call, calls, type Deployment } from "@tredio/contracts";
+import { type Call, calls, type Deployment, opensAtCap } from "@tredio/contracts";
 import type { Snapshot } from "./snapshot";
 
 export type ActionKind = "liquidate" | "settleRetired" | "graduate" | "settle" | "retire" | "openSeries" | "list" | "createCurve" | "cancelExpired" | "poke";
@@ -67,9 +67,12 @@ export function plan(s: Snapshot, d: Deployment, cfg: PlanConfig): Action[] {
     }
   }
 
-  for (const t of s.trends) {
-    if (t.status === "retired") continue;
-    const stale = s.now - t.updated_at >= s.params.stale_retire_window;
+  // When every live trend went stale together, the oracle stopped reporting (an outage, not trends that
+  // faded): retiring them all would end every market for good, so stale retirement waits for the oracle.
+  const live = s.trends.filter((t) => t.status !== "retired");
+  const outage = live.length > 1 && live.every((t) => s.now - t.updated_at >= s.params.stale_retire_window);
+  for (const t of live) {
+    const stale = !outage && s.now - t.updated_at >= s.params.stale_retire_window;
     const cooledOut = t.status === "cooling" && s.now - t.status_since >= s.params.retire_window;
     if (stale || cooledOut) {
       actions.push({ key: `retire:${t.id}`, kind: "retire", call: C.registry.pokeLifecycle(t.id), reason: stale ? "no oracle update within the stale retire window" : "cooling for the retire window" });
@@ -77,11 +80,12 @@ export function plan(s: Snapshot, d: Deployment, cfg: PlanConfig): Action[] {
   }
 
   // A window gets its next series once the previous one expired, so the latest one per window is
-  // all there is to act on. Only active, fresh trends open series (the registry checks it too).
+  // all there is to act on. Only active, fresh trends open series (the registry checks it too), and
+  // never at the index cap, where Up could not win.
   for (const l of s.latest) {
     const t = trendById.get(l.trend);
     if (!t || !cfg.seriesWindows.includes(l.window) || !s.windows.includes(l.window)) continue;
-    if (t.status !== "active" || s.now - t.updated_at > s.params.staleness_limit) continue;
+    if (t.status !== "active" || s.now - t.updated_at > s.params.staleness_limit || opensAtCap(t.index)) continue;
     if (!l.series || s.now >= l.series.expiry) {
       actions.push({ key: `openSeries:${t.id}:${l.window}`, kind: "openSeries", call: C.outcomes.openSeries(t.id, l.window), reason: l.series ? "previous series expired" : "first series" });
     }
