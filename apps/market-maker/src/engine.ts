@@ -116,7 +116,7 @@ export class Engine {
     );
     const open = latest.filter((x): x is { t: Trend; s: Series } => x.s !== null && x.s.outcome === "open" && nowSec < x.s.expiry - this.cfg.stopBeforeExpirySec);
     const listed = await Promise.all(open.map(async (x) => ((await this.view<Market | null>(this.d.contracts.book, "get_market", { series: x.s.id, side: "up" })) ? x : null)));
-    const candidates = listed.filter((x): x is { t: Trend; s: Series } => x !== null).map((x) => ({ series: x.s, index: x.t.index, window: x.s.window }));
+    const candidates = listed.filter((x): x is { t: Trend; s: Series } => x !== null).map((x) => ({ series: x.s, index: x.t.index, window: x.s.window, opening: x.s.opening_index }));
     return pickSeries(candidates, this.cfg.maxSeries);
   }
 

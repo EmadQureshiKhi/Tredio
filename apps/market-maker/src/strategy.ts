@@ -1,3 +1,4 @@
+import { opensAtCap } from "@tredio/contracts";
 /**
  * Quoting math for the Tredio book. Prices are USDC per token in ticks of 0.001 (1 to 999), sizes
  * raw token units (6 decimals) in lots of 0.001 token. Pure, so it is tested without a chain.
@@ -99,9 +100,13 @@ export function requoteUrgency(live: Ladder, want: Ladder, thresholdTicks: numbe
   return drift ? "drift" : "none";
 }
 
-/** The series worth quoting: shorter windows first (most trading happens there), then by attention. */
-export function pickSeries<T extends { window: number; index: number }>(series: readonly T[], max: number): T[] {
-  return [...series].sort((a, b) => a.window - b.window || b.index - a.index).slice(0, max);
+/**
+ * The series worth quoting: shorter windows first (most trading happens there), then by attention.
+ * A series that opened at the index cap is left alone: it can only settle Down, so its Up is worth
+ * nothing and its Down a full USDC, and quoting either around the registry's fair value would give money away.
+ */
+export function pickSeries<T extends { window: number; index: number; opening: number }>(series: readonly T[], max: number): T[] {
+  return series.filter((s) => !opensAtCap(s.opening)).sort((a, b) => a.window - b.window || b.index - a.index).slice(0, max);
 }
 
 export type Arbitrage = { kind: "buyBoth"; tokens: number; upTick: number; downTick: number; edge: number } | { kind: "sellBoth"; tokens: number; upTick: number; downTick: number; edge: number };
