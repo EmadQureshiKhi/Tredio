@@ -35,7 +35,10 @@ test("re-quote urgency", () => {
 });
 
 test("series order and arbitrage", () => {
-  expect(pickSeries([{ window: 604_800, index: 90 }, { window: 86_400, index: 10 }, { window: 86_400, index: 50 }], 2)).toEqual([{ window: 86_400, index: 50 }, { window: 86_400, index: 10 }]);
+  const s = (window: number, index: number, opening = index * 1e6) => ({ window, index, opening });
+  expect(pickSeries([s(604_800, 90), s(86_400, 10), s(86_400, 50)], 2)).toEqual([s(86_400, 50), s(86_400, 10)]);
+  // A series that opened at the cap of 100 can only settle Down: it is never quoted.
+  expect(pickSeries([s(86_400, 100), s(604_800, 80)], 2)).toEqual([s(604_800, 80)]);
   const lvl = (tick: number) => ({ tick, size: 10_000_000n });
   expect(findArbitrage({ bestBid: null, bestAsk: lvl(450) }, { bestBid: null, bestAsk: lvl(500) }, 20, 0.005, 100)).toMatchObject({ kind: "buyBoth", tokens: 10 });
   expect(findArbitrage({ bestBid: lvl(560), bestAsk: null }, { bestBid: lvl(470), bestAsk: null }, 20, 0.005, 100)).toMatchObject({ kind: "sellBoth" });
