@@ -222,11 +222,16 @@ export interface SenderOptions {
   rpc?: RpcEndpoints;
 }
 
-/** A failed transaction or receipt, with the contract's panic message when there is one. */
+/**
+ * A failed transaction or receipt, with the contract's panic message when there is one. `outcome`
+ * is set when the chain ran the transaction and it failed; without it the transaction was not
+ * signed, was turned away, or its fate is unknown.
+ */
 export class TxError extends Error {
   constructor(
     message: string,
     readonly hash?: string,
+    readonly outcome?: FinalExecutionOutcome,
   ) {
     super(message);
     this.name = "TxError";
@@ -372,7 +377,7 @@ export class Sender {
         o = landed;
       }
       const failed = failureOf(o);
-      if (failed) throw new TxError(failed, o.transaction?.hash ?? hash);
+      if (failed) throw new TxError(failed, o.transaction?.hash ?? hash, o);
       return o;
     };
     if (this.lanes > 0) {

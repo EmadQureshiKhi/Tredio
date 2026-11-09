@@ -23,13 +23,16 @@ import {
 import { z } from "zod";
 import type { TredioApi } from "./api";
 import type { ChainViews, TxIndex } from "./chain";
+import { account, identifier, READ_ONLY, run, WINDOWS, windowName } from "./tools";
+import { registerTradeTools, type TradingDeps } from "./trade";
 import { checkReview, type ReviewEvidence, verifyIndex } from "./verify";
 
 /**
- * The Tredio MCP server: tools an agent uses to read Tredio's attention markets, each answering
- * structured JSON. Reads come from the public API and, where the truth is on chain, from NEAR
- * RPC views of the Tredio contracts. Every tool is read-only, except `buy_trend_history`, which
- * exists only when a payer key is configured and spends at most the configured USDC per call.
+ * The Tredio MCP server: tools an agent uses to read and trade Tredio's attention markets, each
+ * answering structured JSON. Reads come from the public API and, where the truth is on chain, from
+ * NEAR RPC views of the Tredio contracts. Tools that send exist only when a key is configured:
+ * `buy_trend_history` (an x402 payer, at most the configured USDC per call) and the trade tools
+ * (trade.ts), which run within the user's trading policy (policy.ts).
  */
 
 export interface ServerDeps {
@@ -40,6 +43,8 @@ export interface ServerDeps {
   network: "testnet" | "mainnet";
   /** x402 purchases: the payer and the most it pays per call (USDC atomic units). Absent, no paying tool. */
   x402?: { signer: X402Signer; rpc: RpcReader; maxAmount: bigint } | null;
+  /** Trading: who signs, the caller identity and the policy with its ledger. Absent, no trade tools. */
+  trading?: TradingDeps | null;
   fetchImpl?: typeof fetch;
 }
 
@@ -47,33 +52,6 @@ export const SERVER_NAME = "tredio";
 export const SERVER_VERSION = "0.1.0";
 
 const usdc = (raw: string | bigint | number) => fromRaw(BigInt(raw), USDC_DECIMALS);
-const identifier = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .regex(/^[a-z0-9:._-]{1,64}$/, "a trend identifier such as topic:world-cup");
-const account = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .regex(/^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/, "a NEAR account id")
-  .min(2)
-  .max(64);
-const WINDOWS = { "15m": 900, "24h": 86_400, "7d": 604_800 } as const;
-const windowName = (sec: number) => (Object.entries(WINDOWS).find(([, s]) => s === sec)?.[0] ?? `${sec}s`) as string;
-const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true } as const;
-
-type Result = { content: Array<{ type: "text"; text: string }>; structuredContent?: Record<string, unknown>; isError?: boolean };
-const run =
-  <A>(fn: (args: A) => Promise<Record<string, unknown>>) =>
-  async (args: A): Promise<Result> => {
-    try {
-      const data = await fn(args);
-      return { content: [{ type: "text", text: JSON.stringify(data) }], structuredContent: data };
-    } catch (e) {
-      return { content: [{ type: "text", text: String((e as Error).message ?? e) }], isError: true };
-    }
-  };
 
 interface ApiTrend {
   identifier: string;
@@ -119,7 +97,10 @@ export function createServer(d: ServerDeps): McpServer {
       instructions:
         "Tredio lists internet trends on NEAR, each with an attention index from 0 to 100 that a TEE oracle writes to the registry contract, and markets on it: Up/Down outcome series (24h, 7d), attention perps (up to 3x) and trend coins. " +
         "Start with list_trends, then get_trend for one trend's markets. Index values are points (0 to 100, 6 decimals on chain); USDC amounts are decimal strings. " +
-        `This server reads ${d.network}; testnet balances have no value. verify_index checks the oracle's signature on chain instead of trusting the API.`,
+        `This server reads ${d.network}; testnet balances have no value. verify_index checks the oracle's signature on chain instead of trusting the API.` +
+        (d.trading
+          ? ` The tools that send (${[...(d.trading.signer ? ["buy_outcome", "sell_outcome", "open_perp", "close_perp", "add_perp_margin", "buy_coin", "sell_coin"] : []), ...(d.trading.caller ? ["post_call"] : [])].join(", ")}) are dry runs unless confirm is true, and send only within the user's trading policy; get_trading_policy shows the policy, the signer and today's spend.`
+          : ""),
     },
   );
 
@@ -524,5 +505,6 @@ export function createServer(d: ServerDeps): McpServer {
     );
   }
 
+  if (d.trading) registerTradeTools(server, d, d.trading);
   return server;
 }

@@ -1,6 +1,6 @@
 ---
 name: tredio
-description: Read, verify and trade Tredio's attention markets on NEAR. Tredio lists internet trends, each with a 0 to 100 attention index that an oracle signs and the registry contract stores, and trades it through Up/Down outcome series, attention perps and trend coins. Use when an agent needs Tredio's API or MCP server, its contract ids and units, to check an index value or an AI review on chain instead of trusting the API, to pay for Tredio's x402 endpoints in USDC on NEAR, or to trade safely through a session key.
+description: Read, verify and trade Tredio's attention markets on NEAR. Tredio lists internet trends, each with a 0 to 100 attention index that an oracle signs and the registry contract stores, and trades it through Up/Down outcome series, attention perps and trend coins. Use when an agent needs Tredio's API or MCP server, its contract ids and units, to check an index value or an AI review on chain instead of trusting the API, to pay for Tredio's x402 endpoints in USDC on NEAR, or to trade safely through a session key or the MCP server's trade tools, which send only within the user's spending policy.
 ---
 
 # Tredio
@@ -87,9 +87,23 @@ Signed-in routes (alerts, Autopilot rules, links) take a NEP-413 sign-in at `POS
 claude mcp add tredio --env TREDIO_API_URL=http://localhost:4000 -- bun /path/to/Tredio/packages/mcp/src/bin.ts
 ```
 
-Tools: `get_status`, `list_trends`, `get_trend`, `get_index_history`, `get_market`, `get_perp_market`, `get_coin`, `get_review`, `verify_index`, `get_account`, `get_leaders`, `list_candidates`, `get_paid_api`.
+Read tools: `get_status`, `list_trends`, `get_trend`, `get_index_history`, `get_market`, `get_perp_market`, `get_coin`, `get_review`, `verify_index`, `get_account`, `get_leaders`, `list_candidates`, `get_paid_api`.
 With `TREDIO_X402_ACCOUNT` and `TREDIO_X402_PRIVATE_KEY` in its env it also offers `buy_trend_history`, which pays at most `TREDIO_X402_MAX_USDC` (default 0.05) per call.
 See `packages/mcp/README.md` for Claude Desktop and `.mcp.json` setups.
+
+### Trading through the MCP server
+
+With a trading key in its env the server also offers trade tools: `buy_outcome`, `sell_outcome`, `open_perp`, `close_perp`, `add_perp_margin`, `buy_coin`, `sell_coin`, `post_call`, and `get_trading_policy`.
+
+- Every trade tool is a dry run unless it gets `confirm: true`: the dry run answers the quote (from the contracts' own views), the exact contract calls, and the policy check, and sends nothing.
+- With `confirm: true` it quotes again and sends only within the user's policy: the tool must be in the policy's allowlist, a spending tool (`buy_outcome`, `open_perp`, `add_perp_margin`, `buy_coin`) stays under its `maxUsdc` per call, and the spending tools together stay under `dailyCapUsdc` per UTC day.
+- The policy is JSON in `TREDIO_POLICY` or the file `TREDIO_POLICY_FILE`; without one nothing sends.
+- A ledger file records every confirmed trade with its transaction and keeps the day's spend across restarts.
+- Call `get_trading_policy` first: it names the signer, which tools it can send, the caps, today's spend and today's trades.
+- A passkey account's session key (`TREDIO_SESSION_ACCOUNT`, `TREDIO_SESSION_KEY`) trades Up/Down and opens and closes perps, within the session's own scope and on-chain daily limit too; margin top-ups and coin trades are owner actions the passkey signs, so a session cannot send them.
+- A NEAR account's own full-access key (`TREDIO_TRADER_ACCOUNT`, `TREDIO_TRADER_PRIVATE_KEY`) can send every trade tool; it registers storage at a contract before its first trade there.
+- `post_call` signs with a caller key (`TREDIO_CALLER_KEY`, or the NEAR account's key): the agent's own identity, never the person's.
+- A refusal the contracts log (`open_refused`, `trade_refused`) returns the USDC and does not count against the day.
 
 ## Paid API (x402)
 
@@ -126,7 +140,7 @@ Two ways to trade: a NEAR wallet calls the contracts itself, or a Tredio passkey
 - A session is a function-call key (usually a gas key) on the account itself that can call only `session_call`, with typed actions only: `swap`, `mint_sets`, `redeem_sets`, `redeem_winnings`, `book_withdraw`, `perp_open`, `perp_close`, `claim_curation`, `faucet`, `hl_order`, `hl_leverage` (and `top_up_gas` from account code v2).
 - Each session has an expiry (at most 30 days; the app asks for 7), a scope (`outcomes`, `perps`, `hyperliquid`) and a gross daily USDC outflow limit that inflows never offset (the app asks for 500 USDC a day).
 - Read a session with `session({"public_key": ...})` or all of them with `sessions({})` on the account; `frozen({})` says whether the owner froze them.
-- Autopilot and agents get a session of their own (Autopilot's is labelled `autopilot` and scoped to Hyperliquid), so the owner can cap and revoke it without touching the rest.
+- Autopilot and agents get a session of their own (Autopilot's is labelled `autopilot` and scoped to Hyperliquid; an agent using the MCP server needs `outcomes` and `perps`), so the owner can cap and revoke it without touching the rest.
 
 ### On-chain guards
 

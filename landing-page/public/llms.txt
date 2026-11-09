@@ -27,7 +27,8 @@ The API answers index values in points (51.86 is 51.86 points); on chain they ha
 
 ## For agents
 
-- MCP: `packages/mcp` in the repository is a read-only MCP server (stdio) with tools for trends, markets, accounts, AI reviews and `verify_index`, which checks the registry's checkpoint and the oracle's signature itself.
+- MCP: `packages/mcp` in the repository is an MCP server (stdio) with tools for trends, markets, accounts, AI reviews and `verify_index`, which checks the registry's checkpoint and the oracle's signature itself.
+  Its trade tools (Up/Down, perps, coins, calls) are dry runs by default and send only within the user's policy: an allowlist of tools, a USDC cap per call and a daily cap.
 - Skill: `skills/tredio/SKILL.md` in the repository teaches an agent to read, verify and trade Tredio safely.
 - x402: `GET /v1/x402` lists the paid routes (`GET /v1/x402/trends/{identifier}/history` for 0.01 USDC: every checkpoint and source reading; `POST /v1/x402/backtests` for 0.02 USDC).
   They follow x402 v2's NEAR `exact` scheme: the route answers 402 with `PAYMENT-REQUIRED`, the agent signs one USDC `ft_transfer` as a NEP-366 delegate action and sends it in `PAYMENT-SIGNATURE`, and Tredio's relayer submits it, so the agent needs no NEAR for gas.

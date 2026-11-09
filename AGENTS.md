@@ -7,10 +7,10 @@ The product overview is in [README.md](README.md); the judges' checklist is in [
 ## Layout
 
 - `contracts/`: Rust contracts (near-sdk 5, one Cargo workspace), deployed under `tredio.testnet`; account ids in `deployments/testnet.json`.
-- `apps/`: Bun services, each with `/health`, `/live`, a `Dockerfile` and a `.env.example`: relayer (4100), keeper (4200), market-maker (4300), autopilot (4400), topup (4500), oracle (4600), indexer (4700).
+- `apps/`: Bun services, each with `/health`, `/live`, a `Dockerfile` and a `.env.example`: relayer (4100), keeper (4200), market-maker (4300), autopilot (4400), topup (4500), oracle (4600), indexer (4700), agent-market (4800: the attention check on the NEAR AI Agent Market, prepared and not listed).
 - `backend/`: the Hono API on Postgres (4000): radar, NEAR AI review, sign-in, Autopilot, deposits, social, status, x402.
 - `frontend/` (the app, 3000), `admin/` (operator console), `landing-page/` (tredio.bid): Next.js.
-- `packages/`: `chain` (sender, viewer, proofs, the x402 paying client), `contracts-ts` (`@tredio/contracts`: typed calls and deployments), `hyperliquid`, `intents` (1Click), `autopilot` (rule engine), `mcp` (MCP server).
+- `packages/`: `chain` (sender, viewer, proofs, the x402 paying client), `contracts-ts` (`@tredio/contracts`: typed calls and deployments), `hyperliquid`, `intents` (1Click), `autopilot` (rule engine), `mcp` (MCP server: read tools, and trade tools that send only within the user's policy, from a session key or an account's own key).
 - `skills/tredio/SKILL.md`: the agent skill for using Tredio.
 - `scripts/`: `dev.ts` (run everything), `verify.ts` (check the claims against testnet), `e2e-testnet.ts` (one full flow on testnet), `x402-demo.ts` (pay for an x402 route on testnet), `gas-keys.ts`.
 - `contracts/scripts/`: `build.sh` (local, or `--reproducible [commit]` in SourceScan's Docker image) and `deploy.sh testnet|mainnet`.

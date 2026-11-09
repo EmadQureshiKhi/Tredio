@@ -71,7 +71,7 @@ Each of these is a NEAR primitive doing real work in the product, not a logo on 
    Code: [`apps/autopilot`](apps/autopilot), [`backend/src/autopilot`](backend/src/autopilot).
 8. **Paid data for agents, settled in USDC on NEAR.**
    Premium API endpoints (full-resolution index history with every source reading, and Autopilot backtests) follow x402 v2's NEAR `exact` scheme: the API answers HTTP 402, the agent signs one USDC `ft_transfer` as a NEP-366 delegate action and sends it in `PAYMENT-SIGNATURE`, and Tredio's relayer submits it, so the agent needs no NEAR for gas.
-   A read-only MCP server and an agent skill describe the whole product to AI agents; the MCP server can also buy the paid history under a spending cap.
+   An MCP server and an agent skill describe the whole product to AI agents; the MCP server can also buy the paid history under a spending cap, and trade Up/Down, perps and coins and post calls for a user within the limits the user sets (an allowlist of tools, a USDC cap per call and a daily cap), from a passkey account's session key or the agent's own NEAR account.
    Code: [`backend/src/x402`](backend/src/x402), [`packages/chain/src/x402.ts`](packages/chain/src/x402.ts) (the paying client), [`packages/mcp`](packages/mcp), [`skills/tredio/SKILL.md`](skills/tredio/SKILL.md).
 
 ## How it works
@@ -163,8 +163,9 @@ pnpm security
 ## For AI agents
 
 - [AGENTS.md](AGENTS.md): how the repository is laid out and how to work in it.
-- [`packages/mcp`](packages/mcp): a read-only MCP server for trends, markets, accounts and index verification.
+- [`packages/mcp`](packages/mcp): an MCP server for trends, markets, accounts and index verification, with trade tools that are dry runs by default and send only within the user's spending policy.
 - [`skills/tredio/SKILL.md`](skills/tredio/SKILL.md): a skill that teaches an agent to read and trade Tredio safely.
+- [`apps/agent-market`](apps/agent-market): "attention check", a worker for the NEAR AI Agent Market that answers any topic with its attention index, the sources behind it and the NEAR AI review, paid per call (ready to list; a trial hire settled in testnet USDC).
 - [`llms.txt`](landing-page/public/llms.txt) and the x402 endpoints in the API.
 
 ## License

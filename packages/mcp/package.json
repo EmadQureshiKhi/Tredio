@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Tredio's MCP server: read-only tools for AI agents over the public API and NEAR RPC views (trends, the attention index and its oracle signature, markets, accounts, reviews), plus optional x402 purchases from a key in env.",
+  "description": "Tredio's MCP server for AI agents: tools that read the public API and NEAR RPC views (trends, the attention index and its oracle signature, markets, accounts, reviews), optional x402 purchases, and trade tools (Up/Down, perps, coins, calls) that send only within a user's spending policy, from a passkey account's session key or a NEAR account's own key.",
   "author": "Emad Qureshi",
   "license": "MIT",
   "main": "src/index.ts",
