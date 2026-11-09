@@ -158,9 +158,9 @@ What the team can still do on testnet, stated plainly:
 
 ## Accepted risks and observations
 
-- The account checks that the passkey's assertion carries user presence, not user verification (the UV flag).
-  The app requires user verification from the authenticator (Face ID, a fingerprint or a PIN), so a person's own device always asks, but the contract itself would accept a presence-only assertion from the same key.
-  Requiring the UV flag on chain is a one-line change for the next account code.
+- Account code v1 and v2 check that the passkey's assertion carries user presence, not user verification (the UV flag).
+  The app requires user verification from the authenticator (Face ID, a fingerprint or a PIN), so a person's own device always asks, but that code would accept a presence-only assertion from the same key.
+  Account code v3 requires both flags, as do the API's and the relayer's own checks.
 - Plain (non-gas) session keys have an unlimited allowance, so a leaked one sent directly could burn the account's liquid NEAR on failing calls.
   A cap was tried and reverted: an allowance is charged the attached gas at 1e9 yocto per gas (the sandbox charged 0.3009 NEAR of allowance for one 300 Tgas call), so any cap small enough to matter stops the key.
   The app uses gas keys only; plain keys are the fallback for meta transactions, where the relayer pays.
@@ -181,7 +181,7 @@ What the team can still do on testnet, stated plainly:
 
 - Callbacks: every `on_*`, `after_*`, `wrap_unused` and resolver method is `#[private]`, and each reads its promise result defensively.
 - Initialization: every contract has one `#[init]` constructor and `PanicOnDefault`.
-- Access control: owner-only methods check the predecessor; the account's owner path verifies a WebAuthn P-256 signature over a domain-tagged hash bound to account, network, nonce and a time window; sessions require the account's own key and are checked for expiry, scope and a gross daily USDC limit; the registry accepts only reports signed by its oracle key, with strictly increasing run ids and age limits.
+- Access control: owner-only methods check the predecessor; the account's owner path verifies a WebAuthn P-256 signature over a domain-tagged hash bound to account, network, nonce and a time window; sessions require the account's own key (or, from v3, the session key's own implicit account calling directly) and are checked for expiry, scope and a gross daily USDC limit; the registry accepts only reports signed by its oracle key, with strictly increasing run ids and age limits.
 - State before calls: payouts, withdrawals, claims and redemptions update state before the transfer and restore it in the callback on failure (outcomes, book, perps, curation, coins).
 - Refunds: `ft_on_transfer` and `mt_on_transfer` handlers return the unused amount on every refusal, and panics roll back through the token's resolve step.
 - Session scope: no session action can send value to a third party; outputs return to the account, and swaps are anchored to the attention-implied value.
@@ -204,6 +204,18 @@ Published as a new global contract; each account upgrades with its passkey.
 - `bootstrap` is a no-op after the first run; `version` returns 2.
 - State: `STATE` keeps the exact v1 layout (the factory writes it, v1 code reads it), and what v2 adds lives under its own key, read as empty when absent.
   An account upgraded from v1 needs no migration, and the sandbox test `a_v1_account_upgrades_to_v2_and_keeps_its_sessions_and_balances` upgrades an account running the exact deployed v1 bytes and checks its sessions, gas key, USDC, outcome tokens and NEAR.
+
+## Account code v3
+
+Published as a new global contract; each account upgrades with its passkey (new accounts move onto the newest code in their first request).
+
+- `session_call` also takes a call sent directly by the implicit account of one of the account's session keys (its 32-byte ed25519 key as 64 hex characters), for policy wallets: OutLayer's custody enclave and the NEAR Intents Agent API sign only as the wallet's own account.
+  The predecessor must be the signer (no contract can relay such a call), the signer's account must be exactly the implicit account of the signing key, and that key must have a session on the account, which only the passkey adds.
+  The session then bounds the call exactly as before: scope, expiry, the gross daily USDC limit, the Hyperliquid guard and the account's freeze.
+  A gas-key session never signs from elsewhere (`a gas key session signs as the account`), so `top_up_gas` and gas-key renewals keep their meaning.
+- Owner assertions need the user-verification flag as well as user presence.
+- `version` returns 3. State is unchanged from v2, so an upgrade needs no migration.
+- Tests: `account` `a_policy_wallet_acts_for_its_session_as_its_own_implicit_account`, `a_contract_cannot_relay_a_wallet_call`, `an_implicit_account_must_be_the_session_keys_own`, `an_implicit_account_without_a_session_is_refused`, `a_gas_key_session_never_signs_from_its_implicit_account`, `a_frozen_account_refuses_its_policy_wallet_too` and `an_assertion_without_user_verification_is_refused`; sandbox `a_v2_account_upgrades_and_its_policy_wallet_then_signs_for_its_session`, which upgrades an account running the exact published v2 bytes (`contracts/tests/fixtures/account_v2.wasm`) and has a wallet's implicit account reach the Chain Signatures step, refused while out of scope or frozen.
 
 ## Deployment
 

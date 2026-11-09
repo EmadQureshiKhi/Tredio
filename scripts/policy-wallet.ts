@@ -3,6 +3,7 @@
  *
  *   bun scripts/policy-wallet.ts setup      a passkey account (the relayer pays), then one owner request: store the wallet's
  *                                           policy (the account becomes its controller), fund its gas, add Autopilot's session
+ *   bun scripts/policy-wallet.ts upgrade    the passkey moves the account onto the newest account code (v3 takes the wallet's calls)
  *   bun scripts/policy-wallet.ts call       a session call the enclave signs and sends, and what the account contract answers
  *   bun scripts/policy-wallet.ts outside    calls outside the policy: the enclave refuses them before signing
  *   bun scripts/policy-wallet.ts freeze     the passkey freezes the wallet; the executor's venue and the enclave refuse
@@ -175,6 +176,20 @@ async function call() {
   }
 }
 
+async function upgrade() {
+  const s = load()!;
+  const up = upgradeToLatest(D);
+  if (!up) throw new Error("deployments names no account code past the birth code");
+  const versions = new AccountVersions((a) => viewer.view<number>(a, "version"), { ttlMs: 0 });
+  log("account code", `v${await versions.of(s.account)}`);
+  record(s, `upgrade_${Date.now()}`, await owner(s, [up]));
+  const v = await until(
+    () => versions.of(s.account),
+    (x) => acceptsWalletSessions(x),
+  );
+  log("account code now", `v${v}`, acceptsWalletSessions(v) ? "(takes the wallet's session calls)" : "");
+}
+
 async function outside() {
   const s = load()!;
   const w = walletOf(s);
@@ -251,6 +266,7 @@ async function show() {
 
 const cmd = process.argv[2];
 if (cmd === "setup") await setup();
+else if (cmd === "upgrade") await upgrade();
 else if (cmd === "call") await call();
 else if (cmd === "outside") await outside();
 else if (cmd === "freeze") await freeze(true);
@@ -258,6 +274,6 @@ else if (cmd === "unfreeze") await freeze(false);
 else if (cmd === "fund") await fund(process.argv[3] ?? "0.1");
 else if (cmd === "show") await show();
 else {
-  console.error("usage: bun scripts/policy-wallet.ts setup|call|outside|freeze|unfreeze|fund <NEAR>|show");
+  console.error("usage: bun scripts/policy-wallet.ts setup|upgrade|call|outside|freeze|unfreeze|fund <NEAR>|show");
   process.exit(2);
 }

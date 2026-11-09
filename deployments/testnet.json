@@ -21,7 +21,8 @@
   "globalCode": {
     "coin": "DsgtQXqNL8Jat89BX27i8S34fGu7L2MHxcLTL7BcYV8s",
     "account": "J1GvtY5xj7QuNwmdDFM56EYxmTvwp1wHqkPZjY7CNK9x",
-    "accountV2": "BsFqhAcYESJ5Fyn55Xa6HwPyJaYy3VyEu4ZGh2iTdBMf"
+    "accountV2": "BsFqhAcYESJ5Fyn55Xa6HwPyJaYy3VyEu4ZGh2iTdBMf",
+    "accountV3": "AiQw6Q2mS4cdSQUiRAADX36n4574JePScJSDXXDDyLhx"
   },
   "oracle": {
     "mode": "tee_signer",

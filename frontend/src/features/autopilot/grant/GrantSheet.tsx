@@ -1,12 +1,13 @@
 "use client";
-import { acceptsWalletSessions } from "@tredio/contracts";
+import { acceptsWalletSessions, latestAccountCode } from "@tredio/contracts";
 import { DEFAULT_CALLS_PER_HOUR } from "@tredio/custody";
 import { Check, Cpu, Fingerprint, KeyRound, X } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Button, ErrorNote, Segmented, Sheet, TxStatus } from "@/components/ui";
 import { useAccount } from "@/lib/account/AccountProvider";
 import { useAccountVersion } from "@/lib/account/version";
-import { NETWORK } from "@/lib/config";
+import { DEPLOYMENT, NETWORK } from "@/lib/config";
 import { useTx } from "@/lib/trade/useTx";
 import { type GrantView, useGrant } from "../shared/data";
 import { DAILY_CAPS, useGrantActions, VALID_DAYS, WALLET_GAS_NEAR } from "./grant";
@@ -155,6 +156,8 @@ export function GrantSheet({ open, onOpenChange, onGranted, reason }: { open: bo
  * session: the account stores its policy and alone can freeze it.
  */
 function WalletTerms({ ready, renewing }: { ready: boolean; renewing: boolean }) {
+  // Deployments names code that takes the wallet's calls, so the passkey can move the account onto it.
+  const upgradable = acceptsWalletSessions(latestAccountCode(DEPLOYMENT)?.version ?? 1);
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-line p-4" data-testid="grant-wallet-terms">
       <div className="flex gap-3">
@@ -176,7 +179,17 @@ function WalletTerms({ ready, renewing }: { ready: boolean; renewing: boolean })
       </div>
       {ready ? null : (
         <p className="rounded-xl bg-warn-soft px-3 py-2 text-[12.5px] leading-5 text-warn" role="status" data-testid="grant-wallet-unavailable">
-          Your account&rsquo;s code takes session calls only from its own keys, so it would refuse the wallet&rsquo;s. This opens once your account runs code that accepts them; until then, use a sealed key.
+          {upgradable ? (
+            <>
+              Your account runs code that takes session calls only from its own keys, so it would refuse the wallet&rsquo;s. Upgrade it to version 3 in{" "}
+              <Link href="/settings" className="font-strong underline underline-offset-2">
+                Settings
+              </Link>{" "}
+              (one passkey prompt), or use a sealed key.
+            </>
+          ) : (
+            <>Your account&rsquo;s code takes session calls only from its own keys, so it would refuse the wallet&rsquo;s. This opens once your account runs code that accepts them; until then, use a sealed key.</>
+          )}
         </p>
       )}
     </div>

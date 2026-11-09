@@ -63,8 +63,8 @@ pnpm coverage:contracts
 - NEAR keys are base58 and case-sensitive: never lowercase a public or session key.
 - RPC views at `final` lag a just-sent transaction by a block or two; the app reads `optimistic`.
 - A gas key reserves the attached gas at 1e9 yocto per gas for every call in flight: 300 Tgas needs 0.3 NEAR in the key, and deleting a gas key burns its balance.
-- Accounts run account code v1 (no `version` view) or v2, and callers must not assume either: read it with `AccountVersions` from `@tredio/contracts`, which also gives the session call's gas (300 or 150 Tgas), the Hyperliquid mark age (120 or 300 s), whether the guard binds the mark's `asset_index`, and whether renewals and revokes keep the gas key.
-  New accounts upgrade to v2 in their first request only once `deployments/<network>.json` names `globalCode.accountV2`.
+- Accounts run account code v1 (no `version` view), v2 or v3, and callers must not assume any: read it with `AccountVersions` from `@tredio/contracts`, which also gives the session call's gas (300 or 150 Tgas), the Hyperliquid mark age (120 or 300 s), whether the guard binds the mark's `asset_index`, whether renewals and revokes keep the gas key, and whether policy wallets can call (`acceptsWalletSessions`, v3).
+  New accounts move onto the newest code `deployments/<network>.json` names (`globalCode.accountV2`, `accountV3`) in their first request (`upgradeToLatest`); v3 also requires the passkey's user-verification flag.
 - Returning a joint promise (`a.and(b)`) from a contract method is not allowed; detach instead.
 - Some contract refusals are logged events, not failures (`*_refused`, `*_rejected`): read the receipts' logs, not just the status.
 - Public RPCs rate-limit per IP and answer a browser's 429 without CORS headers; keep polling modest and use the failover lists.
