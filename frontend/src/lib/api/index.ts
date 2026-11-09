@@ -509,7 +509,7 @@ export interface SystemStatus {
 export const system = {
   /** The system status; a 503 still carries the status body, which names what is down. */
   status: () =>
-    api<SystemStatus>("/v1/status").catch((e: unknown) => {
+    api<SystemStatus>("/v1/status?soft=1").catch((e: unknown) => {
       if (e instanceof ApiError && e.status === 503 && e.body && typeof e.body === "object" && "services" in e.body) return e.body as SystemStatus;
       throw e;
     }),

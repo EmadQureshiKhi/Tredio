@@ -7,7 +7,7 @@ import type { SystemStatus } from "@/lib/api";
 import { integer, shortAddress } from "@/lib/format";
 import { useTrends } from "@/lib/hooks/queries";
 import { useNow } from "@/features/portfolio/parts";
-import { serviceInfo, useStatusPage } from "./data";
+import { CONTRACT_LABELS, serviceInfo, useStatusPage } from "./data";
 
 // #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
 
@@ -248,7 +248,7 @@ function ContractsCard({ s }: { s: SystemStatus }) {
             <span className="flex min-w-0 items-center gap-2.5">
               <Dot ok={c.ok} />
               <span className="flex min-w-0 flex-col">
-                <span className="font-strong text-[14px] capitalize text-text">{c.role}</span>
+                <span className="font-strong text-[14px] text-text">{CONTRACT_LABELS[c.role] ?? c.role}</span>
                 <ExplorerLink href={explorerAddress(c.account)} className="num truncate font-mono text-[12px] text-text-3">
                   {shortAddress(c.account)}
                 </ExplorerLink>
