@@ -28,6 +28,22 @@ const cfg = { seriesWindows: [86_400, 604_800], coins: true, settleDelaySec: 30 
 const kinds = (s: Snapshot) => plan(s, D, cfg).map((a) => a.key);
 
 describe("keeper plan", () => {
+  test("a stale trend retires, but not when every trend went stale together (an oracle outage)", () => {
+    const old = NOW - 21_600 - 1;
+    expect(kinds(snap({ trends: [trend("topic:a", { updated_at: old }), trend("topic:b")], curves: [{ trend: "topic:a" } as never, { trend: "topic:b" } as never] }))).toContain("retire:topic:a");
+    const both = kinds(snap({ trends: [trend("topic:a", { updated_at: old }), trend("topic:b", { updated_at: old })], curves: [{ trend: "topic:a" } as never, { trend: "topic:b" } as never] }));
+    expect(both.filter((k) => k.startsWith("retire:"))).toEqual([]);
+    // Cooling out is not about the oracle, so it still retires.
+    const cooling = trend("topic:a", { updated_at: old, status: "cooling", status_since: NOW - 7_200 });
+    expect(kinds(snap({ trends: [cooling, trend("topic:b", { updated_at: old })], curves: [{ trend: "topic:a" } as never, { trend: "topic:b" } as never] }))).toContain("retire:topic:a");
+  });
+
+  test("no series opens at the index cap, where Up could not win", () => {
+    const capped = trend("topic:a", { index: 100_000_000 });
+    expect(kinds(snap({ trends: [capped], latest: [{ trend: "topic:a", window: 86_400, series: null }], curves: [{ trend: "topic:a" } as never] }))).toEqual([]);
+    expect(kinds(snap({ trends: [trend("topic:a", { index: 99_990_000 })], latest: [{ trend: "topic:a", window: 86_400, series: null }], curves: [{ trend: "topic:a" } as never] }))).toEqual(["openSeries:topic:a:86400"]);
+  });
+
   test("opens a first series per window and a coin for a fresh active trend", () => {
     expect(kinds(snap({ trends: [trend("topic:a")], latest: [{ trend: "topic:a", window: 86_400, series: null }, { trend: "topic:a", window: 604_800, series: null }, { trend: "topic:a", window: 900, series: null }] }))).toEqual([
       "openSeries:topic:a:86400",
