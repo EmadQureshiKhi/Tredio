@@ -146,7 +146,8 @@ test("lists paid signals in the clear, and hides and restores one", async ({ pag
     await moderate(page, "signals", newest!.id, "Restore", "e2e check: restore a signal");
     await expect(signal).toHaveAttribute("data-hidden", "false");
     await page.getByRole("tab", { name: "Log" }).click();
-    await expect(page.locator(`[data-testid="log-row"][data-action="restore_signal"][data-target="signals:${newest!.id}"]`)).toContainText("signal #");
+    // The log is newest first, and earlier runs left their own rows for this signal.
+    await expect(page.locator(`[data-testid="log-row"][data-action="restore_signal"][data-target="signals:${newest!.id}"]`).first()).toContainText(`signal #${newest!.id}`);
   } finally {
     // The signal ends as the test found it: visible.
     const now = (await api.content("signals", "")).rows.find((r) => r.id === newest!.id);
