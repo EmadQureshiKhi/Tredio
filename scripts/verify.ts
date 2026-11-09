@@ -43,7 +43,7 @@ const recorded = (existsSync(PROOFS_FILE) ? JSON.parse(readFileSync(PROOFS_FILE,
   signals: { leaderIdentity: string; leaderAccount: string; follower: string; commitTx: string; commitment: string; accessTx: string; relayer: string; price: string };
   settledSeries: { series: number; trend: string; window: number; openTx: string; settleTx: string; keeper: string };
   graduation: { trend: string; pool: number; keeper: string; steps: string[] };
-  policyWallet: { account: string; wallet: string; relayer: string; setupTx: string; sessionCallTx: string; freezeTx: string; unfreezeTx: string };
+  policyWallet: { account: string; wallet: string; relayer: string; setupTx: string; refusedTx: string; upgradeTx: string; sessionCallTx: string; freezeTx: string; unfreezeTx: string };
 } | null;
 class NoProofs extends Error {}
 const proofs = new Proxy({} as NonNullable<typeof recorded>, {
@@ -364,7 +364,7 @@ async function chain() {
     const call = await archive.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: p.sessionCallTx, sender_account_id: p.wallet, wait_until: "NONE" });
     if (call.transaction.signer_id !== p.wallet || call.transaction.receiver_id !== p.account) return fail(`${p.sessionCallTx}: not sent by the wallet to the account`);
     const live = session ? `a live ${session.label} session (${session.gas_key ? "gas key" : "plain key"}, Hyperliquid ${session.scope.hyperliquid ? "only" : "off"})` : "its session since ended";
-    return ok(`controller ${p.account.slice(0, 10)}..., ${policy.frozen ? "frozen" : "not frozen"}; the enclave-signed session_call ${p.sessionCallTx.slice(0, 10)}... reached the account; ${live}`);
+    return ok(`controller ${p.account.slice(0, 10)}..., ${policy.frozen ? "frozen" : "not frozen"}; the enclave-signed session_call ${p.sessionCallTx.slice(0, 10)}... was signed through Chain Signatures; ${live}`);
   });
 
   if (args.has("--build")) {
@@ -378,6 +378,8 @@ async function chain() {
       return hash === attested ? ok(`sha256 ${hash.slice(0, 16)}... with ${toolchain}, the attested build`) : fail(`local build ${hash} with ${toolchain}, attested ${attested} (${proofs.outlayerRun.toolchain})`);
     });
   }
+    const signed = call.receipts_outcome.some((r) => r.outcome.executor_id === p.account && r.outcome.logs.some((l) => l.includes("hyperliquid_signed")));
+    if (!signed) return fail(`${p.sessionCallTx}: the account did not sign the wallet's Hyperliquid action`);
 
   const api = await apiUrl();
   await check(S, "NEAR AI review on a listed trend", async () => {

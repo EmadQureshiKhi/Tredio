@@ -5,7 +5,8 @@
     "0u5rr3y2bqwn16dvh33rwry06bpnyj97j5j9rk2gd0vyj0ncyy5nf0",
     "0uwe0tdnrj46ft4cg7np83tbk6qwyay776as9nh47zb11p6hjsy4pg",
     "0un2gdgafd9z386vkwrvjq1x4287151mx6j0mj4rnsc8fhqj3a3kw0",
-    "0unyeww1mvqhyz1cc6s20ncjdxkbvyt355y2dv4csgr13ygws6vc8g"
+    "0unyeww1mvqhyz1cc6s20ncjdxkbvyt355y2dv4csgr13ygws6vc8g",
+    "0um1v5w8egbz1jk93bfvmqy8t1jmr5krk0g8e7p8nwg4d8f15wskt0"
   ],
   "chainSignaturesOrder": {
     "tx": "DDkP3q4UkhrcN7AWragXMzwn5f4nGo8CXbhnVdBWWBAF",
@@ -80,12 +81,14 @@
     "amount": "12574"
   },
   "policyWallet": {
-    "about": "Autopilot on an OutLayer policy wallet (scripts/policy-wallet.ts): the passkey account stored the wallet's policy and added Autopilot's session for the wallet's own key in one owner request; the wallet's enclave signed a session_call, which the account's v2 code refused (it takes session calls only from its own keys); the passkey froze and unfroze the wallet.",
+    "about": "Autopilot on an OutLayer policy wallet (scripts/policy-wallet.ts): the passkey account stored the wallet's policy and added Autopilot's session for the wallet's own key in one owner request; on account code v2 the enclave-signed session_call was refused (session calls came only from the account's own keys); the passkey moved the account to v3, and the enclave-signed session_call then went through and Chain Signatures signed the Hyperliquid action; the passkey also froze and unfroze the wallet.",
     "account": "0um1v5w8egbz1jk93bfvmqy8t1jmr5krk0g8e7p8nwg4d8f15wskt0",
     "wallet": "4348f62db35f111328e9affa98ffaf1c20004b19a287305056997dff4d61bbf2",
     "relayer": "tredio-relayer.testnet",
     "setupTx": "C3vFoA6KMx1tVeSGtTCq7Yj59Jni8euELWMGzC9XiSLi",
-    "sessionCallTx": "GT3RLHyRq5B6nMRfa2qhJheeUNy72CTsWn37eNAos2zM",
+    "refusedTx": "GT3RLHyRq5B6nMRfa2qhJheeUNy72CTsWn37eNAos2zM",
+    "upgradeTx": "97TmqfGiSzj8ws9WmMNEW1yX7bCG1XvKCcazY3ZY5bLA",
+    "sessionCallTx": "ENCLocW8Mk6KikN2nLgH56UQu8JoxFr2U56wPVn1ejKG",
     "freezeTx": "HbcVYSJTRRZ7ES6PCKt9t94z2dFU6TiDZQGnt4BXDaKF",
     "unfreezeTx": "3rLBDandCdTQAT2aS7kt1CFoP8CjzF34YTkwJ7QEZd9K"
   }
