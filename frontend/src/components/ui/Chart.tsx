@@ -71,14 +71,21 @@ export function withAlpha(color: string, a: number): string {
   return `rgba(${r}, ${g}, ${b}, ${Number((Number(x) * a).toFixed(3))})`;
 }
 
-/** The value range to draw: always the reference, and at least `minRange` wide around the data. */
-export function fitRange(min: number, max: number, minRange: number, reference?: number): { minValue: number; maxValue: number } {
+/**
+ * The value range to draw: always the reference, and at least `minRange` wide around the data, never
+ * past `ceiling` (the index stops at 100, so its axis does too).
+ */
+export function fitRange(min: number, max: number, minRange: number, reference?: number, ceiling = Number.POSITIVE_INFINITY): { minValue: number; maxValue: number } {
   let lo = reference === undefined ? min : Math.min(min, reference);
   let hi = reference === undefined ? max : Math.max(max, reference);
   if (hi - lo < minRange) {
     const mid = (hi + lo) / 2;
     lo = mid - minRange / 2;
     hi = mid + minRange / 2;
+  }
+  if (hi > ceiling) {
+    lo -= hi - ceiling;
+    hi = ceiling;
   }
   return { minValue: lo, maxValue: hi };
 }
@@ -96,7 +103,24 @@ const same = (a: Row, b: Row) => JSON.stringify(a) === JSON.stringify(b);
  * `minRange` keeps the value axis at least that wide, so a flat line never shows a column of
  * identical labels; the reference value always stays in view.
  */
-export function Chart({ points, candles, height = 260, reference, valueFormat, minRange = 0 }: { points?: readonly SeriesPoint[]; candles?: readonly CandlePoint[]; height?: number; reference?: { value: number; label: string }; valueFormat?: (v: number) => string; minRange?: number }) {
+export function Chart({
+  points,
+  candles,
+  height = 260,
+  reference,
+  valueFormat,
+  minRange = 0,
+  ceiling,
+}: {
+  points?: readonly SeriesPoint[];
+  candles?: readonly CandlePoint[];
+  height?: number;
+  reference?: { value: number; label: string };
+  valueFormat?: (v: number) => string;
+  minRange?: number;
+  /** The highest value the series can take (the index's 100): the axis never goes past it. */
+  ceiling?: number;
+}) {
   const el = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Area"> | ISeriesApi<"Candlestick"> | null>(null);
@@ -104,14 +128,14 @@ export function Chart({ points, candles, height = 260, reference, valueFormat, m
   /** The rows the series holds, to tell a new reading from a different history. */
   const shownRef = useRef<Row[]>([]);
   /** Read by the autoscaler and the axis formatter, so changing them never rebuilds the chart. */
-  const scaleRef = useRef({ minRange, reference: reference?.value });
+  const scaleRef = useRef({ minRange, reference: reference?.value, ceiling });
   const formatRef = useRef(valueFormat);
   const paintRef = useRef<() => void>(() => {});
   const kind: Kind = candles && candles.length > 0 ? "candles" : "area";
   const initialHeight = useRef(height);
 
   useEffect(() => {
-    scaleRef.current = { minRange, reference: reference?.value };
+    scaleRef.current = { minRange, reference: reference?.value, ceiling };
     formatRef.current = valueFormat;
   });
 
@@ -144,8 +168,8 @@ export function Chart({ points, candles, height = 260, reference, valueFormat, m
             autoscaleInfoProvider: (base: () => AutoscaleInfo | null) => {
               const info = base();
               if (!info?.priceRange) return info;
-              const { minRange: range, reference: ref } = scaleRef.current;
-              return { ...info, priceRange: fitRange(info.priceRange.minValue, info.priceRange.maxValue, range, ref) };
+              const { minRange: range, reference: ref, ceiling: top } = scaleRef.current;
+              return { ...info, priceRange: fitRange(info.priceRange.minValue, info.priceRange.maxValue, range, ref, top) };
             },
           });
     chartRef.current = chart;

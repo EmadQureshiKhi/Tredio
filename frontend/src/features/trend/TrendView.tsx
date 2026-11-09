@@ -235,7 +235,7 @@ function IndexCard({ detail }: { detail: TrendDetail }) {
       <Morph name={morphName("chart", detail.trend)}>
         <div className="px-2 pb-3 pt-2 sm:px-3">
           {pts.length >= 2 ? (
-            <Chart points={pts} height={260} reference={reference} valueFormat={indexLabel} minRange={4} />
+            <Chart points={pts} height={260} reference={reference} valueFormat={indexLabel} minRange={4} ceiling={100} />
           ) : (
             <div className="flex h-[260px] items-center justify-center text-center text-[13px] text-text-3">The chart fills in as the oracle reports. New trends show history within minutes.</div>
           )}
