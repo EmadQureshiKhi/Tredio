@@ -28,6 +28,8 @@ struct ClientData {
 }
 
 const FLAG_USER_PRESENT: u8 = 0x01;
+/// The authenticator verified the person (Face ID, a fingerprint or a PIN), not only their presence (v3).
+const FLAG_USER_VERIFIED: u8 = 0x04;
 
 /// True when `proof` is the owner's passkey signing `challenge`.
 pub fn verify(challenge: &[u8; 32], proof: &Proof, owner_key: &[u8]) -> bool {
@@ -35,7 +37,8 @@ pub fn verify(challenge: &[u8; 32], proof: &Proof, owner_key: &[u8]) -> bool {
     let Ok(auth) = URL_SAFE_NO_PAD.decode(proof.authenticator_data.trim_end_matches('=')) else {
         return false;
     };
-    if auth.len() < 37 || auth[32] & FLAG_USER_PRESENT == 0 {
+    let both = FLAG_USER_PRESENT | FLAG_USER_VERIFIED;
+    if auth.len() < 37 || auth[32] & both != both {
         return false;
     }
     let Ok(client) = serde_json::from_str::<ClientData>(&proof.client_data_json) else { return false };

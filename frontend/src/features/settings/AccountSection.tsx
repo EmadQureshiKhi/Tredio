@@ -1,6 +1,6 @@
 "use client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { keepsGasKeys, type OwnerAction, type Session, upgradeToV2 } from "@tredio/contracts";
+import { keepsGasKeys, latestAccountCode, type OwnerAction, type Session, upgradeToLatest } from "@tredio/contracts";
 import { Check, Copy, Fingerprint, LogOut, Snowflake } from "lucide-react";
 import { useState } from "react";
 import { Avatar } from "@/components/shell/AppShell";
@@ -91,9 +91,9 @@ function AddressRow({ address }: { address: string }) {
 }
 
 /**
- * The account's code: accounts made before v2 was published run v1 until their passkey moves them
- * onto v2 (new accounts move in their first request). The code is published by hash, so no one can
- * change it afterwards, and only the passkey can switch an account to other code.
+ * The account's code: an account runs the code it was born on, or moved to, until its passkey moves
+ * it onto the newest published version (new accounts move in their first request). The code is
+ * published by hash, so no one can change it afterwards, and only the passkey can switch an account to other code.
  */
 function CodeRow() {
   const account = useAccount();
@@ -101,16 +101,17 @@ function CodeRow() {
   const qc = useQueryClient();
   const tx = useTx();
   const version = useAccountVersion(me.address).data;
-  const upgrade = upgradeToV2(DEPLOYMENT);
+  const upgrade = upgradeToLatest(DEPLOYMENT);
+  const latest = latestAccountCode(DEPLOYMENT)?.version ?? 1;
   if (version === undefined) return <Skeleton className="my-4 h-10 rounded-2xl" />;
   const run = async () => {
     if (!upgrade) return;
-    if (await tx.run(() => account.ownerExecute([upgrade]), { action: "Upgrade account", done: "Account upgraded to version 2", pending: "Confirm with your passkey" })) {
+    if (await tx.run(() => account.ownerExecute([upgrade]), { action: "Upgrade account", done: `Account upgraded to version ${latest}`, pending: "Confirm with your passkey" })) {
       void qc.invalidateQueries({ queryKey: ["account-version"] });
       void qc.invalidateQueries({ queryKey: ["dormant-keys"] });
     }
   };
-  if (version >= 2 || !upgrade) {
+  if (version >= latest || !upgrade) {
     return (
       <SettingRow label="Account code" hint="The code your account runs. It is published by hash, so no one can change it, and only your passkey can move the account to other code.">
         <Badge tone={version >= 2 ? "primary" : undefined}>Version {version}</Badge>
@@ -121,7 +122,7 @@ function CodeRow() {
   return (
     <SettingRow
       label="Account code"
-      hint="Version 2 is out. Renewing or revoking a session keeps the gas its key holds instead of burning it, and each trade reserves half the gas. One passkey prompt moves your account onto it; no one else can."
+      hint={`Version ${latest} is out. ${version < 2 ? "Renewing or revoking a session keeps the gas its key holds instead of burning it, and each trade reserves half the gas. " : ""}${latest >= 3 ? "Autopilot can also trade through a policy wallet your account controls. " : ""}One passkey prompt moves your account onto it; no one else can.`}
     >
       <Badge tone="warn">Version {version}</Badge>
       <Button size="sm" tone="secondary" icon={<Fingerprint className="size-4" aria-hidden />} loading={tx.busy} onClick={() => void run()} data-testid="upgrade-account">

@@ -155,18 +155,23 @@ describe("account versions", () => {
     expect(isMissingMethod(new Error("UNKNOWN_ACCOUNT"))).toBe(false);
   });
 
-  test("v2 code joins the allowed hashes and the first request only once deployments names it", async () => {
-    const { accountCodeHashes, upgradeToV2 } = await import("../src/index");
+  test("later account code joins the allowed hashes and the first request only once deployments names it", async () => {
+    const { accountCodeHashes, latestAccountCode, upgradeToLatest } = await import("../src/index");
     const d = deployment("testnet");
-    const { accountV2: _, ...v1Only } = d.globalCode;
+    const { accountV2: _, accountV3: __, ...v1Only } = d.globalCode;
     const v1 = { ...d, globalCode: v1Only };
     expect(accountCodeHashes(v1)).toEqual([d.globalCode.account]);
-    expect(upgradeToV2(v1)).toBeNull();
-    const v2 = { ...d, globalCode: { ...d.globalCode, accountV2: "4reLvkAWfqk5fsqio1KLudk46cqRz9erQdaHkWZKMJDZ" } };
+    expect(upgradeToLatest(v1)).toBeNull();
+    expect(latestAccountCode(v1)).toBeNull();
+    const v2 = { ...d, globalCode: { ...v1Only, accountV2: "4reLvkAWfqk5fsqio1KLudk46cqRz9erQdaHkWZKMJDZ" } };
     expect(accountCodeHashes(v2)).toEqual([d.globalCode.account, "4reLvkAWfqk5fsqio1KLudk46cqRz9erQdaHkWZKMJDZ"]);
-    expect(upgradeToV2(v2)).toEqual({ upgrade: { code_hash: "4reLvkAWfqk5fsqio1KLudk46cqRz9erQdaHkWZKMJDZ" } });
-    // Testnet has published v2.
+    expect(upgradeToLatest(v2)).toEqual({ upgrade: { code_hash: "4reLvkAWfqk5fsqio1KLudk46cqRz9erQdaHkWZKMJDZ" } });
+    // A third version is the one offered, and accounts on v2 stay recognised.
+    const v3 = { ...d, globalCode: { ...v2.globalCode, accountV3: "9nK6CrUQx6V5WQnaUM4R4VUP8iGXqvTTnZpoKcfJn9Yp" } };
+    expect(accountCodeHashes(v3)).toEqual([d.globalCode.account, "4reLvkAWfqk5fsqio1KLudk46cqRz9erQdaHkWZKMJDZ", "9nK6CrUQx6V5WQnaUM4R4VUP8iGXqvTTnZpoKcfJn9Yp"]);
+    expect(latestAccountCode(v3)).toEqual({ version: 3, hash: "9nK6CrUQx6V5WQnaUM4R4VUP8iGXqvTTnZpoKcfJn9Yp" });
+    // Testnet has published v2, and offers the newest version it names.
     expect(d.globalCode.accountV2).toMatch(/^[1-9A-HJ-NP-Za-km-z]{43,44}$/);
-    expect(upgradeToV2(d)).toEqual({ upgrade: { code_hash: d.globalCode.accountV2! } });
+    expect(upgradeToLatest(d)).toEqual({ upgrade: { code_hash: (d.globalCode.accountV3 ?? d.globalCode.accountV2)! } });
   });
 });

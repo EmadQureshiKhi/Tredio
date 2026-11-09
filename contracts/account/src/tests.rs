@@ -125,6 +125,30 @@ fn another_passkey_is_refused() {
 
 #[test]
 #[should_panic(expected = "passkey signature does not verify")]
+fn an_assertion_without_user_verification_is_refused() {
+    let mut a = setup();
+    let r = request(1, T0, "[{\"freeze\":{\"frozen\":true}}]");
+    // The same key signs, but the authenticator reports presence only (flags 0x01, no UV bit).
+    let challenge = URL_SAFE_NO_PAD.encode(request_hash(&r));
+    let client =
+        format!(r#"{{"type":"webauthn.get","challenge":"{challenge}","origin":"https://app.tredio.bid"}}"#);
+    let mut auth = Sha256::digest(b"tredio.bid").to_vec();
+    auth.push(0x01);
+    auth.extend_from_slice(&[0, 0, 0, 1]);
+    let mut msg = auth.clone();
+    msg.extend_from_slice(&Sha256::digest(client.as_bytes()));
+    let sig: Signature = passkey().sign_prehash(&Sha256::digest(&msg)).unwrap();
+    let proof = Proof {
+        authenticator_data: URL_SAFE_NO_PAD.encode(&auth),
+        client_data_json: client,
+        signature: hex::encode(sig.to_bytes()),
+    };
+    ctx("relayer.testnet", None, T0);
+    let _ = a.owner_execute(r, proof);
+}
+
+#[test]
+#[should_panic(expected = "passkey signature does not verify")]
 fn a_tampered_request_is_refused() {
     let mut a = setup();
     let r = request(1, T0, "[{\"freeze\":{\"frozen\":true}}]");
@@ -218,6 +242,106 @@ fn sessions_must_be_signed_by_the_account() {
     let mut a = with_session(100);
     ctx("mallory.testnet", Some(session_pk()), T0);
     let _ = a.session_call(SessionAction::Faucet);
+}
+
+/// The implicit account of `pk`: its 32 key bytes as 64 hex characters, as custody enclaves sign.
+fn implicit_of(pk: &PublicKey) -> String {
+    hex::encode(&pk.as_bytes()[1..])
+}
+
+/// A context where `predecessor` called directly, signed by `signer` with `pk`.
+fn ctx_signed(predecessor: &str, signer: &str, pk: PublicKey, secs: u64) {
+    testing_env!(VMContextBuilder::new()
+        .current_account_id(acc(ME))
+        .predecessor_account_id(acc(predecessor))
+        .signer_account_id(acc(signer))
+        .signer_account_pk(pk)
+        .block_timestamp(secs * 1_000_000_000)
+        .account_balance(NearToken::from_near(5))
+        .build());
+}
+
+/// An account with a plain-key (not gas key) Hyperliquid session for a policy wallet's key, as a grant adds it.
+fn with_wallet_session(limit: u128) -> Account {
+    let mut a = setup();
+    let actions = format!(
+        r#"[{{"add_session":{{"public_key":"{}","label":"autopilot","scope":{{"outcomes":false,"perps":false,"hyperliquid":true}},"expires_at":{},"daily_limit":"{limit}","gas_key":false,"gas_funding":"0"}}}}]"#,
+        String::from(&session_pk()),
+        T0 + 7 * 86_400
+    );
+    let r = request(1, T0, &actions);
+    ctx("relayer.testnet", None, T0);
+    assert!(a.owner_execute(r.clone(), prove(&r, &passkey())).is_some());
+    a
+}
+
+#[test]
+fn a_policy_wallet_acts_for_its_session_as_its_own_implicit_account() {
+    let mut a = with_wallet_session(100_000_000);
+    let wallet = implicit_of(&session_pk());
+    assert_eq!(wallet.len(), 64);
+    ctx_signed(&wallet, &wallet, session_pk(), T0 + 60);
+    let _ =
+        a.session_call(SessionAction::HlLeverage { asset_index: 0, is_cross: false, leverage: 3, nonce: 1 });
+    assert!(get_logs().iter().any(|l| l.contains("session_action")));
+    // The session still bounds it: an action outside its Hyperliquid scope is refused.
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _ = a.session_call(SessionAction::MintSets { series: 1, amount: U128(1) });
+    }));
+    assert!(r.is_err(), "outcomes are outside a Hyperliquid-only session");
+}
+
+#[test]
+#[should_panic(expected = "session keys only")]
+fn a_contract_cannot_relay_a_wallet_call() {
+    let mut a = with_wallet_session(100);
+    let wallet = implicit_of(&session_pk());
+    // The wallet's key signed, but the call reaches the account through another contract.
+    ctx_signed("relay.testnet", &wallet, session_pk(), T0);
+    let _ = a.session_call(SessionAction::Faucet);
+}
+
+#[test]
+#[should_panic(expected = "session keys only")]
+fn an_implicit_account_must_be_the_session_keys_own() {
+    let mut a = with_wallet_session(100);
+    let other: PublicKey = "ed25519:6E8sCci9badyRkXb3JoRpBj5p8C6Tw41ELDZoiihKEtp".parse().unwrap();
+    let theirs = implicit_of(&other);
+    // Another implicit account signing with the session's key would need that key on its account.
+    ctx_signed(&theirs, &theirs, session_pk(), T0);
+    let _ = a.session_call(SessionAction::Faucet);
+}
+
+#[test]
+#[should_panic(expected = "not a session key")]
+fn an_implicit_account_without_a_session_is_refused() {
+    let mut a = with_wallet_session(100);
+    let other: PublicKey = "ed25519:6E8sCci9badyRkXb3JoRpBj5p8C6Tw41ELDZoiihKEtp".parse().unwrap();
+    let theirs = implicit_of(&other);
+    ctx_signed(&theirs, &theirs, other, T0);
+    let _ = a.session_call(SessionAction::Faucet);
+}
+
+#[test]
+#[should_panic(expected = "a gas key session signs as the account")]
+fn a_gas_key_session_never_signs_from_its_implicit_account() {
+    let mut a = with_session(100);
+    let wallet = implicit_of(&session_pk());
+    ctx_signed(&wallet, &wallet, session_pk(), T0);
+    let _ = a.session_call(SessionAction::Faucet);
+}
+
+#[test]
+#[should_panic(expected = "sessions are frozen")]
+fn a_frozen_account_refuses_its_policy_wallet_too() {
+    let mut a = with_wallet_session(100);
+    let r = request(2, T0, "[{\"freeze\":{\"frozen\":true}}]");
+    ctx("relayer.testnet", None, T0);
+    let _ = a.owner_execute(r.clone(), prove(&r, &passkey()));
+    let wallet = implicit_of(&session_pk());
+    ctx_signed(&wallet, &wallet, session_pk(), T0 + 60);
+    let _ =
+        a.session_call(SessionAction::HlLeverage { asset_index: 0, is_cross: false, leverage: 3, nonce: 2 });
 }
 
 #[test]

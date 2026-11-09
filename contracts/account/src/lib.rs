@@ -43,8 +43,8 @@ pub mod webauthn;
 use near_sdk::json_types::{Base58CryptoHash, Base64VecU8, U128, U64};
 use near_sdk::serde_json::{self, json};
 use near_sdk::{
-    env, near, require, AccountId, Allowance, Gas, GasWeight, IntoStorageKey, NearToken, PanicOnDefault,
-    Promise, PromiseError, PublicKey,
+    env, near, require, AccountId, Allowance, CurveType, Gas, GasWeight, IntoStorageKey, NearToken,
+    PanicOnDefault, Promise, PromiseError, PublicKey,
 };
 use tredio_common::account_state::{AccountCore, AccountKey, Protocol, Scope, Session};
 use tredio_common::{now_secs, Side};
@@ -56,8 +56,9 @@ use crate::webauthn::Proof;
 /// (passkey prompts take a while; block time can lag the client clock).
 pub const REQUEST_WINDOW_SECS: u64 = 600;
 pub const REQUEST_SKEW_SECS: u64 = 300;
-/// The account code's version, as `version` reports it (v1 has no such view).
-pub const VERSION: u32 = 2;
+/// The account code's version, as `version` reports it (v1 has no such view). v3 lets a session
+/// act as the implicit account of its own key, for policy wallets (see `session_call`).
+pub const VERSION: u32 = 3;
 pub const MAX_SESSION_SECS: u64 = 30 * 86_400;
 /// Most keys the account tracks: sessions plus dormant gas keys (every one is an access key).
 pub const MAX_SESSIONS: u32 = 16;
@@ -420,11 +421,21 @@ impl Account {
     /// One typed action from a session key. The transaction must be signed by a key registered
     /// as a session on this account.
     pub fn session_call(&mut self, action: SessionAction) -> Promise {
-        require!(env::predecessor_account_id() == env::current_account_id(), "session keys only");
-        require!(!self.core.frozen, "sessions are frozen");
         let key = env::signer_account_pk();
+        let caller = env::predecessor_account_id();
+        // A session acts through its key on this account, or as the implicit account of that same
+        // key calling directly: custody enclaves (OutLayer policy wallets, the Agent API) sign only as
+        // their own account. Either way the session below bounds the call, so only whoever holds a
+        // session's key can use it, and the passkey alone adds sessions.
+        let from_wallet = caller != env::current_account_id()
+            && caller == env::signer_account_id()
+            && is_implicit_of(&caller, &key);
+        require!(caller == env::current_account_id() || from_wallet, "session keys only");
+        require!(!self.core.frozen, "sessions are frozen");
         let mut s =
             self.core.sessions.get(&key).cloned().unwrap_or_else(|| env::panic_str("not a session key"));
+        // A gas key prepays its calls from the account; it never signs from elsewhere.
+        require!(!from_wallet || !s.gas_key, "a gas key session signs as the account");
         let now = now_secs();
         require!(now <= s.expires_at, "session expired");
         let (name, needs, outflow) = describe(&action);
@@ -941,4 +952,9 @@ impl Account {
             SessionAction::TopUpGas { amount } => self.top_up_gas(key, amount.0, day),
         }
     }
+}
+
+/// Whether `account` is the implicit account of the ed25519 `key` (its 32 bytes as 64 hex characters).
+fn is_implicit_of(account: &AccountId, key: &PublicKey) -> bool {
+    key.curve_type() == CurveType::ED25519 && hex::encode(&key.as_bytes()[1..]) == account.as_str()
 }

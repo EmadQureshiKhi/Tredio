@@ -14,7 +14,7 @@ import {
   type SessionAction,
   sessionCallPrepaid,
   sessionCallTgas,
-  upgradeToV2,
+  upgradeToLatest,
 } from "@tredio/contracts";
 import { activation, ownerApprovals } from "@/lib/api";
 import { accessKey, accountState, view } from "@/lib/chain/client";
@@ -248,9 +248,9 @@ export class AccountService {
     ticketing.catch(() => undefined);
     const key = newKeyPair();
     const expiresAt = nowSec() + SESSION_DAYS * 86_400;
-    // Once v2 account code is published, the first request also moves the account onto it: still
-    // one prompt, and the account never trades on v1. Until then deployments names no v2 code.
-    const upgrade = upgradeToV2(DEPLOYMENT);
+    // Once newer account code is published, the first request also moves the account onto the
+    // newest: still one prompt, and the account never trades on its birth code.
+    const upgrade = upgradeToLatest(DEPLOYMENT);
     const first = ownerActions.addSession({ publicKey: key.publicKey, label: SESSION_LABEL, scope: SESSION_SCOPE, expiresAt, dailyLimit: SESSION_DAILY_LIMIT, gasFunding: FIRST_SESSION_GAS });
     const request = requestJson(ownerRequest(account, NETWORK, upgrade ? [first, upgrade] : [first]));
     progress({ flow: "sign-up", step: "confirm" });

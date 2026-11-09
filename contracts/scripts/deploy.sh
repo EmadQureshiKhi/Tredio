@@ -183,7 +183,7 @@ sub accounts '1.9 NEAR'
 
 # Global code is published once per version: about 10 NEAR per 100 KB, burned, and each build's bytes
 # differ. A live deployment keeps the code its factories already use; PUBLISH_ACCOUNT_CODE=1 publishes
-# the built account code as the version accounts upgrade to (globalCode.accountV2).
+# the built account code as the next version accounts upgrade to (globalCode.accountV2, then accountV3).
 BUILT_ACCOUNT_CODE=$(hash_of "$(wasm account)")
 if initialized "coins.$ROOT" protocol_fees; then
   COIN_CODE=$(planned .globalCode.coin)
@@ -238,7 +238,18 @@ config=$(view "$A" config)
 FACTORY_CODE=$(jq -r '.[2]' <<<"$config")
 [ -n "$FACTORY_CODE" ] && [ "$FACTORY_CODE" != null ] || die "could not read the accounts factory's code"
 ACCOUNT_V2=$(planned .globalCode.accountV2)
-[ -z "${PUBLISH_ACCOUNT_CODE:-}" ] || [ "$BUILT_ACCOUNT_CODE" = "$FACTORY_CODE" ] || ACCOUNT_V2=$BUILT_ACCOUNT_CODE
+ACCOUNT_V3=$(planned .globalCode.accountV3)
+if [ -n "${PUBLISH_ACCOUNT_CODE:-}" ] && [ "$BUILT_ACCOUNT_CODE" != "$FACTORY_CODE" ]; then
+  # The built code takes the next free version, unless deployments already names it. Accounts keep
+  # running the version they are on, so a filled slot is never overwritten.
+  if [ -z "$ACCOUNT_V2" ] || [ "$ACCOUNT_V2" = "$BUILT_ACCOUNT_CODE" ]; then
+    ACCOUNT_V2=$BUILT_ACCOUNT_CODE
+  elif [ -z "$ACCOUNT_V3" ] || [ "$ACCOUNT_V3" = "$BUILT_ACCOUNT_CODE" ]; then
+    ACCOUNT_V3=$BUILT_ACCOUNT_CODE
+  else
+    die "deployments/$NET.json already names account code v2 and v3; add a slot (globalCode, @tredio/contracts) for the next version"
+  fi
+fi
 
 log "deployments/$NET.json"
 # The RPC the app and services read first stays as recorded; RPC only picks where this script reads.
@@ -248,14 +259,14 @@ jq -n \
   --arg network "$NET" --arg root "$ROOT" --arg treasury "$TREASURY" \
   --arg usdc "$U" --arg registry "$R" --arg outcomes "$O" --arg book "$B" --arg perps "$P" \
   --arg curation "$C" --arg coins "$K" --arg accounts "$A" --arg exchange "$EXCHANGE" --arg signer "$SIGNER" \
-  --arg coin_code "$COIN_CODE" --arg account_code "$FACTORY_CODE" --arg account_v2 "$ACCOUNT_V2" --arg oracle_key "$ORACLE_PUBLIC_KEY" \
+  --arg coin_code "$COIN_CODE" --arg account_code "$FACTORY_CODE" --arg account_v2 "$ACCOUNT_V2" --arg account_v3 "$ACCOUNT_V3" --arg oracle_key "$ORACLE_PUBLIC_KEY" \
   --arg rpc "${RECORDED_RPC:-$RPC}" --arg deployed_at "$(planned .deployedAt)" --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg start_block "$START_BLOCK" \
   --argjson test_window "$TEST_WINDOW" --argjson taker_fee "$TAKER_FEE_BPS" --arg max_oi "$MAX_OI" --arg virtual_quote "$VIRTUAL_QUOTE" --arg grad_reserve "$GRAD_RESERVE" \
   '{network:$network, rpc:$rpc, deployedAt:(if $deployed_at == "" then $now else $deployed_at end), root:$root, treasury:$treasury}
     + (if $start_block == "" then {} else {startBlock:($start_block|tonumber)} end)
     + {contracts:{usdc:$usdc, registry:$registry, outcomes:$outcomes, book:$book, perps:$perps, curation:$curation, coins:$coins, accounts:$accounts},
     external:{exchange:$exchange, chainSignatures:$signer},
-    globalCode:({coin:$coin_code, account:$account_code} + (if $account_v2 == "" then {} else {accountV2:$account_v2} end)),
+    globalCode:({coin:$coin_code, account:$account_code} + (if $account_v2 == "" then {} else {accountV2:$account_v2} end) + (if $account_v3 == "" then {} else {accountV3:$account_v3} end)),
     oracle:{mode:"tee_signer", publicKey:$oracle_key},
     params:{usdcDecimals:6, indexDecimals:6, coinDecimals:18, outcomeTestWindow:$test_window, bookTakerFeeBps:$taker_fee, maxOpenInterestPerSide:$max_oi, curveBaseVirtualQuote:$virtual_quote, curveGraduationReserve:$grad_reserve}}' >"$OUT.tmp"
 mv "$OUT.tmp" "$OUT"

@@ -10,7 +10,7 @@
  *   bun scripts/e2e-testnet.ts            (uses ~/.near-credentials/testnet service keys)
  */
 import { readFileSync } from "node:fs";
-import { AccountVersions, calls, type OwnerAction, ownerRequest, requestJson, type Report, type Series, sessionCallTgas, upgradeToV2 } from "@tredio/contracts";
+import { AccountVersions, calls, type OwnerAction, ownerRequest, requestJson, type Report, type Series, sessionCallTgas, upgradeToLatest } from "@tredio/contracts";
 import { Sender } from "@tredio/chain";
 import { D, RPC, SoftPasskey, newEd25519, nowSecs, senderFor, signReport, testnetOnly, viewer } from "./lib/network";
 
@@ -48,7 +48,7 @@ const account = await viewer.view<string>(D.contracts.accounts, "account_id_of",
 const session = newEd25519();
 // Kept locally (gitignored) so a failed run can be inspected with the same session key.
 await Bun.write("internal/scratch/e2e-session.json", JSON.stringify({ account, ...session }, null, 2));
-const upgrade = upgradeToV2(D);
+const upgrade = upgradeToLatest(D);
 const first: OwnerAction[] = [
   {
     add_session: {

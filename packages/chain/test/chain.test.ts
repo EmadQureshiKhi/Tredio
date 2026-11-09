@@ -80,9 +80,10 @@ describe("passkeys", () => {
     expect(verifyPasskey(assertion(), challenge, owner)).toBe(true);
   });
 
-  test("refuses another challenge, a missing user-presence flag, or a create ceremony", () => {
+  test("refuses another challenge, a missing user-presence or user-verification flag, or a create ceremony", () => {
     expect(verifyPasskey(assertion({ challenge: sha256(new TextEncoder().encode("another")) }), challenge, owner)).toBe(false);
     expect(verifyPasskey(assertion({ flags: 0x04 }), challenge, owner)).toBe(false);
+    expect(verifyPasskey(assertion({ flags: 0x01 }), challenge, owner)).toBe(false);
     expect(verifyPasskey(assertion({ type: "webauthn.create" }), challenge, owner)).toBe(false);
     expect(verifyPasskey(assertion(), challenge, hex(p256.getPublicKey(p256.utils.randomSecretKey(), true)))).toBe(false);
   });

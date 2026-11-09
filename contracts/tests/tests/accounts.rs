@@ -1,5 +1,6 @@
-//! Universal accounts on a local sandbox node: creation through the factory, the passkey upgrade
-//! from the v1 code testnet accounts run today, and v2 sessions on real gas keys.
+//! Universal accounts on a local sandbox node: creation through the factory, the passkey upgrades
+//! from the v1 and v2 code testnet accounts run today, sessions on real gas keys, and (v3) a
+//! policy wallet acting for its session as its own implicit account.
 
 mod common;
 
@@ -200,7 +201,7 @@ async fn session_of(
 }
 
 #[tokio::test]
-async fn a_v1_account_upgrades_to_v2_and_keeps_its_sessions_and_balances() -> Result<()> {
+async fn a_v1_account_upgrades_to_the_current_code_and_keeps_its_sessions_and_balances() -> Result<()> {
     let V1Account { s, pk, account, key, series } = v1_account().await?;
     let up = format!("{series}:up");
     let before = (
@@ -218,7 +219,7 @@ async fn a_v1_account_upgrades_to_v2_and_keeps_its_sessions_and_balances() -> Re
     owner(&s, &pk, &account, 2, json!([{ "upgrade": { "code_hash": v2 } }])).await?;
     s.worker.fast_forward(2).await?;
 
-    assert_eq!(s.worker.view(&account, "version").await?.json::<u32>()?, 2);
+    assert_eq!(s.worker.view(&account, "version").await?.json::<u32>()?, ACCOUNT_VERSION);
     let after = (
         s.usdc_of(&account).await?,
         s.mt_of(&account, &up).await?,
@@ -301,7 +302,7 @@ async fn new_accounts_upgrade_in_their_first_request_and_trade_with_150_tgas() -
     let first = json!([add_session(&key, now(&s.worker).await? + 7 * 86_400, true, 300 * MILLINEAR), { "upgrade": { "code_hash": v2 } }]);
     let account = create(&s, &pk, 1_500 * MILLINEAR, first).await?;
     s.worker.fast_forward(2).await?;
-    assert_eq!(s.worker.view(&account, "version").await?.json::<u32>()?, 2);
+    assert_eq!(s.worker.view(&account, "version").await?.json::<u32>()?, ACCOUNT_VERSION);
     assert!(session_of(&s, &account, &key).await?.is_some());
 
     s.list_trend("topic:a", 50 * POINT).await?;
@@ -525,5 +526,72 @@ async fn the_hyperliquid_guard_reads_the_asset_index_from_the_registry() -> Resu
         .await
         .unwrap();
     assert!(r.logs.iter().any(|l| l.contains("hyperliquid_signed")), "{:?} {:?}", r.logs, r.failure);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_v2_account_upgrades_and_its_policy_wallet_then_signs_for_its_session() -> Result<()> {
+    let v2 = account_v2_wasm();
+    assert_eq!(code_hash(&v2), ACCOUNT_V2_HASH, "the fixture is the published v2 code");
+    let s = Stack::with_account_code(&v2).await?;
+    let pk = Passkey::new(66);
+    // The wallet's key lives in a custody enclave, which signs only as the key's implicit account.
+    let wallet_key = SecretKey::from_seed(KeyType::ED25519, "policy-wallet");
+    let wallet_id: near_workspaces::AccountId = hex::encode(
+        &bs58::decode(wallet_key.public_key().to_string().trim_start_matches("ed25519:")).into_vec()?,
+    )
+    .parse()?;
+    let mut grant = add_session(&wallet_key, now(&s.worker).await? + 86_400, false, 0);
+    grant["add_session"]["label"] = json!("autopilot");
+    grant["add_session"]["scope"] = json!({ "outcomes": false, "perps": false, "hyperliquid": true });
+    let account = create(&s, &pk, 1_500 * MILLINEAR, json!([grant])).await?;
+    assert_eq!(s.worker.view(&account, "version").await?.json::<u32>()?, 2);
+    // A transfer to the key's implicit account creates it.
+    let funded = s.root.transfer_near(&wallet_id, NearToken::from_near(2)).await?;
+    assert!(funded.is_success(), "{:?}", funded.failures());
+    let wallet = near_workspaces::Account::from_secret_key(wallet_id.clone(), wallet_key.clone(), &s.worker);
+    let leverage = json!({ "action": { "hl_leverage": { "asset_index": 0, "is_cross": false, "leverage": 3, "nonce": 1_700_000_000_000u64 } } });
+
+    // v2 takes session calls only from keys on the account itself.
+    let r = wallet
+        .call(&account, "session_call")
+        .args_json(leverage.clone())
+        .gas(near_workspaces::types::Gas::from_tgas(150))
+        .transact()
+        .await?;
+    assert!(format!("{:?}", r.failures()).contains("session keys only"), "{:?}", r.failures());
+
+    let current = publish_global_as(&s.root, "publisher4", &wasm("tredio_account")).await?;
+    owner(&s, &pk, &account, 2, json!([{ "upgrade": { "code_hash": current } }])).await?;
+    s.worker.fast_forward(2).await?;
+    assert_eq!(s.worker.view(&account, "version").await?.json::<u32>()?, ACCOUNT_VERSION);
+
+    // Now the wallet acts for the session: the digest goes to the signer (absent in the sandbox).
+    let r = wallet
+        .call(&account, "session_call")
+        .args_json(leverage)
+        .gas(near_workspaces::types::Gas::from_tgas(150))
+        .transact()
+        .await?;
+    assert!(r.logs().iter().any(|l| l.contains("hyperliquid_signed")), "{:?} {:?}", r.logs(), r.failures());
+    // Still bounded by the session: outcomes are outside its scope.
+    let mint = json!({ "action": { "mint_sets": { "series": 1, "amount": "1" } } });
+    let r = wallet
+        .call(&account, "session_call")
+        .args_json(mint)
+        .gas(near_workspaces::types::Gas::from_tgas(150))
+        .transact()
+        .await?;
+    assert!(format!("{:?}", r.failures()).contains("outside the session scope"), "{:?}", r.failures());
+    // And by the account's freeze.
+    owner(&s, &pk, &account, 3, json!([{ "freeze": { "frozen": true } }])).await?;
+    let leverage = json!({ "action": { "hl_leverage": { "asset_index": 0, "is_cross": false, "leverage": 3, "nonce": 1_700_000_000_001u64 } } });
+    let r = wallet
+        .call(&account, "session_call")
+        .args_json(leverage)
+        .gas(near_workspaces::types::Gas::from_tgas(150))
+        .transact()
+        .await?;
+    assert!(format!("{:?}", r.failures()).contains("sessions are frozen"), "{:?}", r.failures());
     Ok(())
 }

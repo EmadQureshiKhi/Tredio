@@ -1,4 +1,4 @@
-import { deployment } from "@tredio/contracts";
+import { deployment, latestAccountCode } from "@tredio/contracts";
 import { expect, LIVE, passkeyUses, test } from "./live";
 
 /**
@@ -27,12 +27,12 @@ test("the account runs v2 account code, upgrading from Settings with one passkey
   }
   await expect(upgrade).toBeHidden();
 
-  // The chain agrees: the account's global code is the v2 hash.
+  // The chain agrees: the account's global code is the newest published hash.
   const res = await fetch("https://near-testnet.drpc.org", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "query", params: { request_type: "view_account", finality: "optimistic", account_id: account } }),
   });
   const state = (await res.json()) as { result: { global_contract_hash?: string } };
-  expect(state.result.global_contract_hash).toBe(deployment("testnet").globalCode.accountV2);
+  expect(state.result.global_contract_hash).toBe(latestAccountCode(deployment("testnet"))?.hash);
 });

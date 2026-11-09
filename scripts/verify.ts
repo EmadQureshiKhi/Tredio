@@ -16,7 +16,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58Decode, base58Encode, rpcEndpoints, Viewer } from "@tredio/chain";
-import { accountCodeHashes, deployment, type Network } from "@tredio/contracts";
+import { accountCodeHashes, deployment, latestAccountCode, type Network } from "@tredio/contracts";
 import { CUSTODY_CONTRACT, custodyKeyOf, nearKeyOf } from "@tredio/custody";
 
 const ROOT = join(import.meta.dir, "..");
@@ -154,7 +154,7 @@ async function chain() {
         .filter(([role]) => role !== "usdc" || ownUsdc)
         .map(([crate, account]) => ({ name: crate, crate, account })),
       { name: "coin (global)", crate: "coin", hash: D.globalCode.coin },
-      { name: `account v${D.globalCode.accountV2 ? 2 : 1} (global)`, crate: "account", hash: D.globalCode.accountV2 ?? D.globalCode.account },
+      { name: `account v${latestAccountCode(D)?.version ?? 1} (global)`, crate: "account", hash: latestAccountCode(D)?.hash ?? D.globalCode.account },
     ];
     const git = (...a: string[]) => run(["git", ...a], ".");
     const local = (crate: string) => join(ROOT, "contracts/target/near", `tredio_${crate}`, `tredio_${crate}.wasm`);
@@ -194,16 +194,17 @@ async function chain() {
   await check(S, "Accounts run published global code", async () => {
     const [, , codeHash] = await viewer.view<[string, unknown, string, number]>(D.contracts.accounts, "config");
     if (codeHash !== D.globalCode.account) return fail(`factory uses ${codeHash}, deployments say ${D.globalCode.account}`);
-    // Accounts are born on the factory's code (v1) and move to v2 with their passkey once deployments names it.
+    // Accounts are born on the factory's code (v1) and move to later versions with their passkey once deployments names them.
     const allowed = accountCodeHashes(D);
-    let onV2 = 0;
+    const versions = [D.globalCode.account, D.globalCode.accountV2, D.globalCode.accountV3];
+    const on = [0, 0, 0];
     for (const account of proofs.passkeyAccounts) {
       const a = await viewAccount(account);
       if (!a.global_contract_hash || !allowed.includes(a.global_contract_hash)) return fail(`${account.slice(0, 10)}... runs ${a.global_contract_hash ?? a.code_hash}`);
-      if (a.global_contract_hash === D.globalCode.accountV2) onV2++;
+      on[versions.indexOf(a.global_contract_hash)]!++;
     }
-    const n = proofs.passkeyAccounts.length;
-    return ok(`${codeHash.slice(0, 10)}... on the factory and ${n - onV2} passkey accounts${D.globalCode.accountV2 ? `, v2 ${D.globalCode.accountV2.slice(0, 10)}... on ${onV2}` : ""}`);
+    const later = versions.map((h, i) => (i > 0 && h ? `, v${i + 1} ${h.slice(0, 10)}... on ${on[i]}` : "")).join("");
+    return ok(`${codeHash.slice(0, 10)}... on the factory and ${on[0]} passkey accounts${later}`);
   });
 
   await check(S, "Account ids derive from their passkeys", async () => {

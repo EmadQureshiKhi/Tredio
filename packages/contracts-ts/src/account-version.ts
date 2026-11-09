@@ -118,8 +118,18 @@ export class AccountVersions {
   }
 }
 
-/** The code hashes a Tredio account may run: the factory's birth code (v1) and, once deployments names it, v2. */
-export const accountCodeHashes = (d: Deployment): string[] => [d.globalCode.account, ...(d.globalCode.accountV2 ? [d.globalCode.accountV2] : [])];
+/** The code hashes a Tredio account may run: the factory's birth code (v1) and every later version deployments names. */
+export const accountCodeHashes = (d: Deployment): string[] => [d.globalCode.account, ...[d.globalCode.accountV2, d.globalCode.accountV3].filter((h): h is string => Boolean(h))];
 
-/** The owner action that moves an account to v2 code, or null while deployments names no v2 code hash. */
-export const upgradeToV2 = (d: Deployment): OwnerAction | null => (d.globalCode.accountV2 ? { upgrade: { code_hash: d.globalCode.accountV2 } } : null);
+/** The newest account code deployments names, with its version, or null while accounts have only their birth code. */
+export function latestAccountCode(d: Deployment): { version: AccountVersion; hash: string } | null {
+  if (d.globalCode.accountV3) return { version: 3, hash: d.globalCode.accountV3 };
+  if (d.globalCode.accountV2) return { version: 2, hash: d.globalCode.accountV2 };
+  return null;
+}
+
+/** The owner action that moves an account to the newest code, or null while deployments names none past the birth code. */
+export const upgradeToLatest = (d: Deployment): OwnerAction | null => {
+  const latest = latestAccountCode(d);
+  return latest ? { upgrade: { code_hash: latest.hash } } : null;
+};

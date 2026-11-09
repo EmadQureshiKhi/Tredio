@@ -407,6 +407,18 @@ pub fn account_v1_wasm() -> Vec<u8> {
 
 pub const ACCOUNT_V1_HASH: &str = "J1GvtY5xj7QuNwmdDFM56EYxmTvwp1wHqkPZjY7CNK9x";
 
+/// The v2 account code published on testnet (global hash BsFqhAcY...), so the upgrade to the
+/// current code is tested from the exact deployed bytes too.
+pub fn account_v2_wasm() -> Vec<u8> {
+    let path = format!("{}/fixtures/account_v2.wasm", env!("CARGO_MANIFEST_DIR"));
+    std::fs::read(&path).unwrap_or_else(|_| panic!("missing {path}"))
+}
+
+pub const ACCOUNT_V2_HASH: &str = "BsFqhAcYESJ5Fyn55Xa6HwPyJaYy3VyEu4ZGh2iTdBMf";
+
+/// The account code's version as this source builds it.
+pub const ACCOUNT_VERSION: u32 = 3;
+
 /// An owner request for `account`, created now with `nonce`, as the app builds it.
 pub async fn owner_request(
     worker: &Worker<Sandbox>,

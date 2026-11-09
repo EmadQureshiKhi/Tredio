@@ -109,16 +109,18 @@ export interface PasskeyAssertion {
 }
 
 /**
- * True when `a` is the passkey with compressed P-256 key `ownerKeyHex` signing `challenge`
- * (WebAuthn: the signature covers SHA-256(authData || SHA-256(clientDataJSON)), the client data's
- * challenge is base64url(challenge) and its type is webauthn.get).
+ * True when `a` is the passkey with compressed P-256 key `ownerKeyHex` signing `challenge` with the
+ * person verified (WebAuthn: the signature covers SHA-256(authData || SHA-256(clientDataJSON)), the
+ * client data's challenge is base64url(challenge), its type is webauthn.get, and the flags carry
+ * user presence and user verification).
  */
 export function verifyPasskey(a: PasskeyAssertion, challenge: Uint8Array, ownerKeyHex: string): boolean {
   try {
     const client = JSON.parse(a.client_data_json) as { type?: string; challenge?: string };
     if (client.type !== "webauthn.get" || client.challenge !== Buffer.from(challenge).toString("base64url")) return false;
     const auth = Buffer.from(a.authenticator_data, "base64url");
-    if (auth.length < 37 || (auth[32]! & 0x01) === 0) return false;
+    // User present (0x01) and user verified (0x04): the app asks for Face ID, a fingerprint or a PIN, and account code v3 requires both.
+    if (auth.length < 37 || (auth[32]! & 0x05) !== 0x05) return false;
     const msg = new Uint8Array([...auth, ...sha256(new TextEncoder().encode(a.client_data_json))]);
     return p256.verify(Buffer.from(a.signature, "hex"), sha256(msg), Buffer.from(ownerKeyHex, "hex"), { prehash: false, lowS: false });
   } catch {

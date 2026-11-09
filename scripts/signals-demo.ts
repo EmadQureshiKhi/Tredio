@@ -19,7 +19,7 @@ import { p256 } from "@noble/curves/nist.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { ACCESS_MEMO_PREFIX, COMMIT_AMOUNT, COMMIT_MEMO_PREFIX, channelMessage, matchesCommitment, openSignal, signalCommitment, signalMessage } from "@tredio/autopilot";
 import { nep413Hash, Sender } from "@tredio/chain";
-import { AccountVersions, calls, type OwnerAction, type OwnerApprovalRequest, ownerApprovalDigest, ownerRequest, ownerRequests, requestJson, sessionCallTgas, upgradeToV2 } from "@tredio/contracts";
+import { AccountVersions, calls, type OwnerAction, type OwnerApprovalRequest, ownerApprovalDigest, ownerRequest, ownerRequests, requestJson, sessionCallTgas, upgradeToLatest } from "@tredio/contracts";
 import { bs58decode, D, newEd25519, nowSecs, RPC, SoftPasskey, senderFor, testnetOnly, viewer } from "./lib/network";
 
 testnetOnly("signals-demo");
@@ -69,7 +69,7 @@ async function person(name: "leader" | "follower"): Promise<Person> {
   const passkey = new SoftPasskey();
   const account = await viewer.view<string>(D.contracts.accounts, "account_id_of", { owner_key: passkey.publicKeyHex });
   const session = newEd25519();
-  const upgrade = upgradeToV2(D);
+  const upgrade = upgradeToLatest(D);
   const first: OwnerAction[] = [
     {
       add_session: {

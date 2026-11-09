@@ -14,7 +14,7 @@
  * transaction hash. Testnet only; the wallet registration is OutLayer's free anonymous wallet.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { AccountVersions, acceptsWalletSessions, calls, explorerTx, type OwnerAction, ownerRequest, requestJson, type Session, upgradeToV2 } from "@tredio/contracts";
+import { AccountVersions, acceptsWalletSessions, calls, explorerTx, type OwnerAction, ownerRequest, requestJson, type Session, upgradeToLatest } from "@tredio/contracts";
 import {
   AUTOPILOT_CAPABILITIES,
   autopilotRules,
@@ -113,7 +113,7 @@ async function setup() {
     const account = await viewer.view<string>(D.contracts.accounts, "account_id_of", { owner_key: passkey.publicKeyHex });
     s = { passkeySeed: Buffer.from(passkey.secret).toString("hex"), account, txs: {} };
     save(s);
-    const upgrade = upgradeToV2(D);
+    const upgrade = upgradeToLatest(D);
     const request = requestJson(ownerRequest(account, "testnet", upgrade ? [upgrade] : []));
     const created = upgrade
       ? await relayer.send(C.accounts.create(passkey.publicKeyHex, (4n * 10n ** 23n).toString(), { request, proof: await passkey.prove(request) }))
