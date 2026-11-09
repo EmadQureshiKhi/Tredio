@@ -4,6 +4,9 @@ export const USDC_DECIMALS = 6;
 export const INDEX_DECIMALS = 6;
 export const COIN_DECIMALS = 18;
 export const ONE_USDC = 1_000_000n;
+/** The index's cap, 100 points. A series that opens there can only settle Down: Up needs a close above the opening, and ties go Down. */
+export const INDEX_MAX = 100 * 10 ** INDEX_DECIMALS;
+export const opensAtCap = (openingIndex: number) => openingIndex >= INDEX_MAX;
 
 /** Parses a decimal string ("12.5") into raw units with `decimals`, rounding down. */
 export function toRaw(value: string | number, decimals: number): bigint {
