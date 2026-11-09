@@ -82,6 +82,7 @@ export function createServer(d: ServerDeps): Hono {
         ok,
         service: "relayer",
         network: d.network,
+        startedAt: Math.floor(d.startedAt / 1000),
         wallets: [wallet],
         alerts: balanceOk ? {} : { balance: `below ${wallet.min} NEAR` },
         lastError: s.lastError,

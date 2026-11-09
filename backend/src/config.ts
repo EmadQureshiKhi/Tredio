@@ -19,7 +19,10 @@ const schema = z.object({
   INDEXER_SCHEMA: z.string().regex(/^[a-z_][a-z0-9_]*$/).default("indexer"),
   /** NEAR Intents 1Click API for any-chain deposits and withdrawals (mainnet). */
   ONECLICK_API_BASE: z.string().url().default("https://1click.chaindefuser.com"),
-  /** Partner JWT from partners.near-intents.org (lower fees); quotes work without it. */
+  /**
+   * Partner JWT from the NEAR Intents Partner Dashboard (https://partners.near-intents.org/home). With it every 1Click quote
+   * is confidential and uses the partner fee schedule; without it quotes are public and pay 1Click's extra 0.25%.
+   */
   ONECLICK_JWT: optional(z.string().min(20)),
   /** Comma-separated app origins allowed by CORS. */
   FRONTEND_URL: z.string().default("http://localhost:3000"),

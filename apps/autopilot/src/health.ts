@@ -12,6 +12,8 @@ export interface HealthDeps {
   /** The bot account with its session gas key, or null without a bot. */
   wallet: () => Promise<WalletHealth | null>;
   network: string;
+  /** When the process started (unix seconds). */
+  startedAt?: number;
   tickSec: number;
   /** The id of the key grants are sealed to, or null when this executor cannot open grants. */
   sealKeyId: string | null;
@@ -59,6 +61,7 @@ export async function healthReport(d: HealthDeps): Promise<{ httpStatus: 200 | 5
       ok,
       service: "autopilot",
       network: d.network,
+      startedAt: d.startedAt ?? null,
       wallets: wallet ? [wallet] : [],
       alerts,
       lastError: s.lastError,

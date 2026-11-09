@@ -4,6 +4,9 @@ import { loadConfig } from "./config";
 import { Executor } from "./executor";
 import { Keeper } from "./keeper";
 
+/** When this process started (unix seconds): the status page shows a recent restart. */
+const STARTED_AT = Math.floor(Date.now() / 1000);
+
 const cfg = loadConfig(process.env);
 const log = (fields: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ service: "keeper", msg, ...fields }));
 const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpc);
@@ -51,6 +54,7 @@ app.get("/health", async (c) => {
       ok,
       service: "keeper",
       network: cfg.NEAR_NETWORK,
+      startedAt: STARTED_AT,
       wallets: [wallet],
       alerts,
       lastError: keeper.lastScanError ?? executor.lastError,

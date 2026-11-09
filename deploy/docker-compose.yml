@@ -3,14 +3,23 @@
 # Each service reads env/<name>.env (gitignored; start from the .env.example beside its code).
 name: tredio
 
+# Docker starts again a service that exits; autoheal (below) restarts one whose health check fails,
+# which Docker alone never does. Every service answers GET /live while its process is up.
 x-service: &service
   restart: unless-stopped
+  labels: { autoheal: "true" }
   depends_on:
     postgres:
       condition: service_healthy
   logging:
     driver: json-file
     options: { max-size: "10m", max-file: "3" }
+
+x-live: &live
+  interval: 30s
+  timeout: 5s
+  retries: 3
+  start_period: 60s
 
 services:
   postgres:
@@ -29,41 +38,56 @@ services:
     <<: *service
     build: { context: .., dockerfile: backend/Dockerfile }
     env_file: env/backend.env
+    healthcheck: { <<: *live, test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4000/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"] }
 
   relayer:
     <<: *service
     build: { context: .., dockerfile: apps/relayer/Dockerfile }
     env_file: env/relayer.env
+    healthcheck: { <<: *live, test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4100/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"] }
 
   keeper:
     <<: *service
     build: { context: .., dockerfile: apps/keeper/Dockerfile }
     env_file: env/keeper.env
+    healthcheck: { <<: *live, test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4200/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"] }
 
   market-maker:
     <<: *service
     build: { context: .., dockerfile: apps/market-maker/Dockerfile }
     env_file: env/market-maker.env
+    healthcheck: { <<: *live, test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4300/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"] }
 
   autopilot:
     <<: *service
     build: { context: .., dockerfile: apps/autopilot/Dockerfile }
     env_file: env/autopilot.env
+    healthcheck: { <<: *live, test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4400/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"] }
 
   topup:
     <<: *service
     build: { context: .., dockerfile: apps/topup/Dockerfile }
     env_file: env/topup.env
+    healthcheck: { <<: *live, test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4500/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"] }
 
   oracle:
     <<: *service
     build: { context: .., dockerfile: apps/oracle/Dockerfile }
     env_file: env/oracle.env
+    healthcheck: { <<: *live, test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4600/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"] }
 
   indexer:
     <<: *service
     build: { context: .., dockerfile: apps/indexer/Dockerfile }
     env_file: env/indexer.env
+    healthcheck: { <<: *live, test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4700/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"] }
+
+  # Restarts a container labelled autoheal=true once its health check fails three times in a row.
+  autoheal:
+    image: willfarrell/autoheal:1.2.0
+    restart: unless-stopped
+    environment: { AUTOHEAL_CONTAINER_LABEL: autoheal, AUTOHEAL_INTERVAL: "30", AUTOHEAL_START_PERIOD: "90" }
+    volumes: ["/var/run/docker.sock:/var/run/docker.sock"]
 
   caddy:
     image: caddy:2-alpine

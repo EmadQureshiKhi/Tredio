@@ -1,7 +1,7 @@
 import { type RpcEndpoint, rpcEndpoints } from "@tredio/chain";
 import { type Deployment, deployment as deploymentOf } from "@tredio/contracts";
 import { z } from "zod";
-import { NEAR, parseTargets, type Target, USDC } from "./targets";
+import { contractTargets, NEAR, parseTargets, type Target, USDC } from "./targets";
 
 // #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
 
@@ -24,6 +24,8 @@ const schema = z.object({
   TREASURY_LOW_NEAR: near(10),
   /** NEAR targets, highest priority first: name=account[/ed25519:key]@min/target. */
   TARGETS: z.string().default(""),
+  /** Keeps each Tredio contract's free NEAR (above its storage) at min/target, or "off". */
+  CONTRACT_FREE_NEAR: z.string().default("0.3/1"),
   /** Testnet only: USDC targets (name=account@min/target), minted by the USDC minter account. */
   USDC_TARGETS: z.string().default(""),
   USDC_MINTER_ACCOUNT_ID: optional(z.string().min(2)),
@@ -47,5 +49,6 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
   const usdcTargets = parseTargets(c.USDC_TARGETS, "usdc");
   if (usdcTargets.length > 0 && c.NEAR_NETWORK === "mainnet") throw new Error("USDC_TARGETS are testnet only: mainnet USDC is real money");
   if (usdcTargets.length > 0 && !(c.USDC_MINTER_ACCOUNT_ID && c.USDC_MINTER_PRIVATE_KEY)) throw new Error("USDC_TARGETS need USDC_MINTER_ACCOUNT_ID and USDC_MINTER_PRIVATE_KEY");
-  return { ...c, deployment, rpc, targets: parseTargets(c.TARGETS, "near"), usdcTargets, dailyCapUsdc: BigInt(Math.round(c.DAILY_CAP_USDC)) * USDC };
+  const targets = [...parseTargets(c.TARGETS, "near"), ...contractTargets(deployment.contracts, deployment.root, c.CONTRACT_FREE_NEAR)];
+  return { ...c, deployment, rpc, targets, usdcTargets, dailyCapUsdc: BigInt(Math.round(c.DAILY_CAP_USDC)) * USDC };
 }

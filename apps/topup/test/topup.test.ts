@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { burnPerDay, DAY_MS, freshMemory, plan } from "../src/plan";
-import { format, NEAR, parseTargets, USDC } from "../src/targets";
+import { contractTargets, format, NEAR, parseTargets, USDC } from "../src/targets";
 
 describe("targets", () => {
   test("parse NEAR, gas-key and USDC entries", () => {
@@ -10,6 +10,18 @@ describe("targets", () => {
     expect(parseTargets("mm=tredio-mm.testnet@500/5000", "usdc")[0]).toMatchObject({ kind: "usdc", min: 500n * USDC });
     expect(() => parseTargets("x=y@5/2", "near")).toThrow(/above the minimum/);
     expect(format(1_234_500n * 10n ** 18n, NEAR)).toBe("1.2345");
+  });
+
+  test("every Tredio contract keeps free NEAR above its storage; an external token is left out", () => {
+    const contracts = { usdc: "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1", registry: "registry.tredio.near", perps: "perps.tredio.near" };
+    const t = contractTargets(contracts, "tredio.near", "0.3/1");
+    expect(t.map((x) => [x.name, x.kind, x.account])).toEqual([
+      ["registry-free", "free", "registry.tredio.near"],
+      ["perps-free", "free", "perps.tredio.near"],
+    ]);
+    expect(t[0]).toMatchObject({ min: (3n * NEAR) / 10n, target: NEAR });
+    expect(contractTargets(contracts, "tredio.near", "off")).toEqual([]);
+    expect(() => contractTargets(contracts, "tredio.near", "1/0.5")).toThrow(/above the minimum/);
   });
 });
 
@@ -22,6 +34,15 @@ describe("plan", () => {
     expect(d.map((x) => [x.target.name, x.amount, x.skip])).toEqual([
       ["relayer", 4n * NEAR, null],
       ["keeper", 0n, "the treasury cannot afford it"],
+    ]);
+  });
+
+  test("a contract's free balance draws on the same NEAR budget", () => {
+    const [registry] = contractTargets({ registry: "registry.tredio.testnet" }, "tredio.testnet", "0.3/1");
+    const d = plan([relayer!, registry!], new Map([["relayer", 1n * NEAR], ["registry-free", 0n]]), new Map(), 0, { ...o, spendable: () => 5n * NEAR });
+    expect(d.map((x) => [x.target.name, x.amount, x.skip])).toEqual([
+      ["relayer", 4n * NEAR, null],
+      ["registry-free", NEAR, null],
     ]);
   });
 

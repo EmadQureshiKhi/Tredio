@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Boxes, Fuel, Radio } from "lucide-react";
+import { Activity, Boxes, FileCode2, Fuel, Radio } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge, Card, cn, ErrorNote, ExplorerLink, RefreshIcon, Skeleton } from "@/components/ui";
 import { explorerAddress } from "@/lib/config";
@@ -56,7 +56,8 @@ export default function Status() {
             <OracleCard s={s} since={since} />
             <ChainCard s={s} since={since} />
           </div>
-          <ServicesCard s={s} />
+          <ServicesCard s={s} since={since} />
+          <ContractsCard s={s} />
           <FleetCard s={s} />
         </>
       ) : null}
@@ -81,7 +82,10 @@ function StateBadge({ ok, testId }: { ok: boolean; testId?: string }) {
 function Overall({ s, since, stale }: { s: SystemStatus; since: number; stale: boolean }) {
   // A service that answered but reported a problem (a low balance) is not "not answering": say which is which.
   const silent = [...s.services.filter((x) => !x.ok && x.latencyMs === null).map((x) => serviceInfo(x.name).label), ...(s.oracle.ok ? [] : ["the attention oracle"]), ...(s.chain.ok ? [] : ["the NEAR head"])];
-  const troubled = s.services.filter((x) => !x.ok && x.latencyMs !== null).map((x) => `${serviceInfo(x.name).label} (${x.issue ?? "reports a problem"})`);
+  const troubled = [
+    ...s.services.filter((x) => !x.ok && x.latencyMs !== null).map((x) => `${serviceInfo(x.name).label} (${x.issue ?? "reports a problem"})`),
+    ...(s.contracts ?? []).filter((c) => !c.ok).map((c) => `the ${c.role} contract (${c.freeNear === null ? "balance unreadable" : "too little NEAR for its storage"})`),
+  ];
   const count = silent.length + troubled.length;
   const problems = [silent.length ? `not answering: ${silent.join(", ")}` : null, troubled.length ? `reporting a problem: ${troubled.join(", ")}` : null].filter(Boolean).join("; ");
   const lastRun = s.oracle.lastRunAgeSec === null ? null : s.oracle.lastRunAgeSec + since;
@@ -169,7 +173,10 @@ function ChainCard({ s, since }: { s: SystemStatus; since: number }) {
   );
 }
 
-function ServicesCard({ s }: { s: SystemStatus }) {
+/** A process that started this long ago or less was restarted recently: worth saying. */
+const RECENT_START_SEC = 15 * 60;
+
+function ServicesCard({ s, since }: { s: SystemStatus; since: number }) {
   return (
     <Card className="overflow-hidden" data-testid="status-services">
       <div className="px-5 pb-4 pt-5 sm:px-6">
@@ -194,6 +201,11 @@ function ServicesCard({ s }: { s: SystemStatus }) {
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] leading-5 text-text-2">{info.body}</p>
                   {!x.ok && x.latencyMs !== null ? <p className="mt-1 text-[12.5px] leading-[18px] text-warn">Answered, and reports: {x.issue ?? "a problem"}.</p> : null}
+                  {x.startedAt && s.at - x.startedAt + since < RECENT_START_SEC ? (
+                    <p className="mt-1 text-[12.5px] leading-[18px] text-text-3" data-testid="service-restarted">
+                      Restarted {age(s.at - x.startedAt + since)} ago.
+                    </p>
+                  ) : null}
                 </div>
                 <div className="hidden shrink-0 items-center gap-3 sm:flex">
                   <span className="num w-[64px] text-right text-[12.5px] text-text-3">{x.latencyMs !== null ? `${x.latencyMs} ms` : x.ok ? "" : "no answer"}</span>
@@ -204,6 +216,51 @@ function ServicesCard({ s }: { s: SystemStatus }) {
           })}
         </ul>
       )}
+    </Card>
+  );
+}
+
+/**
+ * Each Tredio contract's NEAR above what its storage locks. Every write adds state the account pays
+ * for; one that runs out refuses every write until it is topped up, which the top-up service does.
+ */
+function ContractsCard({ s }: { s: SystemStatus }) {
+  const contracts = s.contracts ?? [];
+  if (contracts.length === 0) return null;
+  return (
+    <Card className="overflow-hidden" data-testid="status-contracts">
+      <div className="flex items-start gap-2.5 px-5 pb-4 pt-5 sm:px-6">
+        <FileCode2 className="mt-0.5 size-[18px] shrink-0 text-primary" aria-hidden />
+        <div>
+          <h2 className="font-strong text-[15px] text-text">Contracts</h2>
+          <p className="mt-0.5 text-[13px] text-text-2">The NEAR each contract holds beyond what its storage locks. A contract that runs out cannot record anything new, so Tredio tops each one up before it gets there.</p>
+        </div>
+      </div>
+      <ul className="grid divide-y divide-line border-t border-line sm:grid-cols-2 sm:divide-y-0">
+        {contracts.map((c, i) => (
+          <li
+            key={c.account}
+            className={cn("flex items-center justify-between gap-3 px-5 py-3.5 sm:px-6", i >= 2 && "sm:border-t sm:border-line", i % 2 === 1 && "sm:border-l sm:border-line")}
+            data-testid="status-contract"
+            data-role={c.role}
+            data-ok={c.ok}
+          >
+            <span className="flex min-w-0 items-center gap-2.5">
+              <Dot ok={c.ok} />
+              <span className="flex min-w-0 flex-col">
+                <span className="font-strong text-[14px] capitalize text-text">{c.role}</span>
+                <ExplorerLink href={explorerAddress(c.account)} className="num truncate font-mono text-[12px] text-text-3">
+                  {shortAddress(c.account)}
+                </ExplorerLink>
+              </span>
+            </span>
+            <span className="flex shrink-0 flex-col items-end">
+              <span className="num font-strong text-[13.5px] text-text">{c.freeNear === null ? "-" : `${c.freeNear} NEAR`}</span>
+              <span className={cn("text-[12px]", c.ok ? (c.low ? "text-warn" : "text-text-3") : "text-down")}>{c.ok ? (c.low ? "Low, refill due" : "Free") : "Needs NEAR"}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }

@@ -3,9 +3,11 @@
  * of it, and funding a Hyperliquid perps balance and back, each one quote with its own deposit address.
  * With a partner JWT every quote asks for Confidential Intents (`confidentiality: "basic"`), so
  * the origin and route of a deposit cannot be linked to the account it lands in; the destination
- * transfer itself stays public. 1Click requires partner authentication for that flag, so without a
- * JWT quotes go out without it (1Click still settles them on its private shard, but the quote does
- * not ask for confidentiality).
+ * transfer itself stays public. 1Click refuses that flag without the JWT ("User authentication is
+ * required for confidential intent quotes", checked 2026-11-09), so without one quotes go out public.
+ * The JWT also replaces 1Click's extra 0.25% platform fee on unauthenticated quotes with the partner
+ * schedule (typically 0.2%, 0.01% on stablecoin and same-asset routes). It comes from the Partner
+ * Dashboard, https://partners.near-intents.org/home, and travels as `X-API-Key`.
  *
  * 1Click runs on NEAR mainnet only. On testnet the app shows dry quotes (`dry: true`, no deposit
  * address) at mainnet prices, so the flow is visible without moving funds, and testnet USDC comes
@@ -111,7 +113,7 @@ type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
 export interface OneClickOptions {
   baseUrl?: string;
-  /** A partner JWT from partners.near-intents.org; without one 1Click adds its default fee. */
+  /** A partner JWT from https://partners.near-intents.org/home: confidential quotes and the partner fee schedule. */
   jwt?: string | null;
   fetchImpl?: Fetch;
   timeoutMs?: number;
@@ -131,7 +133,7 @@ export class OneClick {
     this.timeoutMs = o.timeoutMs ?? 20_000;
   }
 
-  /** Whether quotes carry a partner JWT (lower fees). */
+  /** Whether quotes carry a partner JWT (confidential, partner fees). */
   get authenticated(): boolean {
     return this.jwt !== null;
   }
@@ -139,7 +141,7 @@ export class OneClick {
   private async call<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = { accept: "application/json" };
     if (init.body) headers["content-type"] = "application/json";
-    if (this.jwt) headers.authorization = `Bearer ${this.jwt}`;
+    if (this.jwt) headers["x-api-key"] = this.jwt;
     const res = await this.fetchImpl(`${this.base}${path}`, { ...init, headers: { ...headers, ...(init.headers as Record<string, string>) }, signal: AbortSignal.timeout(this.timeoutMs) });
     const text = await res.text();
     if (!res.ok) {

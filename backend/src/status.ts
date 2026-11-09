@@ -102,6 +102,8 @@ export interface ServiceDetail {
   treasury: TreasuryDetail | null;
   /** When the service last finished its work (unix seconds), if it says. */
   lastWorkAt: number | null;
+  /** When the service's process started (unix seconds), if it says: a recent start is a restart. */
+  startedAt: number | null;
 }
 
 type Json = Record<string, unknown>;
@@ -158,7 +160,9 @@ export function describeHealth(body: unknown): Omit<ServiceDetail, "name" | "ok"
   }
   const alerts = Object.entries(obj(b.alerts) ?? {}).map(([k, v]) => (typeof v === "string" && v ? `${k}: ${v}` : k));
   const lastError = message(b.lastError) ?? (b.ok === false ? message(b.error) : null);
-  return { lastError, alerts, wallets, treasury, lastWorkAt: num(b.lastWorkAt) };
+  const iso = str(b.startedAt) !== null ? Date.parse(str(b.startedAt)!) : Number.NaN;
+  const startedAt = num(b.startedAt) ?? (Number.isFinite(iso) ? Math.floor(iso / 1000) : null);
+  return { lastError, alerts, wallets, treasury, lastWorkAt: num(b.lastWorkAt), startedAt };
 }
 
 /**
@@ -183,15 +187,52 @@ export async function serviceDetails(services: readonly ServiceProbe[], fetchImp
         const body: unknown = await res.json().catch(() => null);
         return { name: s.name, ok: res.ok, latencyMs, httpStatus: res.status, ...describeHealth(body) };
       } catch {
-        return { name: s.name, ok: false, latencyMs: null, httpStatus: null, lastError: "no answer", alerts: [], wallets: [], treasury: null, lastWorkAt: null };
+        return { name: s.name, ok: false, latencyMs: null, httpStatus: null, lastError: "no answer", alerts: [], wallets: [], treasury: null, lastWorkAt: null, startedAt: null };
+      }
+    }),
+  );
+}
+
+/** yoctoNEAR per byte of account storage. */
+const STORAGE_PRICE = 10n ** 19n;
+/** Free NEAR (above storage) below which a contract's writes fail soon (LackBalanceForState): the status is down. */
+export const CONTRACT_FREE_CRITICAL = 5n * 10n ** 22n;
+/** Below this the top-up service refills a contract (its CONTRACT_FREE_NEAR minimum): shown as low. */
+export const CONTRACT_FREE_LOW = 3n * 10n ** 23n;
+
+export interface ContractFunds {
+  role: string;
+  account: string;
+  /** NEAR above what the account's storage locks, as a decimal. */
+  freeNear: string | null;
+  /** False when a write could fail for lack of balance (or the balance could not be read). */
+  ok: boolean;
+  low: boolean;
+}
+
+const nearText = (yocto: bigint) => (Number(yocto / 10n ** 18n) / 1e6).toFixed(3);
+
+/** Each Tredio contract's balance above its storage (Circle's USDC on mainnet is not Tredio's). */
+export async function contractFunds(chain: Pick<ChainReader, "viewer" | "deployment">): Promise<ContractFunds[]> {
+  const d = chain.deployment;
+  const own = Object.entries(d.contracts).filter(([, account]) => account.endsWith(`.${d.root}`));
+  return Promise.all(
+    own.map(async ([role, account]) => {
+      try {
+        const a = await chain.viewer.rpc<{ amount: string; storage_usage: number }>("query", { request_type: "view_account", finality: "final", account_id: account });
+        const free = BigInt(a.amount) - BigInt(a.storage_usage) * STORAGE_PRICE;
+        return { role, account, freeNear: nearText(free > 0n ? free : 0n), ok: free >= CONTRACT_FREE_CRITICAL, low: free < CONTRACT_FREE_LOW };
+      } catch {
+        return { role, account, freeNear: null, ok: false, low: true };
       }
     }),
   );
 }
 
 /**
- * The public status: up or down for every service, the oracle and the chain head, plus the
- * service fleet (each account a service sends from and its gas keys, all public on chain anyway).
+ * The public status: up or down for every service, the oracle, the chain head and every contract's
+ * free balance, plus the service fleet (each account a service sends from and its gas keys, all
+ * public on chain anyway).
  */
 export async function status(
   chain: ChainReader,
@@ -199,7 +240,7 @@ export async function status(
   opts: { oracleStaleSec: number; fetchImpl?: typeof fetch; /** Trends rotating out: stale on purpose. */ rotating?: ReadonlySet<string> },
   nowSec = Math.floor(Date.now() / 1000),
 ) {
-  const details = await serviceDetails(services, opts.fetchImpl);
+  const [details, contracts] = await Promise.all([serviceDetails(services, opts.fetchImpl), contractFunds(chain)]);
   let oracle: { ok: boolean; lastRunAgeSec: number | null; staleTrends: number } = { ok: false, lastRunAgeSec: null, staleTrends: 0 };
   let head: { ok: boolean; ageSec: number | null; height: number | null } = { ok: false, ageSec: null, height: null };
   try {
@@ -217,6 +258,15 @@ export async function status(
   const fleet = details.flatMap((s) =>
     s.wallets.map((w) => ({ service: s.name, label: w.label, account: w.account, balance: w.balance, gasKeys: w.gasKeys.map((k) => ({ publicKey: k.publicKey, balance: k.balance, nonces: k.nonces })) })),
   );
-  const ok = details.every((p) => p.ok) && oracle.ok && head.ok;
-  return { ok, network: chain.deployment.network, services: details.map((s) => ({ name: s.name, ok: s.ok, latencyMs: s.latencyMs, issue: publicIssue(s) })), oracle, chain: head, fleet, at: nowSec };
+  const ok = details.every((p) => p.ok) && oracle.ok && head.ok && contracts.every((c) => c.ok);
+  return {
+    ok,
+    network: chain.deployment.network,
+    services: details.map((s) => ({ name: s.name, ok: s.ok, latencyMs: s.latencyMs, issue: publicIssue(s), startedAt: s.startedAt })),
+    oracle,
+    chain: head,
+    contracts,
+    fleet,
+    at: nowSec,
+  };
 }

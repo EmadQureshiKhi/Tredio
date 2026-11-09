@@ -1,0 +1,19 @@
+diff --git a/dist/core/transaction.js b/dist/core/transaction.js
+index b54624686c27c50b9203b3cedf07a15c6b6a98c2..1612e2803911ae825c76fa42324d88fc24cfe2c5 100644
+--- a/dist/core/transaction.js
++++ b/dist/core/transaction.js
+@@ -1001,11 +1001,9 @@ export class TransactionBuilder {
+      * @internal
+      */
+     async fetchGasKeyNonce(publicKey, nonceIndex) {
+-        const result = await this.rpc.call("EXPERIMENTAL_view_gas_key_nonces", {
+-            finality: "optimistic",
+-            account_id: this.signerId,
+-            public_key: publicKey,
+-        });
++        // The standard `query` view, which every RPC serves; some (dRPC) refuse
++        // EXPERIMENTAL_view_gas_key_nonces with HTTP 400.
++        const result = await this.rpc.getGasKeyNonces(this.signerId, publicKey, { finality: "optimistic" });
+         const nonces = result?.nonces;
+         if (!Array.isArray(nonces) ||
+             !Number.isInteger(nonceIndex) ||

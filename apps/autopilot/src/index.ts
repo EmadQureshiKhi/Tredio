@@ -91,6 +91,7 @@ const seal = cfg.AUTOPILOT_SEAL_PRIVATE_KEY ? await sealPublicKey(cfg.AUTOPILOT_
 const server = Bun.serve({
   port: cfg.PORT,
   fetch: healthApp({
+    startedAt: Math.floor(Date.now() / 1000),
     status: () => executor.status,
     stats: (nowSec) => db.stats(nowSec),
     wallet: async () => (botWallet ? botWallet() : null),

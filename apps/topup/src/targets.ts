@@ -5,9 +5,12 @@
  *   `relayer=tredio-relayer.testnet@2/5`.
  * - NEAR in a gas key: `name=account/ed25519:<key>@min/target`; the treasury funds the key directly.
  * - Testnet USDC: `name=account@min/target` in USDC_TARGETS, minted by the USDC minter account.
+ * - A contract account's free NEAR (its balance above what its storage locks): every Tredio contract
+ *   in the deployment, at CONTRACT_FREE_NEAR's `min/target`. A contract whose state outgrows its
+ *   balance refuses every call that writes (LackBalanceForState), which stopped the registry once.
  */
 
-export type Kind = "near" | "gasKey" | "usdc";
+export type Kind = "near" | "gasKey" | "usdc" | "free";
 
 export interface Target {
   name: string;
@@ -42,6 +45,18 @@ export function parseTargets(value: string | undefined, kind: "near" | "usdc"): 
       if (t.target <= t.min) throw new Error(`target "${entry}": the target must be above the minimum`);
       return t;
     });
+}
+
+/** The free-balance targets for a deployment's own contracts (not an external token such as Circle's USDC). */
+export function contractTargets(contracts: Record<string, string>, root: string, minTarget: string): Target[] {
+  if (minTarget === "off") return [];
+  const m = /^([\d.]+)\/([\d.]+)$/.exec(minTarget);
+  if (!m) throw new Error(`bad CONTRACT_FREE_NEAR "${minTarget}" (min/target in NEAR, or off)`);
+  const [min, target] = [amount(m[1]!, NEAR), amount(m[2]!, NEAR)];
+  if (target <= min) throw new Error("CONTRACT_FREE_NEAR: the target must be above the minimum");
+  return Object.entries(contracts)
+    .filter(([, account]) => account.endsWith(`.${root}`))
+    .map(([role, account]) => ({ name: `${role}-free`, kind: "free" as const, account, publicKey: null, min, target }));
 }
 
 /** Decimal text of a raw amount (six decimals at most). */

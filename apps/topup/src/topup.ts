@@ -18,6 +18,8 @@ export interface Persist {
 }
 
 const unitOf = (t: Target) => (t.kind === "usdc" ? USDC : NEAR);
+/** yoctoNEAR per byte of account storage (the same on testnet and mainnet). */
+const STORAGE_PRICE = 10n ** 19n;
 /** Samples are kept at most every ten minutes, for two days. */
 const SAMPLE_MS = 600_000;
 
@@ -53,6 +55,11 @@ export class TopUp {
     try {
       if (t.kind === "near") return await this.viewer.balance(t.account);
       if (t.kind === "gasKey") return (await this.viewer.gasKey(t.account, t.publicKey!))?.balance ?? null;
+      if (t.kind === "free") {
+        const a = await this.viewer.rpc<{ amount: string; storage_usage: number }>("query", { request_type: "view_account", finality: "final", account_id: t.account });
+        const free = BigInt(a.amount) - BigInt(a.storage_usage) * STORAGE_PRICE;
+        return free > 0n ? free : 0n;
+      }
       return BigInt(await this.viewer.view<string>(this.d.contracts.usdc, "ft_balance_of", { account_id: t.account }));
     } catch {
       return null;
@@ -60,7 +67,7 @@ export class TopUp {
   }
 
   private async send(t: Target, amount: bigint): Promise<string | null> {
-    if (t.kind === "near") {
+    if (t.kind === "near" || t.kind === "free") {
       const o = await this.treasury.sendTx((tx) => tx.transfer(t.account, `${amount} yocto` as never));
       return o.transaction?.hash ?? null;
     }

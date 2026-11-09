@@ -7,6 +7,9 @@ import { Oracle } from "./oracle";
 import { OutLayerRunner } from "./outlayer";
 import { KeySigner } from "./signer";
 
+/** When this process started (unix seconds): the status page shows a recent restart. */
+const STARTED_AT = Math.floor(Date.now() / 1000);
+
 const cfg = loadConfig(process.env);
 const log = (fields: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ service: "oracle", msg, ...fields }));
 const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpc);
@@ -78,6 +81,7 @@ app.get("/health", async (c) => {
       ok,
       service: "oracle",
       network: cfg.NEAR_NETWORK,
+      startedAt: STARTED_AT,
       signer: signer ? { kind: signer.kind, publicKey: signer.publicKey } : { kind: "outlayer-tee", wasmHash: cfg.OUTLAYER_WASM_HASH, trustedKey: trusted?.tee_signer?.public_key ?? null },
       wallets: [wallet],
       alerts: funded ? {} : { balance: `below ${cfg.MIN_BALANCE_NEAR} NEAR` },

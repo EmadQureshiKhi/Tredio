@@ -12,12 +12,15 @@ import { quietLog } from "./helpers";
 
 const HL = "0x5e9ee1089755c3435139848e47e6635505d5a13a";
 
-function app() {
+function app(jwt: string | null = null) {
   const sent: QuoteRequest[] = [];
+  const keys: Array<string | undefined> = [];
   const oneClick = new OneClick({
+    jwt,
     fetchImpl: (async (_url: string, init?: RequestInit) => {
       const req = JSON.parse(String(init?.body)) as QuoteRequest;
       sent.push(req);
+      keys.push((init?.headers as Record<string, string>)["x-api-key"]);
       const quote = { amountIn: req.amount, amountInFormatted: "1", amountInUsd: "1", amountOut: "1", amountOutFormatted: "1", amountOutUsd: "1", minAmountOut: "1", timeEstimate: 30 };
       return new Response(JSON.stringify({ quote, quoteRequest: req, signature: "ed25519:x", timestamp: new Date(0).toISOString() }));
     }) as unknown as typeof fetch,
@@ -28,7 +31,7 @@ function app() {
   };
   const routes = depositRoutes({ sql: null as unknown as Sql, oneClick, network: "testnet", signedIn, log: quietLog, now: () => 0 });
   const quote = (body: unknown) => routes.request("/deposits/quote", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  return { sent, quote };
+  return { sent, keys, quote };
 }
 
 describe("deposit quotes on testnet", () => {
@@ -51,5 +54,28 @@ describe("deposit quotes on testnet", () => {
     const { sent, quote } = app();
     expect((await quote({ direction: "from-hyperliquid", amount: "2000000", hyperliquidAddress: "alice.near" })).status).toBe(400);
     expect(sent).toHaveLength(0);
+  });
+});
+
+describe("confidential quotes", () => {
+  const bodies = [
+    { direction: "deposit", asset: "nep141:eth.omft.near", amount: "5000000", refundTo: "0x5e9ee1089755c3435139848e47e6635505d5a13a" },
+    { direction: "withdraw", asset: "nep141:eth.omft.near", amount: "5000000", recipient: "0x5e9ee1089755c3435139848e47e6635505d5a13a" },
+    { direction: "hyperliquid", amount: "2000000", hyperliquidAddress: HL },
+    { direction: "from-hyperliquid", amount: "2000000", hyperliquidAddress: HL },
+  ];
+
+  test("with a partner JWT every direction asks for Confidential Intents and carries the key as X-API-Key", async () => {
+    const { sent, keys, quote } = app("partner-jwt");
+    for (const b of bodies) expect((await quote(b)).status).toBe(200);
+    expect(sent.map((r) => r.confidentiality)).toEqual(["basic", "basic", "basic", "basic"]);
+    expect(keys).toEqual(["partner-jwt", "partner-jwt", "partner-jwt", "partner-jwt"]);
+  });
+
+  test("without one, quotes go out public, since 1Click refuses confidential quotes without the JWT", async () => {
+    const { sent, keys, quote } = app();
+    for (const b of bodies) expect((await quote(b)).status).toBe(200);
+    expect(sent.map((r) => r.confidentiality)).toEqual([undefined, undefined, undefined, undefined]);
+    expect(keys).toEqual([undefined, undefined, undefined, undefined]);
   });
 });

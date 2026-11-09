@@ -5,6 +5,9 @@ import { loadConfig } from "./config";
 import type { TargetMemory } from "./plan";
 import { TopUp } from "./topup";
 
+/** When this process started (unix seconds): the status page shows a recent restart. */
+const STARTED_AT = Math.floor(Date.now() / 1000);
+
 const cfg = loadConfig(process.env);
 const log = (fields: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ service: "topup", msg, ...fields }));
 const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpc);
@@ -54,6 +57,7 @@ app.get("/health", async (c) => {
       ok,
       service: "topup",
       network: cfg.NEAR_NETWORK,
+      startedAt: STARTED_AT,
       dryRun: cfg.DRY_RUN === "on",
       ...r,
       wallets: [wallet],

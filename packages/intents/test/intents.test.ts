@@ -46,14 +46,14 @@ describe("OneClick client", () => {
     const client = new OneClick({
       jwt: "jwt-1",
       fetchImpl: async (url, init) => {
-        seen.push({ url, auth: (init?.headers as Record<string, string>).authorization });
+        seen.push({ url, auth: (init?.headers as Record<string, string>)["x-api-key"] });
         return new Response(JSON.stringify({ message: "amount is too low" }), { status: 400 });
       },
     });
     const err = await client.quote(depositRequest({ originAsset: "x", amount: "1", account: "a.near", refundTo: "b", dry: true })).catch((e) => e);
     expect(err).toBeInstanceOf(OneClickError);
     expect((err as OneClickError).message).toContain("amount is too low");
-    expect(seen[0]).toEqual({ url: "https://1click.chaindefuser.com/v0/quote", auth: "Bearer jwt-1" });
+    expect(seen[0]).toEqual({ url: "https://1click.chaindefuser.com/v0/quote", auth: "jwt-1" });
   });
 
   test("asks for confidentiality only with a partner JWT", async () => {

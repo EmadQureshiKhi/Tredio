@@ -39,7 +39,9 @@ export const freshMemory = (): TargetMemory => ({ lastTransfer: null, sent: [], 
  */
 export function plan(targets: readonly Target[], balances: ReadonlyMap<string, bigint | null>, memory: ReadonlyMap<string, TargetMemory>, nowMs: number, o: PlanOptions): Decision[] {
   const left = new Map<Target["kind"], bigint>();
-  const budget = (k: Target["kind"]) => left.get(k === "gasKey" ? "near" : k) ?? o.spendable(k);
+  // Gas keys and contracts' free balances are paid in NEAR, from the same budget as plain NEAR targets.
+  const pool = (k: Target["kind"]) => (k === "gasKey" || k === "free" ? "near" : k);
+  const budget = (k: Target["kind"]) => left.get(pool(k)) ?? o.spendable(k);
   return targets.map((t) => {
     const balance = balances.get(t.name);
     const m = memory.get(t.name) ?? freshMemory();
@@ -54,7 +56,7 @@ export function plan(targets: readonly Target[], balances: ReadonlyMap<string, b
     if (amount <= 0n) return { target: t, amount: 0n, skip: "daily cap reached" };
     const have = budget(t.kind);
     if (amount > have) return { target: t, amount: 0n, skip: "the treasury cannot afford it" };
-    left.set(t.kind === "gasKey" ? "near" : t.kind, have - amount);
+    left.set(pool(t.kind), have - amount);
     return { target: t, amount, skip: null };
   });
 }

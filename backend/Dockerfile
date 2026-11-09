@@ -3,6 +3,8 @@ FROM node:22-slim AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@10.7.0 --activate
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+# pnpm applies patches/ (a near-kit fix) while it installs.
+COPY patches ./patches
 COPY packages ./packages
 COPY backend ./backend
 RUN pnpm install --frozen-lockfile --prod --filter @tredio/backend...

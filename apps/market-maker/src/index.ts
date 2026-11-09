@@ -4,6 +4,9 @@ import { Hono } from "hono";
 import { loadConfig } from "./config";
 import { Engine, type EngineState } from "./engine";
 
+/** When this process started (unix seconds): the status page shows a recent restart. */
+const STARTED_AT = Math.floor(Date.now() / 1000);
+
 const cfg = loadConfig(process.env);
 const log = (fields: Record<string, unknown>, msg: string) => console.log(JSON.stringify({ service: "market-maker", msg, ...fields }));
 const viewer = new Viewer(cfg.NEAR_NETWORK, cfg.rpc);
@@ -65,6 +68,7 @@ app.get("/health", async (c) => {
       ok,
       service: "market-maker",
       network: cfg.NEAR_NETWORK,
+      startedAt: STARTED_AT,
       wallets: [wallet],
       alerts: funded ? {} : { balance: `below ${cfg.MIN_BALANCE_NEAR} NEAR` },
       lastError: engine.lastError,

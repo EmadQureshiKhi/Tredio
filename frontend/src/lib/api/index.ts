@@ -403,10 +403,12 @@ export interface FleetWallet {
 export interface SystemStatus {
   ok: boolean;
   network: "testnet" | "mainnet";
-  /** `issue`: why a down service is down, in a few words ("not answering", "balance below 1 NEAR"). */
-  services: Array<{ name: string; ok: boolean; latencyMs: number | null; issue?: string | null }>;
+  /** `issue`: why a down service is down, in a few words ("not answering", "balance below 1 NEAR"); `startedAt`: when its process started (unix seconds). */
+  services: Array<{ name: string; ok: boolean; latencyMs: number | null; issue?: string | null; startedAt?: number | null }>;
   oracle: { ok: boolean; lastRunAgeSec: number | null; staleTrends: number };
   chain: { ok: boolean; ageSec: number | null; height: number | null };
+  /** Each Tredio contract's NEAR above its storage: a contract that cannot pay for new state refuses every write. */
+  contracts?: Array<{ role: string; account: string; freeNear: string | null; ok: boolean; low: boolean }>;
   fleet: FleetWallet[];
   at: number;
 }
