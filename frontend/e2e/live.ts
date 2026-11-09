@@ -131,6 +131,20 @@ export async function withIdentity(page: Page, ready: Locator) {
   await expect(ready).toBeVisible();
 }
 
+/**
+ * The trend the market specs trade: E2E_TREND, else the live trend with the most room below the index
+ * cap, read from the API (E2E_API_URL, the local one by default). Live trends change as the radar
+ * rotates them, and a series opened at the cap of 100 can never pay Up, so a fixed name goes stale.
+ */
+export async function liveTrend(): Promise<string> {
+  if (process.env.E2E_TREND) return process.env.E2E_TREND;
+  const res = await fetch(`${process.env.E2E_API_URL ?? "http://localhost:4000"}/v1/trends`);
+  const { trends } = (await res.json()) as { trends: Array<{ identifier: string; status: string; index: number }> };
+  const pick = trends.filter((t) => t.status === "active" && t.index < 95).sort((a, b) => a.index - b.index)[0];
+  if (!pick) throw new Error("no live trend below 95 points to trade; set E2E_TREND");
+  return pick.identifier;
+}
+
 /** Test USDC through the session, unless the faucet's cooldown says this account drew it already. */
 export async function fundWithFaucet(page: Page) {
   await page.goto("/portfolio");

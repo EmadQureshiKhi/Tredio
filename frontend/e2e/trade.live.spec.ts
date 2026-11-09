@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "@playwright/test";
-import { expect, fundWithFaucet, landed, LIVE, passkeyUses, test } from "./live";
+import { expect, fundWithFaucet, landed, LIVE, liveTrend, passkeyUses, test } from "./live";
 
 /**
  * Trading on the live Testnet stack with the worker's passkey account: test USDC from the faucet,
@@ -10,13 +10,16 @@ import { expect, fundWithFaucet, landed, LIVE, passkeyUses, test } from "./live"
  * prompt, then the portfolio holding both. Then the same passkey on a second device finds the
  * account again (its key recovered from one signature) and opens a session there.
  *
- * E2E_TREND picks the trend (default topic:world-cup); it must be live, with a fresh index and a
+ * E2E_TREND picks the trend (by default `liveTrend()`); it must be live, with a fresh index and a
  * quoted book, or the contracts refuse the trades (the spec then reports their reason).
  */
 
 test.skip(!LIVE, "live Testnet spec: run with playwright.live.config.ts");
 
-const TREND = process.env.E2E_TREND ?? "topic:world-cup";
+let TREND = "";
+test.beforeAll(async () => {
+  TREND = await liveTrend();
+});
 
 test("test USDC, an Up/Down buy and an attention perp, with no passkey prompt, then the portfolio", async ({ live, account }) => {
   const { page } = live;

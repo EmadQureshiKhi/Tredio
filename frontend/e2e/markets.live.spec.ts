@@ -1,4 +1,4 @@
-import { expect, fundWithFaucet, landed, LIVE, passkeyUses, test } from "./live";
+import { expect, fundWithFaucet, landed, LIVE, liveTrend, passkeyUses, test } from "./live";
 
 /**
  * The market flows beyond a first trade, on the live Testnet stack with the worker's passkey
@@ -8,15 +8,16 @@ import { expect, fundWithFaucet, landed, LIVE, passkeyUses, test } from "./live"
  * margin, coin trades, withdrawals) take exactly one passkey prompt each and go through the relayer,
  * whose answer carries the receipts the app reads (the order id, or a refusal).
  *
- * E2E_TREND picks the trend (default topic:world-cup): live, with a fresh index, a quoted book and a
- * launched coin.
+ * E2E_TREND picks the trend (by default `liveTrend()`: the live trend with the most room below the
+ * index cap); the keeper gives every live trend a quoted series and a coin.
  */
 
 test.skip(!LIVE, "live Testnet spec: run with playwright.live.config.ts");
 
-const TREND = process.env.E2E_TREND ?? "topic:world-cup";
+let TREND = "";
 
 test.beforeAll(async ({ live, account }) => {
+  TREND = await liveTrend();
   // Signing in on a fresh worker and drawing USDC wait on testnet RPC, which a shared address can slow down.
   test.setTimeout(600_000);
   expect(account).toMatch(/^0u[0-9a-z]+$/);
