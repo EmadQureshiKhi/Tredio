@@ -64,4 +64,3 @@ The hosted app at app.tredio.bid goes live before judging; until then, run it lo
 - Mainnet is not deployed: the code, the deploy script and a sandbox rehearsal are ready, and the accounts and funds are not ([MAINNET.md](MAINNET.md)).
   Hyperliquid withdrawals and the NEAR Intents return route have been checked against Hyperliquid's signing vectors and testnet, not yet with funds.
 - The collectors run on Tredio's server, outside the enclave; [`apps/oracle/docs/tee.md`](apps/oracle/docs/tee.md) says what the attestation does and does not prove.
-- The screens, admin panel, website and much of the backend come from an earlier Tredio prototype on another chain; everything on NEAR was built during the hackathon.

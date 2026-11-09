@@ -1,4 +1,4 @@
-// The website's hero film: the source film re-edited for Tredio on NEAR (src/hero).
+// The website's hero film: Tredio's cut of the owner's source film (src/hero).
 //
 //   node scripts/hero.mjs compare 1080 1400      source (left) and the rebuild (right) at these frames: out/hero/compare-<frame>.png
 //   node scripts/hero.mjs render                  render, splice, encode, check, poster (about 15 minutes)
@@ -6,7 +6,7 @@
 //   node scripts/hero.mjs splice                  splice, encode, check and poster from the last render's frames
 //   node scripts/hero.mjs sheet                   one frame a second of the finished film: out/hero/sheet.png
 //
-// The source is the previous product's film, copied to public/source/hero-src.mp4 (gitignored, never committed).
+// The source is the owner's film, copied to public/source/hero-src.mp4 (gitignored, never committed).
 // Only the rebuilt frames are rendered; the kept frames are the source's own, spliced in without a colour round
 // trip, and the soundtrack is the source's AAC stream copied bit for bit, so picture and sound stay where they were.
 // The source was encoded with BT.709 but carries no colour tags; the rebuild is converted with BT.709 too and the

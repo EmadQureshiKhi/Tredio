@@ -15,7 +15,7 @@ A reading older than its source's `maxAgeSec` is ignored, so a stalled collector
 | GDELT | News articles worldwide matching the keywords over the last day | Keyless |
 | Bluesky | Posts matching any keyword over the last 24 hours | Keyless public AppView |
 | Hacker News | Stories and comments mentioning a keyword over the last 24 hours | A boost, see below |
-| Wikipedia | Human views of the trend's article over the last complete UTC day | A slow-moving baseline |
+| Wikipedia | Human views of the trend's article over the last complete UTC day | A slow-moving reference level |
 | Nansen (crypto only) | Net smart-money flow in USD over 24 hours | Shapes the index and gates new crypto trends |
 
 ## From measurement to a component in [0, 1]

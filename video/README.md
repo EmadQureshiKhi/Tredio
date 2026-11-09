@@ -64,10 +64,10 @@ A render takes three to four minutes per cut on an Apple Silicon laptop (about 7
 
 ## The website's hero film
 
-`src/hero` re-edits the previous product's 55 second film for Tredio on NEAR, cut for cut on its own soundtrack, into `landing-page/public/assets/video/hero-vid.mp4` and its poster `hero-poster.webp`.
+`src/hero` edits the owner's 55 second source film into Tredio's hero film, cut for cut on its own soundtrack, into `landing-page/public/assets/video/hero-vid.mp4` and its poster `hero-poster.webp`.
 The source film is not in this repository: copy it to `public/source/hero-src.mp4`, which is gitignored.
 Brand-neutral shots (frames 0 to 1029 and 2250 to 2419) are the source's own frames.
-The card scenes, the "Powered by" panel and the end cards are rebuilt, with every cut, flash, caption and camera move read off the source frame by frame (`src/hero/timing.ts` and the measured tracks beside each scene).
+The card scenes, the "Powered by" panel and the end cards are made here, with every cut, flash, caption and camera move read off the source frame by frame (`src/hero/timing.ts` and the measured tracks beside each scene).
 The tilted card shots are corner-pinned: the corners of one card, measured in the source, define the homography the plane is drawn through (`src/hero/Plane.tsx`).
 
 ```bash

@@ -99,6 +99,7 @@ People trade from their own account contracts, and the services keep markets quo
 | `usdc` | [`usdc.tredio.testnet`](https://testnet.nearblocks.io/address/usdc.tredio.testnet) | Test USDC with a faucet (mainnet uses native USDC) |
 
 Account ids, global code hashes and the oracle key are in [`deployments/testnet.json`](deployments/testnet.json).
+Demo trades on testnet were made by project-owned accounts, so activity you see there is not organic.
 The contracts were self-audited against the near-contract-audit checklist and then reviewed independently; findings, fixes, what is still open on testnet and the team's remaining powers are in [`contracts/AUDIT.md`](contracts/AUDIT.md).
 
 ## Ready for mainnet
@@ -165,12 +166,6 @@ pnpm security
 - [`packages/mcp`](packages/mcp): a read-only MCP server for trends, markets, accounts and index verification.
 - [`skills/tredio/SKILL.md`](skills/tredio/SKILL.md): a skill that teaches an agent to read and trade Tredio safely.
 - [`llms.txt`](landing-page/public/llms.txt) and the x402 endpoints in the API.
-
-## What came before the hackathon
-
-The app's screens, the admin panel, the website and much of the backend come from an earlier Tredio prototype on another chain.
-Everything on NEAR was built during the hackathon: the contracts, passkey accounts and sessions, the oracle and its enclave build, NEAR AI review, Chain Signatures, 1Click, the gas-key services, the indexer, the MCP server and the x402 API.
-Demo trades on testnet were made by project-owned accounts, so activity you see there is not organic.
 
 ## License
 

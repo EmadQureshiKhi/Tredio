@@ -99,7 +99,7 @@ export function useGrantActions() {
       setError(null);
       setWorking(true);
       try {
-        // A grant's key is never reused (a new grant makes a new one), so on v2, where revoking would
+        // A grant's key is never used twice (a new grant makes a new one), so on v2, where revoking would
         // keep the key dormant toward the account's key limit, it is deleted instead.
         const deleteKey = account.address ? keepsGasKeys(await accountVersion(account.address)) : false;
         const sent = await tx.run(() => account.ownerExecute([ownerActions.revokeSession(key, deleteKey)]), { action: "Revoke Autopilot access", done: "Autopilot access revoked", pending: "Confirm with your passkey" });

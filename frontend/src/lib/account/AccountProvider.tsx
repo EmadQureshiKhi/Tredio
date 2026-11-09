@@ -126,12 +126,12 @@ export default function AccountProvider({ children }: { children: React.ReactNod
    */
   const connectBackend = useCallback(
     async (active: ActiveAccount, opts: { fresh?: boolean; prompt?: boolean } = {}): Promise<string | null> => {
-      const reuse = opts.fresh ? null : storedToken(active);
-      if (!reuse && active.kind === "wallet" && !opts.prompt) {
+      const storedSession = opts.fresh ? null : storedToken(active);
+      if (!storedSession && active.kind === "wallet" && !opts.prompt) {
         setBackendReady(false);
         return null;
       }
-      let token = reuse;
+      let token = storedSession;
       for (let attempt = 0; !token; attempt++) {
         try {
           const issuedAt = Math.floor(Date.now() / 1000);

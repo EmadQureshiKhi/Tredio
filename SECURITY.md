@@ -14,7 +14,7 @@ Results from 2026-11-07, on the code deployed on NEAR testnet under `tredio.test
 | Deployed code is this source | Reproducible builds in SourceScan's Docker image (NEP-330), `near contract verify`, `pnpm verify` | 10 of 10 match byte for byte: the 8 contracts are reproducible builds of commit `d976aea`, ready for NearBlocks verification once it is public; the global coin and account code match the local build |
 | NEAR rules | `pnpm security` | 6 of 6 hold: overflow checks, no `unsafe`, 30 of 30 callbacks private, 6 of 6 token receivers check their token, no `signer_account_id`, no joint promise returned |
 | Static analysis | Clippy's security lints on the wasm32 build | 0 panics; every truncating cast, unwrap and slice index reviewed (below) |
-| Static analysis built for NEAR | BlockSec's Rustle, every detector, ported to LLVM 22 ([contracts/RUSTLE.md](contracts/RUSTLE.md)) | 0 high, 0 medium; 2 low findings, both fixed and gone on a second run; the rest triaged as false positives or by design |
+| Static analysis built for NEAR | BlockSec's Rustle, every detector, adapted to LLVM 22 ([contracts/RUSTLE.md](contracts/RUSTLE.md)) | 0 high, 0 medium; 2 low findings, both fixed and gone on a second run; the rest triaged as false positives or by design |
 | Dependencies of the deployed wasm | `cargo deny` with [contracts/deny.toml](contracts/deny.toml) | advisories ok, bans ok, sources ok |
 | Every dependency, tests included | `cargo audit` (RustSec, 1,422 advisories) | 436 crates: 3 advisories, none in a way that touches the deployed contracts (below) |
 | Oracle enclave dependencies | `cargo audit` on `apps/oracle/tee` | 87 crates, no advisories |
@@ -125,7 +125,7 @@ No caller can reach that: every string it encodes is a constant (`"Gtc"`, `"orde
 ## Rustle
 
 [BlockSec's Rustle](https://github.com/blocksecteam/rustle) is the static analyzer built for NEAR contracts: about thirty detectors for unhandled promises, missing `#[private]`, reentrancy, unchecked math, missing one-yocto deposits, rounding, storage and NEP interfaces.
-Its last release targets Rust 1.67 and LLVM 15, which cannot build near-sdk 5, so it was ported to LLVM 22 (the LLVM of rustc 1.98.1) and to near-sdk 5's code shapes, and checked against its own 30 examples before it ran here.
+Its last release targets Rust 1.67 and LLVM 15, which cannot build near-sdk 5, so it was adapted to LLVM 22 (the LLVM of rustc 1.98.1) and to near-sdk 5's code shapes, and checked against its own 30 examples before it ran here.
 It found nothing at high or medium severity.
 Its two true findings, both low, are fixed: owner-only setters now require one attached yoctoNEAR (so only a full-access key can call them), and the liquidation index multiplies before it divides.
 [contracts/RUSTLE.md](contracts/RUSTLE.md) has the port, the counts per detector and contract, and a triage of every finding with file and line.

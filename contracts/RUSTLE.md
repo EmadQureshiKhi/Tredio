@@ -1,7 +1,7 @@
 # Rustle static analysis
 
 This records a run of BlockSec's Rustle, the static analyzer for NEAR contracts, over every crate in this workspace, and the triage of everything it reported.
-Rustle targets Rust 1.67 and LLVM 15, so it was first ported to LLVM 22 (the LLVM of rustc 1.98.1); the ported copy lives outside this repository.
+Rustle targets Rust 1.67 and LLVM 15, so it was first adapted to LLVM 22 (the LLVM of rustc 1.98.1); the adapted copy lives outside this repository.
 Analysed revision: `cb5226a` (2026-11-07), all detectors (`-d all`), one run per crate: `common`, `registry`, `usdc`, `curation`, `outcomes`, `book`, `perps`, `coin`, `coins`, `account`, `accounts` (the test crates are skipped).
 Result: no high or medium issue.
 Two items were true but low: owner-only setters did not require a one-yocto deposit, and one view rounded a quotient before multiplying (negligible).
@@ -20,7 +20,7 @@ Everything else is a false positive or by design, as triaged below, in line with
 
 ## How to reproduce
 
-The image (Dockerfile next to the ported Rustle):
+The image (Dockerfile next to the adapted Rustle):
 
 ```dockerfile
 FROM ubuntu:24.04
@@ -36,7 +36,7 @@ RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile min
 ENV PATH=/opt/venv/bin:/opt/cargo/bin:/usr/lib/llvm-22/bin:$PATH
 ```
 
-The run, from `contracts/` (the sources are mounted read-only; `RUSTLE` is the ported copy, `OUT` and `TARGET` are scratch directories):
+The run, from `contracts/` (the sources are mounted read-only; `RUSTLE` is the adapted copy, `OUT` and `TARGET` are scratch directories):
 
 ```bash
 docker build --platform linux/arm64 -t rustle-llvm22 <directory with the Dockerfile>
@@ -62,7 +62,7 @@ The counts below are taken from the `summary.csv` files.
 - Working, nothing to report here: `unhandled-promise`, `unsafe-math` (every operation is overflow-checked), `self-transfer` (both tokens delegate to near-contract-standards), `round` (no floats), `tautology`, `dup-collection-id` (every collection has its own `BorshStorageKey` variant).
 - Runs but cannot fire on near-sdk 5 code: `reentrancy` matches near-sdk 4's `PromiseResult::Successful` switch with the state write in the same function, while near-sdk 5 callbacks get a `Result` from `promise_result_checked` in the generated wrapper; `unsaved-changes` matches legacy `near_sdk::collections`, whose `get` returns a copy, while this code uses `near_sdk::store`, whose `get_mut` writes back.
 - Not applicable: `nft-approval-check` and `nft-owner-check` (no NEP-171 code).
-- Not part of `all`: `nep-interface` (ported and working) and `struct-member` (ported, but it matches typed struct pointers, which LLVM 22 IR no longer has).
+- Not part of `all`: `nep-interface` (adapted and working) and `struct-member` (adapted, but it matches typed struct pointers, which LLVM 22 IR no longer has).
 
 ## Findings per detector and contract
 

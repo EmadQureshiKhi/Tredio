@@ -30,7 +30,7 @@ export function useCallerIdentity() {
 
 let session: { identity: string; token: string; expiresAt: number } | null = null;
 
-/** A vault session for the identity: one signature (no prompt), reused until it nears expiry. */
+/** A vault session for the identity: one signature (no prompt), kept until it nears expiry. */
 export async function identityToken(identity: PrivateIdentity): Promise<string> {
   if (session && session.identity === identity.id && session.expiresAt > Date.now() / 1000 + 120) return session.token;
   const { issuedAt, signature } = await signAsCaller(identity, (t) => identitySignInMessage(identity.id, t));

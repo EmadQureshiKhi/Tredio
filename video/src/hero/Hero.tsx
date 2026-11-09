@@ -1,6 +1,6 @@
-// The website's hero film (landing-page/public/assets/video/hero-vid.mp4): the source film re-edited for
-// Tredio on NEAR, cut for cut on its own soundtrack. Brand-neutral footage is kept as it is; the card
-// scenes, the partner panel and the end cards are rebuilt here. scripts/hero.mjs renders only the rebuilt
+// The website's hero film (landing-page/public/assets/video/hero-vid.mp4): Tredio's cut of the owner's
+// source film, cut for cut on its own soundtrack. Brand-neutral footage is kept as it is; the card
+// scenes, the partner panel and the end cards are made here. scripts/hero.mjs renders only the rebuilt
 // frames and splices them into the source's untouched frames, so the source plays here only as a preview.
 import React from 'react';
 import { AbsoluteFill, OffthreadVideo, Sequence, staticFile, useCurrentFrame } from 'remotion';

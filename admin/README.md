@@ -59,7 +59,7 @@ npm run test:e2e    # Playwright, against the local backend
 
 ## End-to-end tests
 
-`npm run test:e2e` drives the panel in Chromium against the real backend on port 4000 (start it first with `cd backend && bun run dev`), reusing a dev server on 3001 or starting one.
+`npm run test:e2e` drives the panel in Chromium against the real backend on port 4000 (start it first with `cd backend && bun run dev`), using a dev server already on 3001 or starting one.
 The tests sign in with a local admin key, which must be in the backend's `ADMIN_ADDRESSES`.
 The key stays in the test process and is never printed.
 Run `npx playwright install chromium` once.

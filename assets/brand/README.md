@@ -1,7 +1,7 @@
 # Tredio brand
 
 The logo is a brush-stroke T: a crossbar with a waving top edge and a stem that tapers to a foot.
-The wordmark is TREDIO in capitals: that T, then REDIO outlined from Arial Bold at the T's cap height with the font's own spacing, on one baseline.
+The wordmark is TREDIO in capitals: that T, then REDIO outlined from Arial Bold at the T's cap height with the font's own spacing, on one base line.
 The lockup is the wordmark with the T in the glyph colour; the glyph alone is the T.
 `tools/make_brand_marks.py` draws every SVG here (and the path data the apps draw inline), so the marks never drift apart.
 

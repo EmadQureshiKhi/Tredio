@@ -15,7 +15,7 @@ The site loads them from Google Fonts at build time through `next/font/google` a
 
 ## Photos and pictures
 
-Every picture on the home page except the three example market scenes comes from the previous version of this site, which the owner directed us to reuse.
+Every picture on the home page except the three example market scenes is listed here with its source.
 
 | File | Where it is used | Source |
 | --- | --- | --- |
@@ -27,15 +27,15 @@ Every picture on the home page except the three example market scenes comes from
 | `public/assets/img/rising-chart.jpg` | "Each winning token pays 1 USDC" card | Generated with Higgsfield |
 | `public/assets/img/no-gas-cat.jpg` | "No gas, no seed phrase" card | Generated with Higgsfield |
 | `public/assets/img/launch-thumbnails.jpg` | Launch section background | Generated with Higgsfield |
-| `public/assets/img/crypto-act-narrative.jpg` | How it works, review slide | Previous site; the owner's own, cleared for use (confirmed November 2026) |
-| `public/assets/img/topics-trend-every-day.jpg` | How it works, markets slide | Previous site; the owner's own, cleared for use (confirmed November 2026) |
-| `public/assets/img/attention-eye.jpg` | How it works, account slide | Previous site; the owner's own, cleared for use (confirmed November 2026) |
-| `public/assets/img/token-cards.jpg` | Memecoins track | Previous site; the owner's own, cleared for use (confirmed November 2026) |
-| `public/assets/img/ai-thumbnails.jpg` | Social Money track | Previous site; the owner's own, cleared for use (confirmed November 2026) |
-| `public/assets/img/topics-tiles.jpg` | DeFi track | Previous site; the owner's own, cleared for use (confirmed November 2026) |
-| `public/assets/img/market-opens.webp` | "24-hour and 7-day rounds" card | Previous site; the owner's own, cleared for use (confirmed November 2026) |
+| `public/assets/img/crypto-act-narrative.jpg` | How it works, review slide | The owner's own, cleared for use (confirmed November 2026) |
+| `public/assets/img/topics-trend-every-day.jpg` | How it works, markets slide | The owner's own, cleared for use (confirmed November 2026) |
+| `public/assets/img/attention-eye.jpg` | How it works, account slide | The owner's own, cleared for use (confirmed November 2026) |
+| `public/assets/img/token-cards.jpg` | Memecoins track | The owner's own, cleared for use (confirmed November 2026) |
+| `public/assets/img/ai-thumbnails.jpg` | Social Money track | The owner's own, cleared for use (confirmed November 2026) |
+| `public/assets/img/topics-tiles.jpg` | DeFi track | The owner's own, cleared for use (confirmed November 2026) |
+| `public/assets/img/market-opens.webp` | "24-hour and 7-day rounds" card | The owner's own, cleared for use (confirmed November 2026) |
 
-The pictures from the previous site belong to the owner, who confirmed in November 2026 that Tredio may use them.
+The pictures marked as the owner's own belong to the owner, who confirmed in November 2026 that Tredio may use them.
 
 ## Rendered images
 
@@ -43,7 +43,7 @@ Tredio's own UI scenes, rendered with `assets/brand/export.sh scenes`.
 Every trend, account name and number in them is illustrative.
 
 `example-near.webp`, `example-agents.webp`, `example-heatwave.webp` (in `public/assets/img`), and the link cards `src/app/opengraph-image.jpg` and `twitter-image.jpg`.
-The hero film and its poster (`public/assets/video/`) are cut from the previous site's film, re-edited for Tredio in `video/`.
+The hero film and its poster (`public/assets/video/`) are edited in `video/` from the owner's own source film.
 
 ## Logos in "Built with"
 

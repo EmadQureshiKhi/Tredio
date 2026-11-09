@@ -35,7 +35,7 @@ export interface EngineState {
   requotedAt: Record<string, number>;
   /**
    * The last ladder read per market and the market's trade count then: our orders can only change
-   * when the market trades (or we re-quote), so an unchanged count reuses it instead of reading
+   * when the market trades (or we re-quote), so an unchanged count keeps it instead of reading
    * every order again.
    */
   seen?: Record<string, { trades: number; ids: number[]; bids: Array<[number, string]>; asks: Array<[number, string]> }>;

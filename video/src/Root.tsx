@@ -17,7 +17,7 @@ export function Root() {
       <Composition id="Vertical" component={Film} durationInFrames={timeline.frames} fps={timeline.fps} width={1080} height={1350} defaultProps={{ mute: false }} />
       <Still id="Poster" component={() => <Film mute poster />} width={1920} height={1080} />
       <Still id="PosterVertical" component={() => <Film mute poster />} width={1080} height={1350} />
-      {/* The website's hero film: the previous film re-edited for Tredio (src/hero, rendered by scripts/hero.mjs). */}
+      {/* The website's hero film: Tredio's cut of the owner's source film (src/hero, rendered by scripts/hero.mjs). */}
       <Composition id="Hero" component={Hero} durationInFrames={FRAMES} fps={FPS} width={1920} height={1080} defaultProps={{ preview: true }} />
     </>
   );

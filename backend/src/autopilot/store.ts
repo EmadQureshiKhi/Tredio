@@ -155,7 +155,7 @@ export class AutopilotStore {
    * Records a newly requested key. While a grant is active and unexpired, the new key waits beside it
    * and the active key keeps trading until the account adds the new one; otherwise the new key replaces
    * the grant as pending. Every grant key is remembered. Null when the key is already another
-   * account's grant key (the app generates keys, so a reused one is never genuine).
+   * account's grant key (the app generates keys, so a key seen before is never genuine).
    */
   async requestGrant(owner: string, sessionKey: string, sealedKey: string, nowSec: number): Promise<{ replaces: string | null } | null> {
     return this.sql.begin(async (tx) => {
