@@ -100,6 +100,9 @@ function SeriesBody({ trend, series: s, initialSide }: { trend: Trend; series: S
           </span>
         </div>
       </div>
+      {s.outcome === "open" && !expired && s.openingIndex >= 100 ? (
+        <Note tone="warn">This series opened at the index&rsquo;s cap of 100, so Up cannot win (a tie goes to Down) and the market maker does not quote it. A new series opens once the index is below 100.</Note>
+      ) : null}
       {s.outcome !== "open" ? (
         <Settled series={s} up={up} down={down} />
       ) : expired ? (
@@ -322,7 +325,7 @@ function Trade({ trend, series: s, up, down, fresh, initialSide, onFilled, onFin
         )}
         {kind === "market" ? (
           // The session's anchor is one-sided: a buy never pays more than 0.10 above the implied price, a sell never takes less than 0.10 below it.
-          <Row label={buy ? "Pays at most" : "Sells for at least"} value={fair !== null ? `${cents(anchor / 1000)} per ${sideName}` : buy ? "0.10 above the implied price" : "0.10 below the implied price"} tone="muted" />
+          <Row label={buy ? "You pay at most" : "You receive at least"} value={fair !== null ? `${cents(anchor / 1000)} per ${sideName}` : buy ? "0.10 above the implied price" : "0.10 below the implied price"} tone="muted" />
         ) : null}
         <Row label={kind === "market" ? "Fee and slippage limit" : "Taker fee if it crosses"} value={kind === "market" ? `${Number(TAKER_FEE_BPS) / 100}% · 1%` : `${Number(TAKER_FEE_BPS) / 100}%`} tone="muted" />
       </div>
