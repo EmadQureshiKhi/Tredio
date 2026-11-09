@@ -3,6 +3,9 @@ import { base58Decode, type PasskeyAssertion, returnValue, type Sender, TxError,
 import { type ActivationTicket, activationTicketMessage, calls, type Deployment, type OwnerRequest, requestChallenge } from "@tredio/contracts";
 import { decodeSignedDelegateAction } from "near-kit";
 
+/** A view that failed because the account is not a Tredio account (no such account, no code, no such method), not because the RPC did. */
+const notAnAccount = (e: unknown) => /UNKNOWN_ACCOUNT|does not exist|CodeDoesNotExist|NoContractCode|MethodNotFound|MethodResolveError|CONTRACT_EXECUTION_ERROR/.test(String((e as Error)?.message ?? e));
+
 /**
  * What the relayer pays for, each checked before a transaction goes out:
  *
@@ -192,10 +195,18 @@ export class Relayer {
     let ownerKey: string;
     try {
       ownerKey = await this.d.viewer.view<string>(account, "owner_key");
-    } catch {
-      return null;
+    } catch (e) {
+      // An account that does not exist or runs other code is not Tredio's; a failed read (a rate limit,
+      // an outage) says nothing about the account, so the caller is told to try again, not refused.
+      if (notAnAccount(e)) return null;
+      throw new RelayError("could not read the account on chain; try again", 503);
     }
-    const derived = await this.d.viewer.view<string>(this.d.deployment.contracts.accounts, "account_id_of", { owner_key: ownerKey }).catch(() => null);
+    let derived: string;
+    try {
+      derived = await this.d.viewer.view<string>(this.d.deployment.contracts.accounts, "account_id_of", { owner_key: ownerKey });
+    } catch {
+      throw new RelayError("could not read the accounts factory; try again", 503);
+    }
     return derived === account ? ownerKey : null;
   }
 
