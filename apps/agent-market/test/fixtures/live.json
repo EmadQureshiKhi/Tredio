@@ -1,0 +1,1287 @@
+{
+ "capturedAt": 1794248992,
+ "registry": {
+  "trend": {
+   "id": "topic:godzilla-minus-zero.2",
+   "asset_class": "topic",
+   "status": "active",
+   "created_at": 1794247547,
+   "updated_at": 1794248794,
+   "index": 99880000,
+   "peak_index": 99880000,
+   "below_floor_since": 0,
+   "status_since": 1794247547,
+   "surfacer": null,
+   "review_hash": "5133101e64f60150c5ecdb0f4d1dd84afbdf984b92cc1caf4786f63c621cd2b7",
+   "asset": null,
+   "fresh": true
+  },
+  "history": [
+   {
+    "at": 1794247547,
+    "index": 99880000
+   },
+   {
+    "at": 1794247997,
+    "index": 99880000
+   },
+   {
+    "at": 1794248434,
+    "index": 99880000
+   },
+   {
+    "at": 1794248794,
+    "index": 99880000
+   }
+  ]
+ },
+ "detail": {
+  "trend": {
+   "id": "topic:godzilla-minus-zero.2",
+   "identifier": "topic:godzilla-minus-zero.2",
+   "displayName": "Godzilla Minus Zero",
+   "summary": "Godzilla Minus Zero, sequel to Minus One, opens in theaters as fans buy IMAX and 4DX tickets.",
+   "assetClass": "topic",
+   "status": "active",
+   "index": 99.88,
+   "peakIndex": 99.88,
+   "createdAt": 1794247547,
+   "updatedAt": 1794248794,
+   "surfacer": "",
+   "reviewHash": "5133101e64f60150c5ecdb0f4d1dd84afbdf984b92cc1caf4786f63c621cd2b7",
+   "asset": null,
+   "keywords": [
+    "Godzilla Minus Zero",
+    "Godzilla"
+   ],
+   "article": "Godzilla_Minus_Zero",
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": {
+     "value": 19,
+     "windowSec": 86400,
+     "observedAt": 1794096250
+    },
+    "nansen": null,
+    "wikipedia": {
+     "value": 145122,
+     "windowSec": 86400,
+     "observedAt": 1794239019
+    },
+    "bluesky": {
+     "value": 2901,
+     "windowSec": 86400,
+     "observedAt": 1794248055
+    },
+    "hn": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794246279
+    }
+   },
+   "rotatingOut": false
+  },
+  "index": [
+   {
+    "t": 1794247547,
+    "v": 99.88
+   },
+   {
+    "t": 1794247997,
+    "v": 99.88
+   },
+   {
+    "t": 1794248434,
+    "v": 99.88
+   },
+   {
+    "t": 1794248794,
+    "v": 99.88
+   }
+  ],
+  "history": [
+   {
+    "source": "bluesky",
+    "value": 3003,
+    "observedAt": 1794242619
+   },
+   {
+    "source": "hn",
+    "value": 0,
+    "observedAt": 1794242679
+   },
+   {
+    "source": "bluesky",
+    "value": 2982,
+    "observedAt": 1794244419
+   },
+   {
+    "source": "bluesky",
+    "value": 2949,
+    "observedAt": 1794246219
+   },
+   {
+    "source": "hn",
+    "value": 0,
+    "observedAt": 1794246279
+   },
+   {
+    "source": "bluesky",
+    "value": 2901,
+    "observedAt": 1794248055
+   }
+  ],
+  "relistedAs": null
+ },
+ "trends": [
+  {
+   "id": "topic:e2e-to1kbk",
+   "identifier": "topic:e2e-to1kbk",
+   "displayName": null,
+   "summary": null,
+   "assetClass": "topic",
+   "status": "retired",
+   "index": 0.01,
+   "peakIndex": 55,
+   "createdAt": 1793902898,
+   "updatedAt": 1793935879,
+   "surfacer": "0ugt5v5y5rdhyhndtyhrwrkp5rxrmxhpfbrcx9ets3g94pjsdjt330",
+   "reviewHash": null,
+   "asset": null,
+   "keywords": [],
+   "article": null,
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": null,
+    "nansen": null,
+    "wikipedia": null,
+    "bluesky": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1793935253
+    },
+    "hn": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1793935193
+    }
+   },
+   "change24h": null,
+   "spark": [],
+   "rotatingOut": false
+  },
+  {
+   "id": "topic:world-cup",
+   "identifier": "topic:world-cup",
+   "displayName": "World Cup",
+   "summary": "The 2026 FIFA World Cup in North America.",
+   "assetClass": "topic",
+   "status": "retired",
+   "index": 58.33,
+   "peakIndex": 88.17,
+   "createdAt": 1793924565,
+   "updatedAt": 1794016794,
+   "surfacer": "tredio.testnet",
+   "reviewHash": null,
+   "asset": null,
+   "keywords": [
+    "World Cup",
+    "FIFA World Cup"
+   ],
+   "article": "2026_FIFA_World_Cup",
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": {
+     "value": 98,
+     "windowSec": 86400,
+     "observedAt": 1794097930
+    },
+    "nansen": null,
+    "wikipedia": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794234838
+    },
+    "bluesky": {
+     "value": 417,
+     "windowSec": 86400,
+     "observedAt": 1794248055
+    },
+    "hn": {
+     "value": 1,
+     "windowSec": 86400,
+     "observedAt": 1794246279
+    }
+   },
+   "change24h": null,
+   "spark": [],
+   "rotatingOut": false
+  },
+  {
+   "id": "topic:ai-agents",
+   "identifier": "topic:ai-agents",
+   "displayName": "AI agents",
+   "summary": "Software that acts on its own, from coding to trading.",
+   "assetClass": "topic",
+   "status": "retired",
+   "index": 63.22,
+   "peakIndex": 78.99,
+   "createdAt": 1793950670,
+   "updatedAt": 1794016794,
+   "surfacer": "tredio.testnet",
+   "reviewHash": null,
+   "asset": null,
+   "keywords": [
+    "AI agents",
+    "autonomous agents"
+   ],
+   "article": "Intelligent_agent",
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": {
+     "value": 20,
+     "windowSec": 86400,
+     "observedAt": 1794141228
+    },
+    "nansen": null,
+    "wikipedia": {
+     "value": 130,
+     "windowSec": 86400,
+     "observedAt": 1794241719
+    },
+    "bluesky": {
+     "value": 793,
+     "windowSec": 86400,
+     "observedAt": 1794248134
+    },
+    "hn": {
+     "value": 166,
+     "windowSec": 86400,
+     "observedAt": 1794246219
+    }
+   },
+   "change24h": null,
+   "spark": [],
+   "rotatingOut": false
+  },
+  {
+   "id": "topic:e2e-to3bp8",
+   "identifier": "topic:e2e-to3bp8",
+   "displayName": null,
+   "summary": null,
+   "assetClass": "topic",
+   "status": "retired",
+   "index": 0.01,
+   "peakIndex": 55,
+   "createdAt": 1793985042,
+   "updatedAt": 1793996032,
+   "surfacer": "0un2gdgafd9z386vkwrvjq1x4287151mx6j0mj4rnsc8fhqj3a3kw0",
+   "reviewHash": null,
+   "asset": null,
+   "keywords": [],
+   "article": null,
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": null,
+    "nansen": null,
+    "wikipedia": null,
+    "bluesky": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1793996029
+    },
+    "hn": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1793995969
+    }
+   },
+   "change24h": null,
+   "spark": [],
+   "rotatingOut": false
+  },
+  {
+   "id": "topic:e2e-to3d3s",
+   "identifier": "topic:e2e-to3d3s",
+   "displayName": null,
+   "summary": null,
+   "assetClass": "topic",
+   "status": "retired",
+   "index": 0.01,
+   "peakIndex": 55,
+   "createdAt": 1793986851,
+   "updatedAt": 1793997712,
+   "surfacer": "0uq9rd3st1584vds6jmrha9dnhh186g6d5hh75s9apz92j90gzracg",
+   "reviewHash": null,
+   "asset": null,
+   "keywords": [],
+   "article": null,
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": null,
+    "nansen": null,
+    "wikipedia": null,
+    "bluesky": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1793997829
+    },
+    "hn": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1793997829
+    }
+   },
+   "change24h": null,
+   "spark": [],
+   "rotatingOut": false
+  },
+  {
+   "id": "equity:tsla",
+   "identifier": "equity:tsla",
+   "displayName": "Tesla Cybertruck halt",
+   "summary": "Tesla ends Cybertruck production, retiring its divisive angular electric pickup.",
+   "assetClass": "equity",
+   "status": "retired",
+   "index": 66.67,
+   "peakIndex": 85.51,
+   "createdAt": 1793988727,
+   "updatedAt": 1794016794,
+   "surfacer": "",
+   "reviewHash": "5133101e64f60150c5ecdb0f4d1dd84afbdf984b92cc1caf4786f63c621cd2b7",
+   "asset": null,
+   "keywords": [
+    "$TSLA",
+    "Tesla",
+    "Cybertruck"
+   ],
+   "article": "Tesla_Cybertruck",
+   "ticker": "TSLA",
+   "readings": {
+    "elfa": null,
+    "gdelt": {
+     "value": 49,
+     "windowSec": 86400,
+     "observedAt": 1794141288
+    },
+    "nansen": null,
+    "wikipedia": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794234838
+    },
+    "bluesky": {
+     "value": 2216,
+     "windowSec": 86400,
+     "observedAt": 1794248055
+    },
+    "hn": {
+     "value": 60,
+     "windowSec": 86400,
+     "observedAt": 1794246279
+    }
+   },
+   "change24h": null,
+   "spark": [],
+   "rotatingOut": false
+  },
+  {
+   "id": "topic:godzilla-minus-zero",
+   "identifier": "topic:godzilla-minus-zero",
+   "displayName": "Godzilla Minus Zero",
+   "summary": "Godzilla Minus Zero, sequel to Minus One, opens in theaters as fans buy IMAX and 4DX tickets.",
+   "assetClass": "topic",
+   "status": "retired",
+   "index": 58.33,
+   "peakIndex": 97.71,
+   "createdAt": 1793988727,
+   "updatedAt": 1794016794,
+   "surfacer": "",
+   "reviewHash": "5133101e64f60150c5ecdb0f4d1dd84afbdf984b92cc1caf4786f63c621cd2b7",
+   "asset": null,
+   "keywords": [
+    "Godzilla Minus Zero",
+    "Godzilla"
+   ],
+   "article": "Godzilla_Minus_Zero",
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": {
+     "value": 19,
+     "windowSec": 86400,
+     "observedAt": 1794096250
+    },
+    "nansen": null,
+    "wikipedia": {
+     "value": 145122,
+     "windowSec": 86400,
+     "observedAt": 1794239019
+    },
+    "bluesky": {
+     "value": 2901,
+     "windowSec": 86400,
+     "observedAt": 1794248055
+    },
+    "hn": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794246279
+    }
+   },
+   "change24h": null,
+   "spark": [],
+   "rotatingOut": false
+  },
+  {
+   "id": "person:stephen-miller",
+   "identifier": "person:stephen-miller",
+   "displayName": "Stephen Miller chief of staff",
+   "summary": "Trump names Stephen Miller chief of staff; Susie Wiles moves to his political operation.",
+   "assetClass": "person",
+   "status": "retired",
+   "index": 58.33,
+   "peakIndex": 90.71,
+   "createdAt": 1793992628,
+   "updatedAt": 1794016794,
+   "surfacer": "",
+   "reviewHash": "b6048fd704cb82d83c26163906f8463575d2d28d9bb9a93fce08f8012508de04",
+   "asset": null,
+   "keywords": [
+    "Stephen Miller",
+    "Susie Wiles",
+    "chief of staff"
+   ],
+   "article": "Stephen_Miller",
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": {
+     "value": 185,
+     "windowSec": 86400,
+     "observedAt": 1794179464
+    },
+    "nansen": null,
+    "wikipedia": {
+     "value": 164875,
+     "windowSec": 86400,
+     "observedAt": 1794239019
+    },
+    "bluesky": {
+     "value": 6013,
+     "windowSec": 86400,
+     "observedAt": 1794248055
+    },
+    "hn": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794246279
+    }
+   },
+   "change24h": null,
+   "spark": [],
+   "rotatingOut": false
+  },
+  {
+   "id": "topic:e2e-to3il1",
+   "identifier": "topic:e2e-to3il1",
+   "displayName": null,
+   "summary": null,
+   "assetClass": "topic",
+   "status": "retired",
+   "index": 0.01,
+   "peakIndex": 50,
+   "createdAt": 1793993953,
+   "updatedAt": 1794005273,
+   "surfacer": "0uck9fknh99qnws8b29d1s1w0gd0g6kj8hmgya5qwwb7rxmdpw885g",
+   "reviewHash": null,
+   "asset": null,
+   "keywords": [],
+   "article": null,
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": null,
+    "nansen": null,
+    "wikipedia": null,
+    "bluesky": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794004851
+    },
+    "hn": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794004851
+    }
+   },
+   "change24h": null,
+   "spark": [],
+   "rotatingOut": false
+  },
+  {
+   "id": "topic:e2e-to3in3",
+   "identifier": "topic:e2e-to3in3",
+   "displayName": null,
+   "summary": null,
+   "assetClass": "topic",
+   "status": "retired",
+   "index": 0.01,
+   "peakIndex": 55,
+   "createdAt": 1793994020,
+   "updatedAt": 1794005273,
+   "surfacer": "0uj08nmprppqqkes3ekcp3wpnwe40a60tgwadwqxpyws77raap2gkg",
+   "reviewHash": null,
+   "asset": null,
+   "keywords": [],
+   "article": null,
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": null,
+    "nansen": null,
+    "wikipedia": null,
+    "bluesky": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794004911
+    },
+    "hn": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794004911
+    }
+   },
+   "change24h": null,
+   "spark": [],
+   "rotatingOut": false
+  },
+  {
+   "id": "politics:ukraine-russia-peace-talks",
+   "identifier": "politics:ukraine-russia-peace-talks",
+   "displayName": "Ukraine-Russia peace talks",
+   "summary": "Kushner says the US will host Ukraine-Russia trilateral talks in Abu Dhabi and outlines a European security plan.",
+   "assetClass": "politics",
+   "status": "retired",
+   "index": 100,
+   "peakIndex": 100,
+   "createdAt": 1793994412,
+   "updatedAt": 1794016794,
+   "surfacer": "",
+   "reviewHash": "3625e7e562ab1b3eebb42a462c23991d869ab2408e3538ba5e6fe3835753f15d",
+   "asset": null,
+   "keywords": [
+    "Jared Kushner",
+    "Ukraine Russia peace talks",
+    "Abu Dhabi talks",
+    "trilateral talks"
+   ],
+   "article": null,
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": {
+     "value": 17,
+     "windowSec": 86400,
+     "observedAt": 1794179884
+    },
+    "nansen": null,
+    "wikipedia": null,
+    "bluesky": {
+     "value": 735,
+     "windowSec": 86400,
+     "observedAt": 1794248055
+    },
+    "hn": {
+     "value": 1,
+     "windowSec": 86400,
+     "observedAt": 1794246219
+    }
+   },
+   "change24h": null,
+   "spark": [],
+   "rotatingOut": false
+  },
+  {
+   "id": "topic:e2e-to3rm7",
+   "identifier": "topic:e2e-to3rm7",
+   "displayName": null,
+   "summary": null,
+   "assetClass": "topic",
+   "status": "retired",
+   "index": 0.01,
+   "peakIndex": 55,
+   "createdAt": 1794005657,
+   "updatedAt": 1794014634,
+   "surfacer": "0usq1a6tx6p2nm9wcbbg7dpn24935zcjxbqyb2bd9rzmw4497pvbzg",
+   "reviewHash": null,
+   "asset": null,
+   "keywords": [],
+   "article": null,
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": null,
+    "nansen": null,
+    "wikipedia": null,
+    "bluesky": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794016612
+    },
+    "hn": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794016552
+    }
+   },
+   "change24h": null,
+   "spark": [],
+   "rotatingOut": false
+  },
+  {
+   "id": "topic:e2e-to3tz2",
+   "identifier": "topic:e2e-to3tz2",
+   "displayName": null,
+   "summary": null,
+   "assetClass": "topic",
+   "status": "retired",
+   "index": 0.01,
+   "peakIndex": 55,
+   "createdAt": 1794008707,
+   "updatedAt": 1794016794,
+   "surfacer": "0u6xynn46jqv8rwe2r6we26zeakwcsnykzsr3bnxtyt32k5gvsdza0",
+   "reviewHash": null,
+   "asset": null,
+   "keywords": [],
+   "article": null,
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": null,
+    "nansen": null,
+    "wikipedia": null,
+    "bluesky": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794019612
+    },
+    "hn": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794019612
+    }
+   },
+   "change24h": null,
+   "spark": [],
+   "rotatingOut": false
+  },
+  {
+   "id": "person:stephen-miller.2",
+   "identifier": "person:stephen-miller.2",
+   "displayName": "Stephen Miller chief of staff",
+   "summary": "Trump names Stephen Miller chief of staff; Susie Wiles moves to his political operation.",
+   "assetClass": "person",
+   "status": "active",
+   "index": 100,
+   "peakIndex": 100,
+   "createdAt": 1794247547,
+   "updatedAt": 1794248794,
+   "surfacer": "",
+   "reviewHash": "b6048fd704cb82d83c26163906f8463575d2d28d9bb9a93fce08f8012508de04",
+   "asset": null,
+   "keywords": [
+    "Stephen Miller",
+    "Susie Wiles",
+    "chief of staff"
+   ],
+   "article": "Stephen_Miller",
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": {
+     "value": 185,
+     "windowSec": 86400,
+     "observedAt": 1794179464
+    },
+    "nansen": null,
+    "wikipedia": {
+     "value": 164875,
+     "windowSec": 86400,
+     "observedAt": 1794239019
+    },
+    "bluesky": {
+     "value": 6013,
+     "windowSec": 86400,
+     "observedAt": 1794248055
+    },
+    "hn": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794246279
+    }
+   },
+   "change24h": 0,
+   "spark": [
+    100
+   ],
+   "rotatingOut": false
+  },
+  {
+   "id": "topic:godzilla-minus-zero.2",
+   "identifier": "topic:godzilla-minus-zero.2",
+   "displayName": "Godzilla Minus Zero",
+   "summary": "Godzilla Minus Zero, sequel to Minus One, opens in theaters as fans buy IMAX and 4DX tickets.",
+   "assetClass": "topic",
+   "status": "active",
+   "index": 99.88,
+   "peakIndex": 99.88,
+   "createdAt": 1794247547,
+   "updatedAt": 1794248794,
+   "surfacer": "",
+   "reviewHash": "5133101e64f60150c5ecdb0f4d1dd84afbdf984b92cc1caf4786f63c621cd2b7",
+   "asset": null,
+   "keywords": [
+    "Godzilla Minus Zero",
+    "Godzilla"
+   ],
+   "article": "Godzilla_Minus_Zero",
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": {
+     "value": 19,
+     "windowSec": 86400,
+     "observedAt": 1794096250
+    },
+    "nansen": null,
+    "wikipedia": {
+     "value": 145122,
+     "windowSec": 86400,
+     "observedAt": 1794239019
+    },
+    "bluesky": {
+     "value": 2901,
+     "windowSec": 86400,
+     "observedAt": 1794248055
+    },
+    "hn": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794246279
+    }
+   },
+   "change24h": 0,
+   "spark": [
+    99.88
+   ],
+   "rotatingOut": false
+  },
+  {
+   "id": "equity:tsla.2",
+   "identifier": "equity:tsla.2",
+   "displayName": "Tesla Cybertruck halt",
+   "summary": "Tesla ends Cybertruck production, retiring its divisive angular electric pickup.",
+   "assetClass": "equity",
+   "status": "active",
+   "index": 61.07,
+   "peakIndex": 61.07,
+   "createdAt": 1794247607,
+   "updatedAt": 1794248794,
+   "surfacer": "",
+   "reviewHash": "5133101e64f60150c5ecdb0f4d1dd84afbdf984b92cc1caf4786f63c621cd2b7",
+   "asset": null,
+   "keywords": [
+    "$TSLA",
+    "Tesla",
+    "Cybertruck"
+   ],
+   "article": "Tesla_Cybertruck",
+   "ticker": "TSLA",
+   "readings": {
+    "elfa": null,
+    "gdelt": {
+     "value": 49,
+     "windowSec": 86400,
+     "observedAt": 1794141288
+    },
+    "nansen": null,
+    "wikipedia": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794234838
+    },
+    "bluesky": {
+     "value": 2216,
+     "windowSec": 86400,
+     "observedAt": 1794248055
+    },
+    "hn": {
+     "value": 60,
+     "windowSec": 86400,
+     "observedAt": 1794246279
+    }
+   },
+   "change24h": 0,
+   "spark": [
+    61.07
+   ],
+   "rotatingOut": false
+  },
+  {
+   "id": "topic:ai-agents.2",
+   "identifier": "topic:ai-agents.2",
+   "displayName": "AI agents",
+   "summary": "Software that acts on its own, from coding to trading.",
+   "assetClass": "topic",
+   "status": "active",
+   "index": 76.67,
+   "peakIndex": 76.67,
+   "createdAt": 1794247607,
+   "updatedAt": 1794248794,
+   "surfacer": "tredio.testnet",
+   "reviewHash": null,
+   "asset": null,
+   "keywords": [
+    "AI agents",
+    "autonomous agents"
+   ],
+   "article": "Intelligent_agent",
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": {
+     "value": 20,
+     "windowSec": 86400,
+     "observedAt": 1794141228
+    },
+    "nansen": null,
+    "wikipedia": {
+     "value": 130,
+     "windowSec": 86400,
+     "observedAt": 1794241719
+    },
+    "bluesky": {
+     "value": 793,
+     "windowSec": 86400,
+     "observedAt": 1794248134
+    },
+    "hn": {
+     "value": 166,
+     "windowSec": 86400,
+     "observedAt": 1794246219
+    }
+   },
+   "change24h": 0.11752415774354062,
+   "spark": [
+    76.67
+   ],
+   "rotatingOut": false
+  },
+  {
+   "id": "politics:ukraine-russia-peace-talks.2",
+   "identifier": "politics:ukraine-russia-peace-talks.2",
+   "displayName": "Ukraine-Russia peace talks",
+   "summary": "Kushner says the US will host Ukraine-Russia trilateral talks in Abu Dhabi and outlines a European security plan.",
+   "assetClass": "politics",
+   "status": "active",
+   "index": 95.55,
+   "peakIndex": 95.55,
+   "createdAt": 1794247667,
+   "updatedAt": 1794248794,
+   "surfacer": "",
+   "reviewHash": "3625e7e562ab1b3eebb42a462c23991d869ab2408e3538ba5e6fe3835753f15d",
+   "asset": null,
+   "keywords": [
+    "Jared Kushner",
+    "Ukraine Russia peace talks",
+    "Abu Dhabi talks",
+    "trilateral talks"
+   ],
+   "article": null,
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": {
+     "value": 17,
+     "windowSec": 86400,
+     "observedAt": 1794179884
+    },
+    "nansen": null,
+    "wikipedia": null,
+    "bluesky": {
+     "value": 735,
+     "windowSec": 86400,
+     "observedAt": 1794248055
+    },
+    "hn": {
+     "value": 1,
+     "windowSec": 86400,
+     "observedAt": 1794246219
+    }
+   },
+   "change24h": 0.10476689366159697,
+   "spark": [
+    95.55
+   ],
+   "rotatingOut": false
+  },
+  {
+   "id": "topic:world-cup.2",
+   "identifier": "topic:world-cup.2",
+   "displayName": "World Cup",
+   "summary": "The 2026 FIFA World Cup in North America.",
+   "assetClass": "topic",
+   "status": "active",
+   "index": 50.96,
+   "peakIndex": 50.96,
+   "createdAt": 1794247667,
+   "updatedAt": 1794248794,
+   "surfacer": "tredio.testnet",
+   "reviewHash": null,
+   "asset": null,
+   "keywords": [
+    "World Cup",
+    "FIFA World Cup"
+   ],
+   "article": "2026_FIFA_World_Cup",
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": {
+     "value": 98,
+     "windowSec": 86400,
+     "observedAt": 1794097930
+    },
+    "nansen": null,
+    "wikipedia": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794234838
+    },
+    "bluesky": {
+     "value": 417,
+     "windowSec": 86400,
+     "observedAt": 1794248055
+    },
+    "hn": {
+     "value": 1,
+     "windowSec": 86400,
+     "observedAt": 1794246279
+    }
+   },
+   "change24h": 0.039261876717713244,
+   "spark": [
+    50.96
+   ],
+   "rotatingOut": false
+  },
+  {
+   "id": "politics:hegseth-impeachment-vote",
+   "identifier": "politics:hegseth-impeachment-vote",
+   "displayName": "Hegseth impeachment vote",
+   "summary": "House heads toward a forced vote on Massie's articles of impeachment against Pete Hegseth.",
+   "assetClass": "politics",
+   "status": "active",
+   "index": 93.87,
+   "peakIndex": 93.87,
+   "createdAt": 1794248794,
+   "updatedAt": 1794248794,
+   "surfacer": "",
+   "reviewHash": "b13a63229aabfb1d668845de8286a0f92c7ae7fb94d0d4eb7116804a723ca0ba",
+   "asset": null,
+   "keywords": [
+    "Hegseth",
+    "Massie",
+    "impeachment"
+   ],
+   "article": "Pete_Hegseth",
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": null,
+    "nansen": null,
+    "wikipedia": {
+     "value": 25957,
+     "windowSec": 86400,
+     "observedAt": 1794248734
+    },
+    "bluesky": {
+     "value": 8783,
+     "windowSec": 86400,
+     "observedAt": 1794248734
+    },
+    "hn": {
+     "value": 3,
+     "windowSec": 86400,
+     "observedAt": 1794248734
+    }
+   },
+   "change24h": 0,
+   "spark": [
+    93.87
+   ],
+   "rotatingOut": false
+  },
+  {
+   "id": "politics:hegseth-officer-promotions",
+   "identifier": "politics:hegseth-officer-promotions",
+   "displayName": "Hegseth blocks promotions",
+   "summary": "Report says Hegseth's office used internet searches to hold up senior officer promotions.",
+   "assetClass": "politics",
+   "status": "active",
+   "index": 93.87,
+   "peakIndex": 93.87,
+   "createdAt": 1794248794,
+   "updatedAt": 1794248794,
+   "surfacer": "",
+   "reviewHash": "b13a63229aabfb1d668845de8286a0f92c7ae7fb94d0d4eb7116804a723ca0ba",
+   "asset": null,
+   "keywords": [
+    "Hegseth",
+    "Pete Hegseth",
+    "military promotions"
+   ],
+   "article": "Pete_Hegseth",
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": null,
+    "nansen": null,
+    "wikipedia": {
+     "value": 25957,
+     "windowSec": 86400,
+     "observedAt": 1794248734
+    },
+    "bluesky": {
+     "value": 6206,
+     "windowSec": 86400,
+     "observedAt": 1794248734
+    },
+    "hn": {
+     "value": 0,
+     "windowSec": 86400,
+     "observedAt": 1794248734
+    }
+   },
+   "change24h": 0,
+   "spark": [
+    93.87
+   ],
+   "rotatingOut": false
+  },
+  {
+   "id": "person:jensen-huang",
+   "identifier": "person:jensen-huang",
+   "displayName": "Jensen Huang",
+   "summary": "NVIDIA CEO Jensen Huang ranks among yesterday's most-read Wikipedia pages.",
+   "assetClass": "person",
+   "status": "active",
+   "index": 99.29,
+   "peakIndex": 99.29,
+   "createdAt": 1794248854,
+   "updatedAt": 1794248854,
+   "surfacer": "",
+   "reviewHash": "e409e6d8fb4160a2e8119a375d3ca6d44b88a24f7b048bd03adf04225e17049f",
+   "asset": null,
+   "keywords": [
+    "Jensen Huang",
+    "$NVDA"
+   ],
+   "article": "Jensen_Huang",
+   "ticker": null,
+   "readings": {
+    "elfa": null,
+    "gdelt": null,
+    "nansen": null,
+    "wikipedia": {
+     "value": 122360,
+     "windowSec": 86400,
+     "observedAt": 1794248794
+    },
+    "bluesky": {
+     "value": 6159,
+     "windowSec": 86400,
+     "observedAt": 1794248794
+    },
+    "hn": {
+     "value": 60,
+     "windowSec": 86400,
+     "observedAt": 1794248794
+    }
+   },
+   "change24h": 0,
+   "spark": [
+    99.29
+   ],
+   "rotatingOut": false
+  }
+ ],
+ "candidates": {
+  "slots": {
+   "live": 9,
+   "max": 24
+  },
+  "candidates": [
+   {
+    "id": 82,
+    "identifier": "crypto:ada",
+    "displayName": "Cardano",
+    "summary": "Cardano ranks among CoinGecko's most-searched coins; price flat over 24 hours.",
+    "assetClass": "crypto",
+    "keywords": [
+     "$ADA",
+     "Cardano"
+    ],
+    "article": "Cardano_(blockchain_platform)",
+    "ticker": "ADA",
+    "source": "coingecko_trending",
+    "attribution": {
+     "text": "Data from CoinGecko",
+     "url": "https://www.coingecko.com"
+    },
+    "surfacer": "radar",
+    "status": "approved",
+    "createdAt": "2026-11-07T05:39:05.264Z",
+    "queue": null,
+    "signal": {
+     "label": "CoinGecko trending",
+     "count": null,
+     "unit": null
+    },
+    "readings": {
+     "mentions": 160,
+     "bluesky": 16,
+     "wikipedia": 0,
+     "news": null,
+     "hn": 1
+    },
+    "spark": [],
+    "heating": 23.1,
+    "watchers": 0,
+    "pick": false
+   },
+   {
+    "id": 81,
+    "identifier": "crypto:xmr",
+    "displayName": "Monero",
+    "summary": "Monero tops CoinGecko's most-searched coins; price down 1% over 24 hours.",
+    "assetClass": "crypto",
+    "keywords": [
+     "$XMR",
+     "Monero"
+    ],
+    "article": "Monero",
+    "ticker": "XMR",
+    "source": "coingecko_trending",
+    "attribution": {
+     "text": "Data from CoinGecko",
+     "url": "https://www.coingecko.com"
+    },
+    "surfacer": "radar",
+    "status": "approved",
+    "createdAt": "2026-11-07T05:39:05.050Z",
+    "queue": null,
+    "signal": {
+     "label": "CoinGecko trending",
+     "count": null,
+     "unit": null
+    },
+    "readings": {
+     "mentions": 210,
+     "bluesky": 21,
+     "wikipedia": 0,
+     "news": null,
+     "hn": 0
+    },
+    "spark": [],
+    "heating": 23.5,
+    "watchers": 0,
+    "pick": false
+   },
+   {
+    "id": 67,
+    "identifier": "crypto:avax",
+    "displayName": "Avalanche",
+    "summary": "Avalanche ranks among CoinGecko's most-searched coins; price up 1% in 24h.",
+    "assetClass": "crypto",
+    "keywords": [
+     "$AVAX",
+     "Avalanche"
+    ],
+    "article": "Avalanche_(blockchain_platform)",
+    "ticker": "AVAX",
+    "source": "coingecko_trending",
+    "attribution": {
+     "text": "Data from CoinGecko",
+     "url": "https://www.coingecko.com"
+    },
+    "surfacer": "radar",
+    "status": "approved",
+    "createdAt": "2026-11-07T01:39:15.351Z",
+    "queue": null,
+    "signal": {
+     "label": "CoinGecko trending",
+     "count": null,
+     "unit": null
+    },
+    "readings": {
+     "mentions": 2270,
+     "bluesky": 227,
+     "wikipedia": 48,
+     "news": null,
+     "hn": 1
+    },
+    "spark": [],
+    "heating": 17,
+    "watchers": 0,
+    "pick": false
+   },
+   {
+    "id": 19,
+    "identifier": "crypto:trump",
+    "displayName": "OFFICIAL TRUMP",
+    "summary": "OFFICIAL TRUMP (TRUMP) is a trending Solana DEX pool, up 6% in 24 hours on $5.2M volume.",
+    "assetClass": "crypto",
+    "keywords": [
+     "$TRUMP",
+     "Official Trump",
+     "Trump coin"
+    ],
+    "article": null,
+    "ticker": "TRUMP",
+    "source": "geckoterminal_trending",
+    "attribution": {
+     "text": "Data from GeckoTerminal",
+     "url": "https://www.geckoterminal.com"
+    },
+    "surfacer": "radar",
+    "status": "approved",
+    "createdAt": "2026-11-06T18:08:57.131Z",
+    "queue": null,
+    "signal": {
+     "label": "GeckoTerminal trending",
+     "count": null,
+     "unit": null
+    },
+    "readings": {
+     "mentions": 420,
+     "bluesky": 42,
+     "wikipedia": null,
+     "news": null,
+     "hn": 5
+    },
+    "spark": [],
+    "heating": 162.5,
+    "watchers": 0,
+    "pick": false
+   }
+  ]
+ }
+}

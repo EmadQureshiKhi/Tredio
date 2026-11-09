@@ -37,6 +37,7 @@ const PROCS: Proc[] = [
   { name: "topup", dir: "apps/topup", cmd: ["bun", "--env-file=.env", "src/index.ts"], port: 4500 },
   { name: "oracle", dir: "apps/oracle", cmd: ["bun", "--env-file=.env", "src/index.ts"], port: 4600 },
   { name: "indexer", dir: "apps/indexer", cmd: ["bun", "--env-file=.env", "src/index.ts"], port: 4700 },
+  { name: "agent-market", dir: "apps/agent-market", cmd: ["bun", "--env-file=.env", "src/index.ts"], port: 4800 },
   { name: "frontend", dir: "frontend", cmd: ["node", "node_modules/next/dist/bin/next", "dev", "-p", "3000"], port: 3000, next: true },
   { name: "admin", dir: "admin", cmd: ["node", "node_modules/next/dist/bin/next", "dev", "-p", "3001"], port: 3001, next: true },
 ];
