@@ -145,6 +145,12 @@ describe("owner requests and session gas", () => {
     // The receipts' logs come back with the answer, so the app reads what happened without another RPC call.
     expect(done.outcome.receipts_outcome[0]!.outcome.logs[0]).toContain("order_placed");
     await expect(relayer(fakes()).ownerExecute({ account, request, proof: await pk.prove(request) })).rejects.toThrow(/not a Tredio account/);
+    // A rate-limited read says nothing about the account: try again (503), never "not a Tredio account".
+    const limited = fakes({ owners: new Map([[account, pk.ownerKey]]) });
+    const view = limited.viewer.view.bind(limited.viewer);
+    (limited.viewer as { view: unknown }).view = async (c: string, m: string, a: object) => (m === "owner_key" ? Promise.reject(new Error("HTTP 429: rate limits exceeded")) : view(c, m, a as never));
+    const refused = await relayer(limited).ownerExecute({ account, request, proof: await pk.prove(request) }).catch((e: RelayError) => e);
+    expect(refused).toMatchObject({ status: 503, message: "could not read the account on chain; try again" });
     await expect(relayer(f).ownerExecute({ account, request, proof: await passkey().prove(request) })).rejects.toBeInstanceOf(RelayError);
   });
 
