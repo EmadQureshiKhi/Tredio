@@ -1,5 +1,7 @@
 import { Viewer, walletWatch } from "@tredio/chain";
-import { AccountVersions } from "@tredio/contracts";
+import { AccountVersions, acceptsWalletSessions } from "@tredio/contracts";
+import type { WalletSigner } from "@tredio/custody";
+import { AgentApiSigner, agentApi, passkeySpki } from "@tredio/custody/agent-api";
 import { type HlNetwork, HyperliquidInfo, hyperliquidAddressOf } from "@tredio/hyperliquid";
 import { loadConfig } from "./config";
 import { Copier, hyperliquidLeaders } from "./copier";
@@ -9,8 +11,10 @@ import { healthApp } from "./health";
 import { jsonLog } from "./log";
 import type { RegistryMark } from "./orders";
 import { sealPublicKey } from "./seal";
-import { AUTOPILOT_POLICY, hyperliquidApi, Nonces, relayerFunding, SessionVenue } from "./venue";
+import { signalLeaders } from "./signals";
+import { AUTOPILOT_POLICY, hyperliquidApi, Nonces, relayerFunding, SessionVenue, WALLET_POLICY } from "./venue";
 import { nearGrantChain, nearSessionChain, type VenueRequest, Venues } from "./venues";
+import { type GrantWallet, outLayerSigner, txValue, WalletGate, walletSessionChain } from "./wallets";
 
 // #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
 
@@ -40,8 +44,49 @@ function addressOf(owner: string): Promise<string> {
   return a;
 }
 
-const makeVenue = (r: VenueRequest) =>
-  new SessionVenue({
+// #mainnet: grants backed by an Agent API agent need the partner key; OutLayer custody grants need nothing more.
+const agentClient = cfg.NEAR_NETWORK === "mainnet" && cfg.AGENT_API_KEY ? agentApi(cfg.AGENT_API_KEY, cfg.AGENT_API_URL ? { baseUrl: cfg.AGENT_API_URL } : {}) : null;
+
+/** The custody signer of a grant's policy wallet, behind the executor's own gate (the account's controller, its freeze, gas). */
+function policyWallet(owner: string, wallet: GrantWallet, credential: string): { signer: WalletSigner; gate: WalletGate } {
+  let signer: WalletSigner;
+  if (wallet.kind === "outlayer") signer = outLayerSigner(viewer, cfg.NEAR_NETWORK, wallet.account, credential, cfg.CUSTODY_API_URL);
+  else {
+    if (!agentClient || !wallet.agentId) throw new Error("this executor has no NEAR Intents Agent API key (AGENT_API_KEY on mainnet), so the account's agent waits");
+    signer = new AgentApiSigner({
+      api: agentClient,
+      agentId: wallet.agentId,
+      grantToken: credential,
+      accountId: wallet.account,
+      owner: { account: owner, spki: async () => passkeySpki(await viewer.view<string>(owner, "owner_key")) },
+      readValue: txValue(viewer),
+    });
+  }
+  const accepts = async () => acceptsWalletSessions(await versions.of(owner));
+  return { signer, gate: new WalletGate(signer, owner, { balance: (a) => viewer.balance(a), minBalance: cfg.POLICY_WALLET_GAS_MIN_NEAR, accepts }) };
+}
+
+const makeVenue = (r: VenueRequest) => {
+  if (r.wallet) {
+    const { signer, gate } = policyWallet(r.owner, r.wallet, r.secretKey);
+    return new SessionVenue({
+      owner: r.owner,
+      kind: r.kind,
+      sessionKey: r.sessionKey,
+      network,
+      policy: WALLET_POLICY,
+      chain: walletSessionChain(viewer, signer, r.owner, versions),
+      hyperliquid,
+      addressOf: () => addressOf(r.owner),
+      nonces,
+      fund: async () => {
+        throw new Error("a policy wallet pays its own gas; its account funds it");
+      },
+      gasMin: 0n,
+      wallet: gate,
+    });
+  }
+  return new SessionVenue({
     owner: r.owner,
     kind: r.kind,
     sessionKey: r.sessionKey,
@@ -54,6 +99,7 @@ const makeVenue = (r: VenueRequest) =>
     fund: relayerFunding(cfg.RELAYER_URL, r.owner, r.sessionKey),
     gasMin: cfg.SESSION_GAS_MIN_NEAR,
   });
+};
 const venues = new Venues(db, nearGrantChain(viewer), makeVenue, { sealPrivateKey: cfg.AUTOPILOT_SEAL_PRIVATE_KEY ?? null, bot: cfg.bot }, log);
 const reader: AccountReader = { addressOf, state: (a) => hyperliquid.accountState(a), fills: (a) => hyperliquid.fills(a) };
 const registryMark = (asset: string) => viewer.view<RegistryMark | null>(cfg.deployment.contracts.registry, "mark_of", { asset });
@@ -79,12 +125,14 @@ const executor = new Executor(
   async (ctx) => copier?.tick(ctx),
 );
 // Leaders: the Tredio bot where it trades (from its own account's address), everyone else on mainnet's leaderboard.
-const leaders = hyperliquidLeaders({
+const traders = hyperliquidLeaders({
   network,
   trading: info,
   mainnet: network === "mainnet" ? info : new HyperliquidInfo("mainnet"),
   onTradingNetwork: async (leader) => cfg.bot !== null && leader.toLowerCase() === (await addressOf(cfg.bot.account)).toLowerCase(),
 });
+// Paid signal channels (`signals:<identity>`) lead too, when this executor holds the API's SIGNALS_SECRET.
+const leaders = cfg.SIGNALS_SECRET ? signalLeaders({ sql: db.sql, secret: new Uint8Array(Buffer.from(cfg.SIGNALS_SECRET, "hex")), network, others: traders, log }) : traders;
 copier = new Copier(db, executor, leaders, log, network);
 
 const seal = cfg.AUTOPILOT_SEAL_PRIVATE_KEY ? await sealPublicKey(cfg.AUTOPILOT_SEAL_PRIVATE_KEY) : null;
@@ -95,6 +143,7 @@ const server = Bun.serve({
     status: () => executor.status,
     stats: (nowSec) => db.stats(nowSec),
     wallet: async () => (botWallet ? botWallet() : null),
+    policyWallets: () => venues.walletChecks(),
     network: cfg.NEAR_NETWORK,
     tickSec: cfg.TICK_SEC,
     sealKeyId: seal?.keyId ?? null,

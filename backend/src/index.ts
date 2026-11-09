@@ -19,6 +19,7 @@ import { Alerts } from "./alerts";
 import { baseOf } from "./identifiers";
 import { Dispatcher } from "./notify/dispatcher";
 import { Push } from "./notify/push";
+import { pauseLapsedSignalFollows } from "./signals/routes";
 import { resolveCalls } from "./social/routes";
 import { DEFAULT_RADAR, Radar } from "./radar";
 import { Bluesky } from "./sources/bluesky";
@@ -358,6 +359,7 @@ jobs.add("collector", cfg.COLLECT_INTERVAL_SEC, () => collector.tick(), { start 
 jobs.add("radar", cfg.RADAR_INTERVAL_SEC, () => radar.tick(), { start });
 jobs.add("history", cfg.HISTORY_INTERVAL_SEC, () => history.sync(), { start });
 jobs.add("calls", 60, () => resolveCalls(sql, chain, Math.floor(Date.now() / 1000)), { start });
+jobs.add("signal-follows", 300, async () => ({ paused: await pauseLapsedSignalFollows(sql, Math.floor(Date.now() / 1000)) }), { start });
 jobs.add("notify", 15, () => dispatcher.tick(), { start });
 jobs.add("alerts", 60, () => alerts.tick(), { start });
 

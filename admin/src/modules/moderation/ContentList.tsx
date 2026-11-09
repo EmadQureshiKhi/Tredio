@@ -3,9 +3,9 @@ import { Eye, EyeOff } from "lucide-react";
 import { Badge } from "@/src/components/ui/Badge";
 import { Button } from "@/src/components/ui/Button";
 import { formatAge, formatDate } from "@/src/lib/format";
-import type { LastModeration, ModeratedCall, ModeratedPost } from "@/src/types/admin";
+import type { LastModeration, ModeratedCall, ModeratedPost, ModeratedSignal } from "@/src/types/admin";
 import type { Moderating } from "./dialogs";
-import { actionOf, CallerName, Direction, horizonLabel, OutcomeBadge } from "./parts";
+import { actionOf, CallerName, Direction, horizonLabel, OutcomeBadge, signalLine } from "./parts";
 
 /** Who last hid or restored a row, and why. */
 function LastAction({ last, now }: { last: LastModeration; now: number }) {
@@ -128,6 +128,43 @@ export function CallRows({ rows, now, onModerate }: { rows: ModeratedCall[]; now
               <OutcomeBadge outcome={c.outcome} />
             </p>
             {c.note && <p className={`mt-1.5 whitespace-pre-wrap break-words text-sm leading-6 ${c.hiddenAt ? "text-muted" : "text-fg"}`}>{c.note}</p>}
+          </Row>
+        );
+      })}
+    </ul>
+  );
+}
+
+export function SignalRows({ rows, now, onModerate }: { rows: ModeratedSignal[]; now: number; onModerate: (t: Moderating) => void }) {
+  return (
+    <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface shadow-card" data-testid="moderation-list">
+      {rows.map((g) => {
+        const issued = g.issuedAt * 1000;
+        const reveal = g.revealAt * 1000;
+        return (
+          <Row
+            key={g.id}
+            target={{ kind: "signals", item: g }}
+            now={now}
+            onModerate={onModerate}
+            meta={
+              <span className="flex items-center gap-x-2 text-subtle">
+                <span title={formatDate(issued)}>{formatAge(issued, now)}</span>
+                <Id id={g.id} />
+                <span className="text-xs" title={formatDate(reveal)}>
+                  {reveal > now ? `public ${formatAge(reveal, now)}` : "public"}
+                </span>
+              </span>
+            }
+          >
+            {g.signal ? (
+              <>
+                <p className={`mt-1.5 text-sm ${g.hiddenAt ? "text-muted" : "text-fg"}`}>{signalLine(g.signal)}</p>
+                {g.signal.note && <p className={`mt-1.5 whitespace-pre-wrap break-words text-sm leading-6 ${g.hiddenAt ? "text-muted" : "text-fg"}`}>{g.signal.note}</p>}
+              </>
+            ) : (
+              <p className="mt-1.5 text-sm text-muted">Sealed: this API does not hold the signals secret.</p>
+            )}
           </Row>
         );
       })}

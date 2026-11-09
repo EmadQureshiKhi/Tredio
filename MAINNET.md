@@ -33,6 +33,7 @@ The contracts are the exception: they hold no network in code but take it as dat
 | Hyperliquid | `api.hyperliquid-testnet.xyz`, leaders read from mainnet | `api.hyperliquid.xyz`; withdrawals sign `hyperliquidChain: "Mainnet"` |
 | RPC | FastNEAR, Intear, dRPC (testnet hosts) | `rpc.mainnet.fastnear.com`, `rpc.intea.rs`, `near.drpc.org` |
 | Contract builds | local build (global code) and reproducible builds | reproducible builds only, from a clean, committed tree |
+| Autopilot policy wallets | an OutLayer custody wallet the app makes, its policy stored on `outlayer.testnet` by the account | a NEAR Intents Agent API agent owned by the account's passkey, through the partner key (`AGENT_API_KEY` on the API and the executor); built and tested offline, not live |
 
 ## How it was tested
 
@@ -71,6 +72,7 @@ Not rehearsed: Chain Signatures signing (it needs the MPC network), live 1Click 
 6. **Services.**
    Set `NEAR_NETWORK=mainnet` in every service's `.env`, with the mainnet service accounts and keys, give them gas keys (`NEAR_NETWORK=mainnet bun scripts/gas-keys.ts <account>`), and set `ACTIVATION_TICKET_KEY` on the API and `ACTIVATION_TICKET_SIGNER` on the relayer.
    Give the indexer the relayer's account (`RELAYER_ACCOUNT_ID`), since only testnet's is built in.
+   For Autopilot on policy wallets, put a partner key from partners.near-intents.org in `AGENT_API_KEY` on the API and the executor (with the owner's go-ahead); it needs account code that accepts the wallet's calls ("Policy wallets" in [apps/autopilot/README.md](apps/autopilot/README.md)).
    Build the app and the admin console with `NEXT_PUBLIC_NEAR_NETWORK=mainnet`, and update the public copy that names testnet ids (`frontend/public/llms.txt`, `skills/tredio/SKILL.md`, the website).
 7. **Fund.**
    NEAR for the service accounts, and USDC for the market maker, the perps pool and the Autopilot bot (below).

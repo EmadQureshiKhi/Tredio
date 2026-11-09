@@ -1,9 +1,11 @@
 import { open } from "@tredio/autopilot";
 import { publicKeyOf, type RpcEndpoints, Sender, type Viewer } from "@tredio/chain";
 import { type AccountVersions, calls, type Deployment, type Session, sessionCallTgas } from "@tredio/contracts";
+import { nearKeyOf } from "@tredio/custody";
 import type { ExecutorDb, GrantRow, Route } from "./db";
 import type { Log } from "./log";
-import { AUTOPILOT_POLICY, type SessionChain, sessionProblem, type Venue } from "./venue";
+import { AUTOPILOT_POLICY, type SessionChain, sessionProblem, type Venue, WALLET_POLICY } from "./venue";
+import { credentialProblem, type GrantWallet, type WalletCheck, WalletGate } from "./wallets";
 
 /**
  * Venues per owner: the Tredio bot's own account, and for every other account the session it
@@ -13,6 +15,10 @@ import { AUTOPILOT_POLICY, type SessionChain, sessionProblem, type Venue } from 
  * trading at once; a replacement key the account asked for takes over as soon as the account has
  * added it on chain (with the backend's checks: Autopilot's label, Hyperliquid scope only, a gas
  * key limited to `session_call`).
+ *
+ * A grant backed by a policy wallet seals the wallet's credential instead of a session key, and its
+ * session is for the wallet's own key: the venue sends every session call through the wallet's
+ * custody enclave, and waits while the account has frozen the wallet.
  */
 
 /** An access key's permission, as far as grants care. */
@@ -27,9 +33,11 @@ export interface GrantChain {
 export interface VenueRequest {
   owner: string;
   kind: "bot" | "grant";
-  /** `ed25519:<base58>` secret of the session key. */
+  /** `ed25519:<base58>` secret of the session key; for a policy wallet, the wallet's credential. */
   secretKey: string;
   sessionKey: string;
+  /** The policy wallet that signs instead of a session key the executor holds. */
+  wallet?: GrantWallet | null;
 }
 
 export type Resolved = { venue: Venue } | { reason: string; pause: boolean };
@@ -45,6 +53,18 @@ export function grantKeyProblem(owner: string, key: KeyPermission | null): strin
   if (!key) return "the key is not on the account";
   if (key.kind !== "function_call" || key.receiverId !== owner || !key.methodNames.includes("session_call")) return "the key is not limited to the account's guarded session calls";
   if (!key.gasKey) return "the key is not a gas key";
+  return null;
+}
+
+/**
+ * Why a policy wallet's key on the account is not one Autopilot's session may have, or null. The
+ * enclave signs only as the wallet's own account, so the key need not be on the account at all; if
+ * it is, it must be a plain key limited to the account's guarded session calls.
+ */
+export function walletKeyProblem(owner: string, key: KeyPermission | null): string | null {
+  if (!key) return null;
+  if (key.kind !== "function_call" || key.receiverId !== owner || !key.methodNames.includes("session_call")) return "the wallet's key is not limited to the account's guarded session calls";
+  if (key.gasKey) return "the wallet's key is a gas key";
   return null;
 }
 
@@ -96,7 +116,7 @@ export class Venues {
       if (await this.db.endGrant(current.owner, current.sessionKey, "expired")) await this.db.audit(current.owner, "grant_expired", { sessionKey: current.sessionKey });
       return null;
     }
-    const problem = sessionProblem(await this.chain.session(current.owner, current.sessionKey), nowSec, AUTOPILOT_POLICY);
+    const problem = sessionProblem(await this.chain.session(current.owner, current.sessionKey), nowSec, current.wallet ? WALLET_POLICY : AUTOPILOT_POLICY);
     if (problem) {
       if (await this.db.endGrant(current.owner, current.sessionKey, "revoked")) await this.db.audit(current.owner, "grant_revoked_on_chain", { sessionKey: current.sessionKey, reason: problem });
       this.log.warn({ owner: current.owner, reason: problem }, "grant ended");
@@ -108,7 +128,9 @@ export class Venues {
   /** Switches a grant to its waiting key once the account has added it as an Autopilot session; null until then. */
   private async switchOver(g: GrantRow, nextKey: string, nowSec: number): Promise<GrantRow | null> {
     const [session, key] = await Promise.all([this.chain.session(g.owner, nextKey), this.chain.accessKey(g.owner, nextKey)]);
-    if (!session || sessionProblem(session, nowSec, AUTOPILOT_POLICY) || grantKeyProblem(g.owner, key)) return null;
+    if (!session) return null;
+    const keyProblem = g.nextWallet ? walletKeyProblem(g.owner, key) : grantKeyProblem(g.owner, key);
+    if (sessionProblem(session, nowSec, g.nextWallet ? WALLET_POLICY : AUTOPILOT_POLICY) || keyProblem) return null;
     const switched = await this.db.switchGrant(g.owner, nextKey, session.expires_at, BigInt(session.daily_limit));
     if (switched) await this.db.audit(g.owner, "grant_switched", { from: g.sessionKey, sessionKey: switched.sessionKey, validUntil: switched.validUntil, dailyLimit: switched.dailyLimit.toString() });
     return switched;
@@ -131,7 +153,7 @@ export class Venues {
     if (!this.opts.sealPrivateKey) return { reason: "this executor cannot open grants (AUTOPILOT_SEAL_PRIVATE_KEY is not set)", pause: false };
     const cacheKey = `${o}|${g.sessionKey}`;
     const cached = this.cache.get(cacheKey);
-    if (cached) return { venue: cached };
+    if (cached) return this.gated(cached);
     const brokenWhy = this.broken.get(cacheKey);
     if (brokenWhy) return { reason: brokenWhy, pause: true };
     let secret: string;
@@ -140,18 +162,42 @@ export class Venues {
     } catch (e) {
       return this.markBroken(cacheKey, o, `the grant does not open with this executor's key (${e instanceof Error ? e.message : String(e)}); grant Autopilot again`);
     }
-    const secretKey = secret.startsWith("ed25519:") ? secret : `ed25519:${secret}`;
-    let key: string | null = null;
-    try {
-      key = publicKeyOf(secretKey);
-    } catch {
-      key = null;
+    let venue: Venue;
+    if (g.wallet) {
+      // The box holds the wallet's credential; the session is for the wallet's own key.
+      const wrong = credentialProblem(g.wallet.kind, secret) ?? (nearKeyOf(g.wallet.account) === g.sessionKey ? null : "the grant's session is not for its policy wallet's key");
+      if (wrong) return this.markBroken(cacheKey, o, `${wrong}; grant Autopilot again`);
+      try {
+        venue = this.make({ owner: o, kind: "grant", secretKey: secret, sessionKey: g.sessionKey, wallet: g.wallet });
+      } catch (e) {
+        // This executor cannot reach the wallet's service (no Agent API key on mainnet): it waits, the grant stands.
+        return { reason: e instanceof Error ? e.message : String(e), pause: false };
+      }
+    } else {
+      const secretKey = secret.startsWith("ed25519:") ? secret : `ed25519:${secret}`;
+      let key: string | null = null;
+      try {
+        key = publicKeyOf(secretKey);
+      } catch {
+        key = null;
+      }
+      if (key !== g.sessionKey) return this.markBroken(cacheKey, o, "the grant does not open to its session key; grant Autopilot again");
+      venue = this.make({ owner: o, kind: "grant", secretKey, sessionKey: g.sessionKey, wallet: null });
     }
-    if (key !== g.sessionKey) return this.markBroken(cacheKey, o, "the grant does not open to its session key; grant Autopilot again");
-    const venue = this.make({ owner: o, kind: "grant", secretKey, sessionKey: g.sessionKey });
     for (const k of this.cache.keys()) if (k.startsWith(`${o}|`)) this.cache.delete(k);
     this.cache.set(cacheKey, venue);
-    return { venue };
+    return this.gated(venue);
+  }
+
+  /** A policy wallet's venue only while its wallet can sign: a freeze makes the account's rules and copies wait, a wallet that is not the account's pauses them. */
+  private async gated(venue: Venue): Promise<Resolved> {
+    const blocked = venue.wallet ? await venue.wallet.check() : null;
+    return blocked ?? { venue };
+  }
+
+  /** The last check of every policy wallet this executor trades through, for /health. */
+  walletChecks(): WalletCheck[] {
+    return [...this.cache.values()].flatMap((v) => (v.wallet instanceof WalletGate && v.wallet.last ? [v.wallet.last] : []));
   }
 
   private async markBroken(cacheKey: string, owner: string, reason: string): Promise<Resolved> {

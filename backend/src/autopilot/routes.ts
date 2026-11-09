@@ -1,3 +1,4 @@
+import { nearKeyOf } from "@tredio/custody";
 import { autopilotMarketProblem, equityCurve, followSettingsSchema, isAutopilotMarket, type Rule, ruleSchema, boxKeyId, sealKeyId, sessionLeverageProblem, stats } from "@tredio/autopilot";
 import { ownerRequests } from "@tredio/contracts";
 import { type HyperliquidInfo, hyperliquidAddressOf } from "@tredio/hyperliquid";
@@ -11,6 +12,7 @@ import { type AccountKeys, ChainUnavailableError, issueUserToken, type SessionRe
 import type { Log } from "../log";
 import type { AutopilotService } from "./service";
 import { type AutopilotStore, ruleHash, type StoredRule } from "./store";
+import { agentIntentRoutes, type GrantWallet, type WalletDeps, walletBody, walletOwnerProblem, walletStatus } from "./wallets";
 
 /**
  * Autopilot and copy-trading API. Accounts sign in, build rules, backtest them, grant Autopilot a
@@ -42,6 +44,8 @@ export interface AutopilotRouteDeps {
   view: <T>(contractId: string, method: string, args: object) => Promise<T>;
   /** The Chain Signatures contract (deployment `external.chainSignatures`). */
   signer: string;
+  /** Whether `follower` holds early access to a signals leader (`signals:<identity>`); copying those signals needs it. */
+  signalAccess?: (follower: string, leader: string) => Promise<boolean>;
   /** Which keys may sign in as an account, and whether they still may. */
   keys: AccountKeys;
   /** The account passkey's approval, which following and enabling rules need. */
@@ -51,6 +55,8 @@ export interface AutopilotRouteDeps {
   sealPublicKey: string | undefined;
   /** The Tredio bot's own account (its rules run on route "api"). */
   botAccount: string | undefined;
+  /** Policy wallets: confirming a grant backed by one, its status, and (#mainnet) the Agent API's owner actions. */
+  wallets?: WalletDeps;
   log: Log;
   now?: () => number;
 }
@@ -85,8 +91,15 @@ const grantBody = z.object({
   /** The key the app generated, and the key itself sealed to the executor (seal v2). */
   sessionKey: nearKey,
   sealedKey: z.string().regex(/^v2\.[A-Za-z0-9_-]{100,600}$/, "seal the key to the executor with the current app"),
+  /** A policy wallet instead: the session is for the wallet's own key, and the box holds the wallet's credential. */
+  wallet: walletBody.optional(),
 });
-const followBody = z.object({ leader: z.string().regex(/^0x[0-9a-fA-F]{40}$/, "a leader is a Hyperliquid address"), settings: followSettingsSchema, approval: z.unknown().optional() });
+const followBody = z.object({
+  leader: z.string().regex(/^(0x[0-9a-fA-F]{40}|signals:[0-9a-f]{64})$/, "a leader is a Hyperliquid address or a signals channel (signals:<identity>)"),
+  settings: followSettingsSchema,
+  approval: z.unknown().optional(),
+});
+const isSignals = (leader: string) => leader.startsWith("signals:");
 
 const issues = (e: z.ZodError) => e.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ");
 
@@ -246,7 +259,8 @@ export function autopilotRoutes(d: AutopilotRouteDeps) {
   app.get("/autopilot/grant/seal-key", (c) => (d.sealPublicKey ? c.json({ publicKey: d.sealPublicKey }) : c.json({ error: "Autopilot is not configured on this server" }, 503)));
   app.get("/autopilot/grant", auth, async (c) => {
     const g = await d.store.grant(c.get("user"));
-    return c.json({ grant: g ? { sessionKey: g.sessionKey, status: g.status, validUntil: g.validUntil, dailyLimit: g.dailyLimit.toString(), nextSessionKey: g.nextSessionKey } : null });
+    const wallet = g?.wallet ? { ...g.wallet, ...(d.wallets ? await walletStatus(d.wallets, g.wallet) : { frozen: null, controller: null, balance: null }) } : null;
+    return c.json({ grant: g ? { sessionKey: g.sessionKey, status: g.status, validUntil: g.validUntil, dailyLimit: g.dailyLimit.toString(), nextSessionKey: g.nextSessionKey, wallet } : null });
   });
 
   app.post("/autopilot/grant", auth, async (c) => {
@@ -255,12 +269,18 @@ export function autopilotRoutes(d: AutopilotRouteDeps) {
     if (!body.success) return c.json({ error: issues(body.error) }, 400);
     const user = c.get("user");
     const sessionKey = body.data.sessionKey;
+    const w = body.data.wallet;
+    const wallet: GrantWallet | null = w ? { kind: w.kind, account: w.account, agentId: w.kind === "agent-api" ? w.agentId : null } : null;
+    if (wallet && nearKeyOf(wallet.account) !== sessionKey) return c.json({ error: "a policy wallet's session is for the wallet's own key" }, 400);
+    if (wallet?.kind === "agent-api" && d.wallets?.network !== "mainnet") return c.json({ error: "NEAR Intents Agent API agents run on mainnet; use an OutLayer policy wallet here" }, 400);
+    if (wallet && !d.wallets) return c.json({ error: "this server cannot check policy wallets" }, 503);
     // The box cannot be opened here; its header says which executor key it was sealed to.
     if (boxKeyId(body.data.sealedKey) !== (await sealKeyId(d.sealPublicKey))) return c.json({ error: "the key is sealed to another Autopilot key; reload the app and try again" }, 400);
     // An active grant keeps trading until this key is on chain, so asking again never pauses rules.
     const requested = await d.store.requestGrant(user, sessionKey, body.data.sealedKey, nowSec());
     if (!requested) return c.json({ error: "this key belongs to another account's grant" }, 409);
-    await d.store.addAudit(user, "grant_requested", requested.replaces ? { sessionKey, replaces: requested.replaces } : { sessionKey });
+    if (wallet) await d.store.setGrantWallet(user, sessionKey, wallet);
+    await d.store.addAudit(user, "grant_requested", { sessionKey, ...(requested.replaces ? { replaces: requested.replaces } : {}), ...(wallet ? { wallet } : {}) });
     // The account adds this session with one passkey prompt (an add_session owner request); only
     // the executor can open the key.
     return c.json({
@@ -270,7 +290,8 @@ export function autopilotRoutes(d: AutopilotRouteDeps) {
         scope: { outcomes: false, perps: false, hyperliquid: true },
         expires_at: nowSec() + body.data.validDays * 86_400,
         daily_limit: body.data.dailyLimit,
-        gas_key: true,
+        // A policy wallet pays its own gas, so its session is a plain key for the wallet's own key.
+        gas_key: wallet === null,
       },
     });
   });
@@ -292,15 +313,29 @@ export function autopilotRoutes(d: AutopilotRouteDeps) {
     if (session.label !== AUTOPILOT_LABEL || !session.scope.hyperliquid || session.scope.outcomes || session.scope.perps) {
       return c.json({ error: "the session is not an Autopilot session; reload the app and grant again" }, 409);
     }
-    // The key must be the account's own function-call key for session_call, so every order passes the contract's guard.
-    if (!key || key.kind !== "function_call" || key.receiverId !== user || !key.methodNames.includes("session_call")) {
+    const wallet = await d.store.grantWallet(sessionKey);
+    if (wallet) {
+      // The wallet's key signs only for the wallet's own account, so it need not be on the account; if it is, only for guarded session calls.
+      if (session.gas_key === true) return c.json({ error: "a policy wallet's session is a plain key; reload the app and grant again" }, 409);
+      if (key && (key.kind !== "function_call" || key.receiverId !== user || !key.methodNames.includes("session_call"))) return c.json({ error: "the wallet's key is not limited to the account's guarded session calls" }, 409);
+      // The account must control the wallet's policy before the executor uses it.
+      const problem = d.wallets ? await walletOwnerProblem(d.wallets, user, wallet).catch(() => "could not check the wallet's policy; try again") : "this server cannot check policy wallets";
+      if (problem) return c.json({ error: problem }, 409);
+    } else if (!key || key.kind !== "function_call" || key.receiverId !== user || !key.methodNames.includes("session_call")) {
+      // The key must be the account's own function-call key for session_call, so every order passes the contract's guard.
       return c.json({ error: "the session key is not limited to the account's guarded session calls" }, 409);
     }
     const dailyLimit = BigInt(session.daily_limit);
     if (!(await d.store.activateGrant(user, sessionKey, session.expires_at, dailyLimit))) return c.json({ error: "a newer grant was requested; try again" }, 409);
-    await d.store.addAudit(user, "grant_active", { sessionKey, validUntil: session.expires_at, dailyLimit: dailyLimit.toString() });
-    return c.json({ grant: { sessionKey, status: "active", validUntil: session.expires_at, dailyLimit: dailyLimit.toString(), nextSessionKey: null } });
+    await d.store.addAudit(user, "grant_active", { sessionKey, validUntil: session.expires_at, dailyLimit: dailyLimit.toString(), ...(wallet ? { wallet } : {}) });
+    return c.json({ grant: { sessionKey, status: "active", validUntil: session.expires_at, dailyLimit: dailyLimit.toString(), nextSessionKey: null, wallet } });
   });
+
+  // #mainnet: the account's Agent API agent, its owner actions signed by the passkey.
+  if (d.wallets) {
+    app.use("/autopilot/agent/*", auth);
+    app.route("/", agentIntentRoutes({ ...d.wallets, log: d.log, now }));
+  }
 
   // Copy-trading.
   app.get("/follows", auth, async (c) => c.json({ follows: await d.store.follows({ follower: c.get("user") }) }));
@@ -313,6 +348,7 @@ export function autopilotRoutes(d: AutopilotRouteDeps) {
     if (body.data.leader.toLowerCase() === user) return c.json({ error: "you cannot follow yourself" }, 400);
     const g = await d.store.grant(user);
     if (g?.status !== "active") return c.json({ error: "grant Autopilot access first: copies trade through the same Hyperliquid-only session" }, 409);
+    if (isSignals(body.data.leader) && !(await d.signalAccess?.(user, body.data.leader))) return c.json({ error: "buy early access to these signals first: Autopilot copies them while it lasts" }, 402);
     // The approval covers the settings exactly as sent; what is stored follows from them.
     const refused = await d.approvals.check(user, ownerRequests.follow(body.data.leader, raw?.settings), body.data.approval);
     if (refused) return c.json(refused.body, refused.status);
@@ -323,8 +359,10 @@ export function autopilotRoutes(d: AutopilotRouteDeps) {
   app.post("/follows/:id/status", auth, async (c) => {
     const body = z.object({ status: z.enum(["active", "paused", "stopped"]), approval: z.unknown().optional() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: issues(body.error) }, 400);
-    // Resuming copies trades again, so it needs the passkey; pausing and stopping do not.
+    // Resuming copies trades again, so it needs the passkey (and, for signals, early access); pausing and stopping do not.
     if (body.data.status === "active") {
+      const follow = (await d.store.follows({ follower: c.get("user") })).find((f) => f.id === Number(c.req.param("id")));
+      if (follow && isSignals(follow.leader) && !(await d.signalAccess?.(c.get("user"), follow.leader))) return c.json({ error: "your early access to these signals ended: renew it first" }, 402);
       const refused = await d.approvals.check(c.get("user"), ownerRequests.resumeFollow(Number(c.req.param("id"))), body.data.approval);
       if (refused) return c.json(refused.body, refused.status);
     }

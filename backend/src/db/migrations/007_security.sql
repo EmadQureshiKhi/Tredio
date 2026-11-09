@@ -1,4 +1,4 @@
--- Security hardening (review of 2026-10-10). Re-applied on every start: idempotent.
+-- Security hardening. Re-applied on every start: idempotent.
 
 -- Every session key the backend generated for an Autopilot grant, replaced ones included. These
 -- keys belong to the executor, never to the account, so they may not sign in to the API.

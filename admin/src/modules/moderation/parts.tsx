@@ -2,7 +2,7 @@ import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge, type Tone } from "@/src/components/ui/Badge";
 import { shortAddress } from "@/src/lib/format";
-import type { ContentKind, ModeratedCall, ModerationAction } from "@/src/types/admin";
+import type { ContentKind, ModeratedCall, ModeratedSignal, ModerationAction } from "@/src/types/admin";
 
 /** Every moderation query sits under ["admin", "moderation"], dropped on sign-out and refetched after each change. */
 export const moderationKey = ["admin", "moderation"] as const;
@@ -13,7 +13,7 @@ export const HANDLE = /^[a-z0-9_]{3,20}$/;
 export const REASON_MAX = 200;
 export const BIO_MAX = 160;
 
-export const noun = (kind: ContentKind) => (kind === "calls" ? "call" : "post");
+export const noun = (kind: ContentKind) => (kind === "calls" ? "call" : kind === "signals" ? "signal" : "post");
 
 /** A caller by handle, or by a shortened identity in mono. */
 export function CallerName({ address, handle }: { address: string; handle: string | null }) {
@@ -33,6 +33,8 @@ const ACTIONS: Record<ModerationAction, { label: string; past: string; tone: Ton
   hide_call: { label: "Hid call", past: "Hidden", tone: "warn" },
   restore_post: { label: "Restored post", past: "Restored", tone: "ok" },
   restore_call: { label: "Restored call", past: "Restored", tone: "ok" },
+  hide_signal: { label: "Hid signal", past: "Hidden", tone: "warn" },
+  restore_signal: { label: "Restored signal", past: "Restored", tone: "ok" },
   rename_caller: { label: "Edited profile", past: "Edited", tone: "accent" },
   remove_post: { label: "Deleted post", past: "Deleted", tone: "bad" },
   remove_call: { label: "Deleted call", past: "Deleted", tone: "bad" },
@@ -94,3 +96,7 @@ export function ListSkeleton({ rows = 5 }: { rows?: number }) {
     </div>
   );
 }
+
+/** A signal in one line: "Open long BTC, 100 USDC at 5x, mark 76,000". */
+export const signalLine = (s: NonNullable<ModeratedSignal["signal"]>) =>
+  `${s.kind === "open" ? "Open" : "Close"} ${s.side} ${s.market}${s.kind === "open" && s.marginUsdc !== null && s.leverage !== null ? `, ${s.marginUsdc} USDC at ${s.leverage}x` : ""}, mark ${s.price.toLocaleString("en-US", { maximumFractionDigits: s.price < 10 ? 4 : 2 })}`;

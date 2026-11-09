@@ -19,12 +19,18 @@ importers:
       '@noble/hashes':
         specifier: 2.0.1
         version: 2.0.1
+      '@tredio/autopilot':
+        specifier: workspace:*
+        version: link:packages/autopilot
       '@tredio/chain':
         specifier: workspace:^
         version: link:packages/chain
       '@tredio/contracts':
         specifier: workspace:^
         version: link:packages/contracts-ts
+      '@tredio/custody':
+        specifier: workspace:*
+        version: link:packages/custody
       '@tredio/hyperliquid':
         specifier: workspace:*
         version: link:packages/hyperliquid
@@ -150,6 +156,9 @@ importers:
       '@tredio/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts-ts
+      '@tredio/custody':
+        specifier: workspace:*
+        version: link:../../packages/custody
       '@tredio/hyperliquid':
         specifier: workspace:*
         version: link:../../packages/hyperliquid
@@ -370,6 +379,9 @@ importers:
       '@tredio/contracts':
         specifier: workspace:*
         version: link:../packages/contracts-ts
+      '@tredio/custody':
+        specifier: workspace:*
+        version: link:../packages/custody
       '@tredio/hyperliquid':
         specifier: workspace:*
         version: link:../packages/hyperliquid
@@ -428,6 +440,9 @@ importers:
       '@tredio/contracts':
         specifier: file:../packages/contracts-ts
         version: link:../packages/contracts-ts
+      '@tredio/custody':
+        specifier: file:../packages/custody
+        version: link:../packages/custody
       '@tredio/hyperliquid':
         specifier: file:../packages/hyperliquid
         version: link:../packages/hyperliquid
@@ -569,6 +584,25 @@ importers:
         version: 5.9.3
 
   packages/contracts-ts:
+    devDependencies:
+      '@types/bun':
+        specifier: 1.3.1
+        version: 1.3.1(@types/react@19.2.14)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/custody:
+    dependencies:
+      '@near-intents-agent-api/sdk':
+        specifier: 0.8.0
+        version: 0.8.0
+      '@noble/curves':
+        specifier: 2.2.0
+        version: 2.2.0
+      '@noble/hashes':
+        specifier: 2.0.1
+        version: 2.0.1
     devDependencies:
       '@types/bun':
         specifier: 1.3.1
@@ -1193,6 +1227,10 @@ packages:
   '@napi-rs/keyring@1.3.0':
     resolution: {integrity: sha512-WrOw/bcXm0f9qHkumlT1QlArXSTWqaY9sunsDpOk+yCCorCKMxvWT/a3xko4EYHVdeZoh00yI2TydXn6eyICDA==}
     engines: {node: '>= 10'}
+
+  '@near-intents-agent-api/sdk@0.8.0':
+    resolution: {integrity: sha512-2FaONCg1VxHyQ7tVrWwFrjqnDp3ja2FlnnE6/x5DzUas9mi3/GAQYHSdQBRPHkLfHTbk8O6E62cEzoOWUW3IJQ==}
+    engines: {node: '>=24'}
 
   '@nearai/inference-sdk@0.2.1':
     resolution: {integrity: sha512-RQPbJjW9n6tk3rqYmbdR59XJYNVs9y8LmR23tP+n7NyQMkuyRYmS1miHoxdX1oREN1FzPOtQfMF0TTroIaFf6A==}
@@ -4397,6 +4435,12 @@ snapshots:
       '@napi-rs/keyring-win32-arm64-msvc': 1.3.0
       '@napi-rs/keyring-win32-ia32-msvc': 1.3.0
       '@napi-rs/keyring-win32-x64-msvc': 1.3.0
+
+  '@near-intents-agent-api/sdk@0.8.0':
+    dependencies:
+      '@noble/curves': 2.4.0
+      '@noble/hashes': 2.4.0
+      '@scure/base': 2.4.0
 
   '@nearai/inference-sdk@0.2.1(typescript@5.9.3)(ws@8.21.0)(zod@4.6.5)':
     dependencies:

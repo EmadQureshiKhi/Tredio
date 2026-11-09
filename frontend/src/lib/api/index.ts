@@ -29,7 +29,7 @@ export interface Reading {
 }
 
 export interface Trend {
-  /** On NEAR a trend's id is its identifier (`topic:openai`). */
+  /** A trend's id is its identifier (`topic:openai`). */
   id: string;
   identifier: string;
   displayName: string | null;
@@ -200,6 +200,33 @@ export interface Grant {
   dailyLimit: string;
   /** A replacement key requested while this grant is active; the grant switches to it once it is on chain. */
   nextSessionKey?: string | null;
+  /** The policy wallet whose key the session is for, with its state; null for a sealed session key. */
+  wallet?: GrantWallet | null;
+}
+
+/**
+ * A policy wallet behind a grant: an OutLayer custody wallet (testnet) or an Agent API agent
+ * (mainnet), whose enclave signs Autopilot's session calls within a policy the account controls.
+ */
+export interface GrantWallet {
+  kind: "outlayer" | "agent-api";
+  /** The wallet's NEAR account (implicit), which sends the calls and pays their gas. */
+  account: string;
+  agentId: string | null;
+  /** Null when it could not be read just now. */
+  frozen: boolean | null;
+  controller: string | null;
+  /** yoctoNEAR the wallet holds for gas. */
+  balance: string | null;
+}
+
+/** What the passkey signs for an Agent API owner action: WebAuthn request options (challenge base64url). */
+export interface AgentWebAuthn {
+  challenge: string;
+  rpId: string;
+  allowCredentials: Array<{ id: string; type: "public-key" }>;
+  userVerification: "required";
+  timeout: number;
 }
 
 /** The session the API asks the account to add for Autopilot (its passkey adds it). */
@@ -251,9 +278,18 @@ export const autopilot = {
   /** The executor's public key, which the app seals grant keys to. */
   sealKey: () => api<{ publicKey: string }>("/v1/autopilot/grant/seal-key"),
   /** A key made on this device: the API gets its public key and a box only the executor opens. */
-  requestGrant: (dailyLimit: bigint, validDays: number, key: { sessionKey: string; sealedKey: string }) =>
-    api<{ session: GrantSession }>("/v1/autopilot/grant", { body: { dailyLimit: dailyLimit.toString(), validDays, sessionKey: key.sessionKey, sealedKey: key.sealedKey }, auth: true }),
+  requestGrant: (dailyLimit: bigint, validDays: number, key: { sessionKey: string; sealedKey: string }, wallet?: { kind: "outlayer"; account: string } | { kind: "agent-api"; account: string; agentId: string }) =>
+    api<{ session: GrantSession }>("/v1/autopilot/grant", { body: { dailyLimit: dailyLimit.toString(), validDays, sessionKey: key.sessionKey, sealedKey: key.sealedKey, ...(wallet ? { wallet } : {}) }, auth: true }),
   confirmGrant: () => api<{ grant: Grant }>("/v1/autopilot/grant/confirm", { body: {}, auth: true }),
+  /** #mainnet: an owner action of the account's Agent API agent, prepared by the API for the passkey to sign. */
+  agentIntent: (
+    body:
+      | { type: "agent_create"; credentialId: string; rpId: string; origin: string }
+      | { type: "grant_issue"; agentId: string; commitment: string; validDays: number }
+      | { type: "agent_freeze" | "agent_unfreeze"; agentId: string },
+  ) => api<{ correlationId: string; type: string; agentId: string; summary: string; webauthn: AgentWebAuthn }>("/v1/autopilot/agent/intent", { body, auth: true }),
+  /** #mainnet: the passkey's assertion for a prepared agent intent; the API submits it and waits for the outcome. */
+  agentSubmit: (correlationId: string, credential: unknown) => api<{ status: string; agentId: string; account: string | null }>("/v1/autopilot/agent/submit", { body: { correlationId, credential }, auth: true }),
   follows: () => api<{ follows: Follow[] }>("/v1/follows", { auth: true }),
   /** Following or changing caps: the passkey approves the leader and these settings first. */
   follow: async (leader: string, settings: FollowSettings, approve: Approve) => {
@@ -368,6 +404,64 @@ export const social = {
     return api<{ caller: string; linkedAccount: string }>("/v1/callers/link", { body: { ...body, approval } });
   },
   identitySession: (identity: string, issuedAt: number, signature: string) => api<{ token: string; identity: string; expiresAt: number }>("/v1/identity/session", { body: { identity, issuedAt, signature } }),
+};
+
+/** A paid signals channel: a caller identity linked to the account it is paid to and commits from. */
+export interface SignalChannel {
+  leader: string;
+  /** The follow leader id for copying it: `signals:<identity>`. */
+  leaderId?: string;
+  handle: string | null;
+  account: string | null;
+  /** USDC, atomic (6 decimals), for one period of early access. */
+  price_usdc: string;
+  period_days: number;
+  reveal_delay_sec: number;
+  signals?: number;
+  last?: number | null;
+}
+
+/** A signal as the feed lists it: sealed until `revealAt`, then also in the clear. */
+export interface SignalItem {
+  id: number;
+  leader: string;
+  handle: string | null;
+  epoch: number;
+  iv: string;
+  ciphertext: string;
+  /** SHA-256 of the signed message, committed on chain in `commitTx`'s USDC memo before anyone could read it. */
+  commitment: string;
+  signature: string;
+  commitTx: string;
+  issuedAt: number;
+  committedAt: number;
+  revealAt: number;
+  signal: SignalBody | null;
+}
+
+export interface SignalBody {
+  leader: string;
+  kind: "open" | "close";
+  market: string;
+  side: "long" | "short";
+  marginUsdc: number | null;
+  leverage: number | null;
+  note: string;
+  issuedAt: number;
+  price: number;
+}
+
+export const signals = {
+  channels: () => api<{ channels: SignalChannel[] }>("/v1/signals/channels"),
+  feed: (leader?: string, limit = 50) => api<{ now: number; signals: SignalItem[] }>(`/v1/signals?limit=${limit}${leader ? `&leader=${leader}` : ""}`),
+  /** The viewing keys the signed-in account holds for a channel (402 without early access). */
+  keys: (leader: string) => api<{ leader: string; expiresAt: number | null; keys: Array<{ epoch: number; key: string }> }>(`/v1/signals/${leader}/keys`, { auth: true }),
+  access: (leader: string) => api<{ leader: string; expiresAt: number | null; active: boolean }>(`/v1/signals/${leader}/access`, { auth: true }),
+  /** Claims early access with the USDC payment the account made to the leader's account. */
+  claim: (leader: string, tx: string, sender: string) => api<{ leader: string; startsAt: number; expiresAt: number }>(`/v1/signals/${leader}/access`, { body: { tx, sender }, auth: true }),
+  setChannel: (body: { caller: string; priceUsdc: string; periodDays: number; revealDelaySec: number; issuedAt: number; signature: string }) => api<{ channel: SignalChannel }>("/v1/signals/channel", { method: "PUT", body }),
+  publish: (body: { caller: string; signal: { kind: "open" | "close"; market: string; side: "long" | "short"; marginUsdc?: number; leverage?: number; note: string }; issuedAt: number; signature: string; commitTx: string; commitSender: string }) =>
+    api<{ signal: { id: number; commitment: string; commitTx: string; committedAt: number; revealAt: number; epoch: number } }>("/v1/signals", { body }),
 };
 
 export interface VaultItem {

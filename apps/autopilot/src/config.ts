@@ -37,6 +37,18 @@ const schema = z.object({
   HL_TAKER_FEE_BPS: z.coerce.number().nonnegative().default(4.5),
   /** Ask the relayer to top up a session gas key below this (its own minimum). */
   SESSION_GAS_MIN_NEAR: nearAmount.default(near("0.31")),
+  /**
+   * A policy wallet pays its own gas: below this NEAR it waits for its account to fund it. OutLayer
+   * sends a call only while the wallet holds the gas it attaches (0.15 NEAR for 150 Tgas); a call burns a few thousandths.
+   */
+  POLICY_WALLET_GAS_MIN_NEAR: nearAmount.default(near("0.16")),
+  /** OutLayer's custody API, for grants backed by an OutLayer policy wallet (the network's own by default). */
+  CUSTODY_API_URL: optional(z.string().url()),
+  /** #mainnet: the NEAR Intents Agent API partner key (partners.near-intents.org), for grants backed by an Agent API agent. Server side only. */
+  AGENT_API_KEY: optional(z.string().min(8)),
+  AGENT_API_URL: optional(z.string().url()),
+  /** The backend's SIGNALS_SECRET: opens paid signals, so follows of a signal channel copy them. Without it those follows wait. */
+  SIGNALS_SECRET: optional(z.string().regex(/^[0-9a-f]{64}$/, "64 hex characters")),
   /** Any value halts openings from the environment, on top of the admin kill switch. */
   KILL_SWITCH: optional(z.string()),
 });

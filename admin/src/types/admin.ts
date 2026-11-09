@@ -387,9 +387,9 @@ export interface RotationBoard {
 /** Social moderation (backend/src/social/moderation.ts). Hidden content leaves every public view and can be restored. */
 export const MODERATION_STATES = ["all", "visible", "hidden"] as const;
 export type ModerationState = (typeof MODERATION_STATES)[number];
-export type ContentKind = "posts" | "calls";
+export type ContentKind = "posts" | "calls" | "signals";
 /** `remove_*` are from before moderation hid rows: those were deleted and cannot be restored. */
-export type ModerationAction = "rename_caller" | "remove_call" | "remove_post" | "hide_call" | "hide_post" | "restore_call" | "restore_post";
+export type ModerationAction = "rename_caller" | "remove_call" | "remove_post" | "hide_call" | "hide_post" | "restore_call" | "restore_post" | "hide_signal" | "restore_signal";
 
 /** The newest moderation of a call or post. */
 export interface LastModeration {
@@ -426,6 +426,15 @@ export interface ModeratedCall extends Moderated {
   resolvesAt: number;
   closingIndex: number | null;
   outcome: "open" | "hit" | "miss" | "void";
+}
+
+/** A paid signal: in the clear when the API holds the signals secret (`identifier` is then its market), else sealed. */
+export interface ModeratedSignal extends Moderated {
+  /** Unix seconds. */
+  issuedAt: number;
+  revealAt: number;
+  commitTx: string;
+  signal: { kind: "open" | "close"; market: string; side: "long" | "short"; marginUsdc: number | null; leverage: number | null; note: string; price: number } | null;
 }
 
 /** A page of calls or posts, newest first, with counts over the whole table (`matching`: the filters). */

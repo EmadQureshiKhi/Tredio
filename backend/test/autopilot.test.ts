@@ -77,3 +77,57 @@ describe("Autopilot markets", () => {
     expect(await res.json()).toEqual({ error: `${autopilotMarketProblem("ZEC")}; edit the rule to trade one of them` });
   });
 });
+
+describe("following a signals channel", () => {
+  const CHANNEL = `signals:${"c".repeat(64)}`;
+  const settings = { mode: "ratio", ratio: 0.1, fixedMarginUsdc: 0, maxMarginUsdc: 50, maxLeverage: 3, maxDailyLossUsdc: 20, maxSlippagePct: 0.3, maxOpenLossUsdc: 5 };
+  /** Follows with a grant and approvals that always pass, and early access that `access` decides. */
+  function follows(access: boolean) {
+    const saved: string[] = [];
+    const statuses: string[] = [];
+    const deps = {
+      isRevoked: async () => false,
+      store: {
+        grant: async () => ({ status: "active" }),
+        upsertFollow: async (_u: string, leader: string, s: unknown) => {
+          saved.push(leader);
+          return { id: 1, leader, settings: s };
+        },
+        follows: async () => [{ id: 1, leader: CHANNEL }],
+        setFollowStatus: async (_id: number, _u: string, status: string) => {
+          statuses.push(status);
+          return true;
+        },
+        addAudit: async () => {},
+      },
+      approvals: { check: async () => null },
+      signalAccess: async (follower: string, leader: string) => access && follower === USER && leader === CHANNEL,
+      keys: { stillActive: async () => true },
+      sessionSecret: SECRET,
+      log: quietLog,
+      now: () => NOW,
+    } as unknown as AutopilotRouteDeps;
+    return { app: autopilotRoutes(deps), saved, statuses };
+  }
+
+  test("a follow of a channel needs early access; a Hyperliquid address does not", async () => {
+    const without = follows(false);
+    const refused = await post(without.app, "/follows", { leader: CHANNEL, settings });
+    expect(refused.status).toBe(402);
+    expect(await refused.json()).toEqual({ error: "buy early access to these signals first: Autopilot copies them while it lasts" });
+    expect((await post(without.app, "/follows", { leader: "0x972dac64d693f387cd089f0efcda320c71097a2c", settings })).status).toBe(201);
+    expect((await post(without.app, "/follows", { leader: "signals:nothex", settings })).status).toBe(400);
+    const withAccess = follows(true);
+    expect((await post(withAccess.app, "/follows", { leader: CHANNEL, settings })).status).toBe(201);
+    expect(withAccess.saved).toEqual([CHANNEL]);
+  });
+
+  test("resuming a channel's follow needs access again; pausing never does", async () => {
+    const without = follows(false);
+    expect((await post(without.app, "/follows/1/status", { status: "active" })).status).toBe(402);
+    expect((await post(without.app, "/follows/1/status", { status: "paused" })).status).toBe(200);
+    expect(without.statuses).toEqual(["paused"]);
+    const withAccess = follows(true);
+    expect((await post(withAccess.app, "/follows/1/status", { status: "active" })).status).toBe(200);
+  });
+});

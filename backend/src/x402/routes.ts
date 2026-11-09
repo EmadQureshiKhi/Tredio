@@ -37,6 +37,8 @@ export interface X402Deps {
   backtest: (rule: Rule, days: number, nowSec: number) => Promise<BacktestResult & { trendId: string | null; resolutionSec: number }>;
   log: Log;
   now?: () => number;
+  /** A signals channel's offer to agents (signals/routes.ts `paidSignalKeys`), or null when there is no such channel. */
+  signalKeys?: (leader: string, nowSec: number) => Promise<{ payTo: string; amount: bigint; periodDays: number; keys: () => Promise<Array<{ epoch: number; key: string }>> } | null>;
   /** Tests: the chain reads and the settler, instead of RPC and the configured relayer. */
   state?: NearState;
   settler?: Settler | null;
@@ -94,9 +96,21 @@ export function x402Routes(d: X402Deps): Hono {
       resources: [
         { method: "GET", path: "/v1/x402/trends/{identifier}/history", query: { from: "unix seconds, optional", to: "unix seconds, optional" }, description: offers.history.description, amount: offers.history.amount.toString(), usdc: fromRaw(offers.history.amount, USDC_DECIMALS) },
         { method: "POST", path: "/v1/x402/backtests", body: { rule: "an Autopilot rule", days: "1 to 30, default 7" }, description: offers.backtest.description, amount: offers.backtest.amount.toString(), usdc: fromRaw(offers.backtest.amount, USDC_DECIMALS) },
+        ...(d.signalKeys
+          ? [{ method: "GET", path: "/v1/x402/signals/{leader}/keys", description: "A signals leader's weekly viewing keys for its next period, paid to the leader's account at the leader's price (GET /v1/signals/channels)", amount: "per channel", usdc: "per channel" }]
+          : []),
       ],
     }),
   );
+
+  // A signals channel's viewing keys for its next period, paid to the leader's account: an agent reads signals before they are public.
+  app.get("/x402/signals/:leader/keys", limit, async (c) => {
+    if (!paywall) return off(c);
+    const offer = d.signalKeys ? await d.signalKeys(c.req.param("leader"), Math.floor(now() / 1000)) : null;
+    if (!offer) return c.json({ error: "no such signals channel" }, 404);
+    const description = `Early access for ${offer.periodDays} days to a Tredio leader's private trade signals: the weekly viewing keys`;
+    return paywall.charge(c, { description, amount: offer.amount, payTo: offer.payTo }, async () => c.json({ leader: c.req.param("leader"), keys: await offer.keys() }));
+  });
 
   app.get("/x402/trends/:identifier/history", limit, async (c) => {
     if (!paywall) return off(c);

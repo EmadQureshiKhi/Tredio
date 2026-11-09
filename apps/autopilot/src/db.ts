@@ -1,5 +1,6 @@
 import { type FollowSettings, type Holding, type Rule, type Side, withFollowDefaults } from "@tredio/autopilot";
 import postgres from "postgres";
+import type { GrantWallet } from "./wallets";
 
 /**
  * The executor's reads and writes. The schema belongs to the backend (backend/src/db/migrations);
@@ -82,6 +83,9 @@ export interface GrantRow {
   /** A replacement key the account asked for; it takes over once the account adds it on chain. */
   nextSessionKey: string | null;
   nextSealedKey: string | null;
+  /** The policy wallet whose key the session is for (the sealed box holds its credential), or null for a sealed session key. */
+  wallet: GrantWallet | null;
+  nextWallet: GrantWallet | null;
 }
 
 export interface FollowRow {
@@ -153,6 +157,9 @@ const toOrder = (r: Row): OrderRow => ({
   createdAt: secs(r.created_at) ?? 0,
 });
 
+const walletOf = (kind: unknown, account: unknown, agentId: unknown): GrantWallet | null =>
+  kind === "outlayer" || kind === "agent-api" ? { kind, account: account as string, agentId: (agentId as string | null) ?? null } : null;
+
 const toGrant = (r: Row): GrantRow => ({
   owner: r.owner as string,
   sessionKey: r.session_key as string,
@@ -161,7 +168,15 @@ const toGrant = (r: Row): GrantRow => ({
   dailyLimit: BigInt(r.daily_limit as string),
   nextSessionKey: (r.next_session_key as string | null) ?? null,
   nextSealedKey: (r.next_sealed_key as string | null) ?? null,
+  wallet: walletOf(r.wallet_kind, r.wallet_account, r.wallet_agent_id),
+  nextWallet: walletOf(r.next_wallet_kind, r.next_wallet_account, r.next_wallet_agent_id),
 });
+
+/** A grant's columns with the policy wallets of its current and waiting keys (`autopilot_grant_wallets`, keyed by session key). */
+const GRANT_COLUMNS = `g.owner, g.session_key, g.sealed_key, g.valid_until, g.daily_limit, g.next_session_key, g.next_sealed_key,
+  w.kind AS wallet_kind, w.account AS wallet_account, w.agent_id AS wallet_agent_id,
+  nw.kind AS next_wallet_kind, nw.account AS next_wallet_account, nw.agent_id AS next_wallet_agent_id`;
+const GRANT_WALLETS = "LEFT JOIN autopilot_grant_wallets w ON w.session_key = g.session_key LEFT JOIN autopilot_grant_wallets nw ON nw.session_key = g.next_session_key";
 
 const toFollow = (r: Row): FollowRow => ({
   id: Number(r.id),
@@ -267,14 +282,14 @@ export class ExecutorDb {
 
   async grants(): Promise<GrantRow[]> {
     const rows = await this.sql<Row[]>`
-      SELECT owner, session_key, sealed_key, valid_until, daily_limit, next_session_key, next_sealed_key FROM autopilot_grants WHERE status = 'active' ORDER BY owner`;
+      SELECT ${this.sql.unsafe(GRANT_COLUMNS)} FROM autopilot_grants g ${this.sql.unsafe(GRANT_WALLETS)} WHERE g.status = 'active' ORDER BY g.owner`;
     return rows.map(toGrant);
   }
 
   async grant(owner: string): Promise<GrantRow | null> {
     const rows = await this.sql<Row[]>`
-      SELECT owner, session_key, sealed_key, valid_until, daily_limit, next_session_key, next_sealed_key FROM autopilot_grants
-       WHERE status = 'active' AND owner = ${owner.toLowerCase()}`;
+      SELECT ${this.sql.unsafe(GRANT_COLUMNS)} FROM autopilot_grants g ${this.sql.unsafe(GRANT_WALLETS)}
+       WHERE g.status = 'active' AND g.owner = ${owner.toLowerCase()}`;
     return rows[0] ? toGrant(rows[0]) : null;
   }
 
@@ -291,10 +306,12 @@ export class ExecutorDb {
    */
   async switchGrant(owner: string, nextSessionKey: string, validUntil: number, dailyLimit: bigint): Promise<GrantRow | null> {
     const rows = await this.sql<Row[]>`
-      UPDATE autopilot_grants SET session_key = next_session_key, sealed_key = next_sealed_key, next_session_key = NULL, next_sealed_key = NULL,
-             status = 'active', valid_until = ${validUntil}, daily_limit = ${dailyLimit.toString()}, updated_at = now()
-       WHERE owner = ${owner.toLowerCase()} AND next_session_key = ${nextSessionKey} AND next_sealed_key IS NOT NULL
-      RETURNING owner, session_key, sealed_key, valid_until, daily_limit, next_session_key, next_sealed_key`;
+      WITH g AS (
+        UPDATE autopilot_grants SET session_key = next_session_key, sealed_key = next_sealed_key, next_session_key = NULL, next_sealed_key = NULL,
+               status = 'active', valid_until = ${validUntil}, daily_limit = ${dailyLimit.toString()}, updated_at = now()
+         WHERE owner = ${owner.toLowerCase()} AND next_session_key = ${nextSessionKey} AND next_sealed_key IS NOT NULL
+        RETURNING owner, session_key, sealed_key, valid_until, daily_limit, next_session_key, next_sealed_key)
+      SELECT ${this.sql.unsafe(GRANT_COLUMNS)} FROM g ${this.sql.unsafe(GRANT_WALLETS)}`;
     return rows[0] ? toGrant(rows[0]) : null;
   }
 

@@ -31,7 +31,6 @@ node scripts/capture.mjs http://localhost:3010 perp   # only the page load that 
 `scripts/capture.mjs` drives Google Chrome headless at a 1600x900 viewport and device scale 2, never signs in, and spaces page loads by 20 seconds because the app reads public NEAR RPCs that rate-limit per IP.
 It also writes `public/captures/boxes.json` with the CSS-pixel box of every `data-testid` element, heading, segmented option and chart, which is where the film's rings and cursor coordinates come from.
 If a layout changes, check the rings in `src/Film.tsx` against the new boxes.
-`internal/scrub.sh` also reads PNG bytes, so a fresh capture can trip it on a random string; re-encode that file losslessly (`ffmpeg -i in.png -pred mixed -compression_level 9 out.png`) and run it again.
 
 ## Preview
 

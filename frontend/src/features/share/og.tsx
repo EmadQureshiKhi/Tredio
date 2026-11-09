@@ -14,16 +14,16 @@ export const OG_SIZE = { width: 1200, height: 630 } as const;
 const fontDir = join(process.cwd(), "src", "features", "share", "fonts");
 const brandDir = join(process.cwd(), "public");
 const [light, display, strong, wordmark] = await Promise.all([
-  readFile(join(fontDir, "sohne-leicht.ttf")),
-  readFile(join(fontDir, "arizona-mix-light.ttf")),
-  readFile(join(fontDir, "sohne-kraftig.ttf")),
+  readFile(join(fontDir, "hanken-grotesk-light.ttf")),
+  readFile(join(fontDir, "newsreader-light.ttf")),
+  readFile(join(fontDir, "hanken-grotesk-medium.ttf")),
   readFile(join(brandDir, "tredio-icon-logo.svg"), "base64"),
 ]);
 
 export const ogFonts = [
-  { name: "Sohne", data: light, weight: 300 as const, style: "normal" as const },
-  { name: "Sohne", data: strong, weight: 500 as const, style: "normal" as const },
-  { name: "Arizona", data: display, weight: 400 as const, style: "normal" as const },
+  { name: "Hanken Grotesk", data: light, weight: 300 as const, style: "normal" as const },
+  { name: "Hanken Grotesk", data: strong, weight: 500 as const, style: "normal" as const },
+  { name: "Newsreader", data: display, weight: 400 as const, style: "normal" as const },
 ];
 
 /** The dark theme's tokens (app/globals.css). */
@@ -46,8 +46,8 @@ export const C = {
   warn: "#fbbf24",
 } as const;
 
-export const SANS = "Sohne";
-export const DISPLAY = "Arizona";
+export const SANS = "Hanken Grotesk";
+export const DISPLAY = "Newsreader";
 
 const host = APP_URL.replace(/^https?:\/\//, "");
 

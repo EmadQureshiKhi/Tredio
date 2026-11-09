@@ -32,6 +32,8 @@ export interface Offer {
   description: string;
   /** Price in the asset's atomic units (USDC: 6 decimals). */
   amount: bigint;
+  /** Who is paid, when not the paywall's own payee (a signals leader's account). */
+  payTo?: string;
 }
 
 export interface PaywallOptions {
@@ -60,7 +62,7 @@ export class Paywall {
       network: this.network,
       amount: offer.amount.toString(),
       asset: this.o.asset,
-      payTo: this.o.payTo,
+      payTo: offer.payTo ?? this.o.payTo,
       maxTimeoutSeconds: MAX_TIMEOUT_SECONDS,
       extra: { symbol: "USDC", decimals: 6 },
     };

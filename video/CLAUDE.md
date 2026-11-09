@@ -8,5 +8,5 @@ Remotion project for the X launch film and the website's hero film (`src/hero`);
 - Launch film: every scene must work at 1920x1080 and 1080x1350 (`useFormat()` in src/kit.tsx); check both contact sheets after any change.
 - `Slam` keeps its layout box before its hit, so stacked lines never jump when one lands.
 - Remotion's own AAC is late; render through `scripts/render.mjs`, which renders muted and muxes the WAV.
-- Hero film: edited from the owner's source film, whose copy lives only in gitignored `public/source/`; only Tredio's own names and partners appear in any file. Measure changes against the source with `node scripts/hero.mjs compare <frames>` and keep every cut on its frame (the soundtrack is the source's). It shows the website's partner logos, as the owner asked.
+- Hero film: edited from the owner's source film, whose copy lives only in gitignored `public/source/`. Measure changes against the source with `node scripts/hero.mjs compare <frames>` and keep every cut on its frame (the soundtrack is the source's). It shows the website's partner logos, as the owner asked.
 

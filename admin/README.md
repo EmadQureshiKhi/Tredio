@@ -7,14 +7,14 @@ Built with Next.js 16 (App Router), TanStack Query and Tailwind CSS 4.
 ## How access works
 
 The browser talks to the backend directly; this app has no server routes of its own.
-The backend checks every admin request against its `ADMIN_ADDRESSES`.
+The backend checks every admin request against its `ADMIN_ACCOUNTS`.
 
 1. The reviewer signs one sign-in request for `POST /v1/admin/session` with an allowlisted admin account, binding the method, path, a timestamp, a random nonce and the body hash.
 2. The backend answers with a 12 hour bearer token, which the panel keeps in memory and in `sessionStorage`, so a reload in the same tab does not ask for a new signature.
    Later requests send that token; signed admin requests (not bearer tokens) are limited to 60 per 10 minutes per IP.
 3. Any `401` ends the session and returns to the sign-in screen with the reason.
 
-`NEXT_PUBLIC_ADMIN_WALLETS` is only a hint on the sign-in screen; it grants nothing.
+`NEXT_PUBLIC_ADMIN_ACCOUNTS` is only a hint on the sign-in screen; it grants nothing.
 Signing out revokes the token on the backend (`POST /v1/admin/session/revoke`) and then forgets it here, even when the backend cannot be reached.
 
 ## Screens
@@ -39,7 +39,7 @@ cp .env.example .env.local
 
 - `NEXT_PUBLIC_BACKEND_URL`: the backend origin (default `http://localhost:4000`).
   The backend's `FRONTEND_URL` must list this panel's origin for CORS.
-- `NEXT_PUBLIC_ADMIN_WALLETS`: optional comma-separated admin accounts for the sign-in hint.
+- `NEXT_PUBLIC_ADMIN_ACCOUNTS`: optional comma-separated admin accounts for the sign-in hint.
 
 `NEXT_PUBLIC_` values are inlined at build time.
 In production the panel is served from https://admin.tredio.bid and talks to https://api.tredio.bid.
@@ -60,7 +60,7 @@ npm run test:e2e    # Playwright, against the local backend
 ## End-to-end tests
 
 `npm run test:e2e` drives the panel in Chromium against the real backend on port 4000 (start it first with `cd backend && bun run dev`), using a dev server already on 3001 or starting one.
-The tests sign in with a local admin key, which must be in the backend's `ADMIN_ADDRESSES`.
+The tests sign in with a local admin key, which must be in the backend's `ADMIN_ACCOUNTS`.
 The key stays in the test process and is never printed.
 Run `npx playwright install chromium` once.
 

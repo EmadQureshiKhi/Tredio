@@ -3,6 +3,7 @@ import { keccak_256 } from "@noble/hashes/sha3.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import type { Side } from "@tredio/autopilot";
 import { isTransient, toNear } from "@tredio/chain";
+import { PolicyRefusal } from "@tredio/custody";
 import { type AccountVersion, type Session, type SessionAction, sessionCallPrepaid } from "@tredio/contracts";
 import {
   type AccountState,
@@ -28,7 +29,8 @@ import { classify, SESSION_MAX_LEVERAGE } from "./orders";
  * account, or an account that granted Autopilot a session. Every order is a `session_call` the
  * account contract checks (scope, expiry, the 2% price guard, the 10x leverage cap) before it asks
  * Chain Signatures to sign; the venue takes the signature from the transaction's result and posts
- * exactly the action the contract hashed to Hyperliquid, so nobody between can change it.
+ * exactly the action the contract hashed to Hyperliquid, so nobody between can change it. A grant on
+ * a policy wallet sends the same `session_call` signed in the wallet's custody enclave instead.
  */
 
 export interface PlaceOrder {
@@ -79,6 +81,8 @@ export interface Venue {
   readonly kind: "bot" | "grant";
   /** The session's public key. */
   readonly sessionKey: string;
+  /** The policy wallet that signs this venue's session calls in its custody enclave; null when the executor holds the session key. */
+  readonly wallet: VenueWallet | null;
   /** Leverage an opening may set from this session (the account contract refuses more). */
   readonly maxLeverage: number;
   /** The account's Hyperliquid address (its Chain Signatures key). */
@@ -87,6 +91,22 @@ export interface Venue {
   version(): Promise<AccountVersion>;
   /** Sends `o`; `sent` runs once the account has signed it on chain, before Hyperliquid sees it. */
   send(o: PlaceOrder, sent: (txHash: string) => Promise<void>): Promise<SendResult>;
+}
+
+/**
+ * A policy wallet: OutLayer custody (testnet) or a NEAR Intents Agent API agent (mainnet) whose
+ * enclave signs the session calls, within a policy the account controls and can freeze.
+ */
+export interface VenueWallet {
+  readonly kind: "outlayer" | "agent-api";
+  /** The wallet's NEAR account, which sends the session calls and pays their gas. */
+  readonly account: string;
+  /**
+   * Why the wallet cannot sign for the account now, or null. `pause` when the account must act (the
+   * wallet's policy is not the account's, or allows more than Autopilot's); a freeze or a wallet
+   * low on gas only waits.
+   */
+  check(): Promise<{ reason: string; pause: boolean } | null>;
 }
 
 /** What the venue needs from NEAR. */
@@ -113,10 +133,14 @@ export interface HyperliquidApi {
 export interface SessionPolicy {
   label: string | null;
   hyperliquidOnly: boolean;
+  /** A policy wallet's session: a plain key, since the wallet pays its own gas. Otherwise the session is a gas key the executor holds. */
+  plainKey?: boolean;
 }
 
 export const AUTOPILOT_LABEL = "autopilot";
 export const AUTOPILOT_POLICY: SessionPolicy = { label: AUTOPILOT_LABEL, hyperliquidOnly: true };
+/** Autopilot's session for a policy wallet's key. */
+export const WALLET_POLICY: SessionPolicy = { ...AUTOPILOT_POLICY, plainKey: true };
 
 /** Why a session cannot trade for Autopilot, or null when it can. */
 export function sessionProblem(s: Session | null, nowSec: number, policy: SessionPolicy): string | null {
@@ -125,7 +149,9 @@ export function sessionProblem(s: Session | null, nowSec: number, policy: Sessio
   if (!s.scope.hyperliquid) return "the session cannot trade Hyperliquid";
   if (policy.hyperliquidOnly && (s.scope.outcomes || s.scope.perps)) return "the session can do more than Hyperliquid orders, so Autopilot does not hold it";
   if (policy.label !== null && s.label !== policy.label) return `the session is labelled ${s.label}, not ${policy.label}`;
-  if (!s.gas_key) return "the session key is not a gas key";
+  if (policy.plainKey) {
+    if (s.gas_key) return "the policy wallet's session is a gas key, not the wallet's own key";
+  } else if (!s.gas_key) return "the session key is not a gas key";
   return null;
 }
 
@@ -164,8 +190,10 @@ export interface SessionVenueOptions {
   /** The account's Hyperliquid address. */
   addressOf: () => Promise<string>;
   nonces: Nonces;
-  /** Tops up the session's gas key (the relayer); the balance it reports. */
+  /** Tops up the session's gas key (the relayer); the balance it reports. Unused with a policy wallet, which pays its own gas. */
   fund: () => Promise<bigint>;
+  /** The policy wallet that signs the session calls (`chain.sessionCall` goes through it). */
+  wallet?: VenueWallet;
   /**
    * Ask for a top-up below this balance (yoctoNEAR); below what a session call prepays for its
    * attached gas (0.3 NEAR on v1 account code, 0.15 on v2) the venue refuses to send.
@@ -183,6 +211,7 @@ export class SessionVenue implements Venue {
   readonly kind: "bot" | "grant";
   readonly sessionKey: string;
   readonly maxLeverage = SESSION_MAX_LEVERAGE;
+  readonly wallet: VenueWallet | null;
   /** The relayer's last refusal to top up, for the health report. */
   lastFundError: string | null = null;
   private checkedAt = Number.NEGATIVE_INFINITY;
@@ -193,6 +222,7 @@ export class SessionVenue implements Venue {
     this.owner = o.owner.toLowerCase();
     this.kind = o.kind;
     this.sessionKey = o.sessionKey;
+    this.wallet = o.wallet ?? null;
     this.now = o.now ?? Date.now;
   }
 
@@ -205,7 +235,10 @@ export class SessionVenue implements Venue {
     return this.o.chain.version(this.owner);
   }
 
-  /** The session is live on chain and its gas key can pay for a call, topped up through the relayer when low. */
+  /**
+   * The session is live on chain and can pay for a call: its gas key, topped up through the relayer
+   * when low, or the policy wallet, which must also be the account's, unfrozen and funded.
+   */
   async ready(): Promise<void> {
     if (this.now() - this.checkedAt < (this.o.checkTtlMs ?? 10_000)) return;
     const session = await this.o.chain.session(this.owner, this.sessionKey).catch((e: unknown) => {
@@ -213,6 +246,12 @@ export class SessionVenue implements Venue {
     });
     const problem = sessionProblem(session, Math.floor(this.now() / 1000), this.o.policy);
     if (problem) throw new VenueError(problem, false);
+    if (this.wallet) {
+      const blocked = await this.wallet.check();
+      if (blocked) throw new VenueError(blocked.reason, !blocked.pause);
+      this.checkedAt = this.now();
+      return;
+    }
     let balance = await this.o.chain.gasBalance(this.owner, this.sessionKey).catch(() => null);
     if (balance !== null && balance < this.o.gasMin) {
       try {
@@ -285,7 +324,9 @@ export class SessionVenue implements Venue {
       return await this.o.chain.sessionCall(action);
     } catch (e) {
       const m = message(e);
-      throw new VenueError(m, WAIT_FOR_MARK.test(m) || isTransient(e));
+      // A policy wallet's enclave refusing while frozen, busy or rate limited may sign the same call later; its policy refusing never will.
+      const later = e instanceof PolicyRefusal && (e.retryable || e.code === "wallet_frozen");
+      throw new VenueError(e instanceof PolicyRefusal ? `the policy wallet refused (${e.code}): ${m}` : m, WAIT_FOR_MARK.test(m) || isTransient(e) || later);
     }
   }
 

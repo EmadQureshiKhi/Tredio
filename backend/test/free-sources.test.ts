@@ -24,7 +24,7 @@ function clock(start = 1_000_000) {
   };
 }
 
-// Trimmed from live answers (October 2026).
+// Trimmed from live answers.
 const bskyTrends = {
   trends: [
     { topic: "c6946312b704", displayName: "Ken Paxton's Texas Senate campaign", description: "Paxton faces Talarico.", link: "/profile/did:plc:q/feed/c6946312b704", startedAt: "2026-10-12T20:01:00Z", postCount: 294, status: "trending", category: "politics", actors: [] },

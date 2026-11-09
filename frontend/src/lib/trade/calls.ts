@@ -79,7 +79,7 @@ export const owner = {
   coinSell: (coin: string, amount: bigint, minOut: bigint): Call => C.coins.sell(coin, s(amount), s(minOut)),
   createCurve: (trend: string): Call => C.coins.createCurve(trend),
   addMargin: (id: number, amount: bigint): Call => C.perps.addMargin(id, s(amount)),
-  sendUsdc: (receiver: string, amount: bigint): Call => C.usdc.transfer(receiver, s(amount)),
+  sendUsdc: (receiver: string, amount: bigint, memo?: string): Call => C.usdc.transfer(receiver, s(amount), memo),
 };
 
 export const ownerActions = {

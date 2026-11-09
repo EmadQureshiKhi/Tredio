@@ -75,6 +75,7 @@ The API serves JSON at `TREDIO_API_URL` (locally `http://localhost:4000`; `GET /
 | `GET /v1/leaderboard/traders`, `GET /v1/callers/leaderboard` | Leaderboards |
 | `GET /v1/hyperliquid/markets`, `/v1/hyperliquid/leaders` | Hyperliquid markets and the leaders to copy |
 | `GET /v1/x402` | The paid resources (below) |
+| `GET /v1/signals/channels`, `GET /v1/signals?leader=` | Paid signal channels (price, period, reveal delay) and the signal feed: sealed until each signal's reveal, then in the clear |
 
 Identifiers are `<class>:<slug>` in lowercase, for example `topic:world-cup`; a trend listed again after retiring gets `.2` to `.9`.
 Signed-in routes (alerts, Autopilot rules, links) take a NEP-413 sign-in at `POST /v1/auth/session` with recipient `tredio.bid`.
@@ -114,6 +115,7 @@ The payer needs USDC and a full-access key on any NEAR account, but no NEAR and 
 | --- | --- | --- |
 | `GET /v1/x402/trends/{identifier}/history?from=&to=` | 0.01 USDC | Every index checkpoint since listing (or in the range) and every per-source reading with metric and window |
 | `POST /v1/x402/backtests` with `{"rule": ..., "days": 1 to 30}` | 0.02 USDC | An Autopilot rule backtested on the index history and Hyperliquid candles |
+| `GET /v1/x402/signals/{leader}/keys` | The channel's price, paid to the leader's account (`payTo`) | The leader's weekly viewing keys for the channel's next period |
 
 The flow:
 
@@ -128,6 +130,12 @@ The flow:
 - Function-call keys and session keys cannot pay (NEP-141 transfers attach 1 yoctoNEAR), so passkey accounts do not pay x402; use a wallet account.
 - The paid routes are on only where the API has a relayer configured; `GET /v1/x402` says `enabled`.
 - In TypeScript, `x402Fetch` from `@tredio/chain` does steps 1 to 4 within a spending limit; `scripts/x402-demo.ts` runs the whole flow on testnet.
+
+### Reading paid signals early
+
+- Each feed item carries `epoch`, `iv`, `ciphertext` and `commitment`; the signal is AES-256-GCM under that week's viewing key (hex), with the commitment as the associated data, and decrypts to JSON `{leader, kind, market, side, marginUsdc, leverage, note, issuedAt, price}`.
+- `openSignal(key, item, item.commitment)` from `@tredio/autopilot` opens one; `matchesCommitment(signal, commitment)` checks it against the hash the leader committed on chain (`commitTx`, a USDC transfer with memo `tredio-signal:<commitment>`).
+- Positions on chain stay public; what is private is the signal and its timing until `revealAt`.
 
 ## Trading safely
 

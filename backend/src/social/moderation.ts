@@ -1,9 +1,10 @@
+import type { Signal } from "@tredio/autopilot";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Sql } from "../db";
 
 /**
- * Moderation of the social layer, for admins (mounted under /v1/admin). Calls and posts are signed
+ * Moderation of the social layer, for admins (mounted under /v1/admin). Calls, posts and paid signals are signed
  * by their caller identity, so moderation never rewrites them: hiding one takes it out of every
  * public view (threads, profiles, the leaderboard, share links, call notifications), and restoring
  * brings it back as it was, with its replies and the posts that cite it. Each hide, restore and
@@ -35,7 +36,17 @@ const lastAction = (r: { m_admin: string | null; m_action: string | null; m_reas
   r.m_admin && r.m_action && r.m_reason && r.m_at ? { admin: r.m_admin, action: r.m_action, reason: r.m_reason, at: r.m_at.toISOString() } : null;
 const stamp = (d: Date | null) => (d ? d.toISOString() : null);
 
-export function moderationRoutes(d: { sql: Sql }) {
+/** A sealed signal as stored, for `open` to read in the clear. */
+export interface SealedSignal {
+  leader: string;
+  epoch: number;
+  iv: string;
+  ciphertext: string;
+  commitment: string;
+}
+
+/** `open` reads a sealed signal on the server that holds the signals secret (backend/src/signals); without it signals list sealed. */
+export function moderationRoutes(d: { sql: Sql; open?: (s: SealedSignal) => Promise<Signal | null> }) {
   const app = new Hono<{ Variables: { admin: string } }>();
   const issues = (e: z.ZodError) => e.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ");
   const id = (raw: string) => (/^[1-9][0-9]{0,15}$/.test(raw) ? raw : null);
@@ -59,23 +70,31 @@ export function moderationRoutes(d: { sql: Sql }) {
     return c.json({ callers: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) });
   });
 
-  // Calls or posts, newest first, `limit` at a time from `offset`. `state` is all, visible or
-  // hidden, and `caller` an identity or a handle. Each row carries its newest moderation, and the
-  // counts cover the whole table (`matching`: the filters).
+  /** A list's paging and filters from the query: `state` is all, visible or hidden, and `caller` an identity or a handle. */
+  const listing = (q: (k: string) => string | undefined) => {
+    const state = MODERATION_STATES.find((s) => s === q("state")) ?? "all";
+    const caller = (q("caller") ?? "").trim().toLowerCase().replace(/^@/, "") || null;
+    if (caller && !address.test(caller)) return null;
+    const limit = Math.min(Math.max(Number(q("limit") ?? 50) || 50, 1), MODERATION_PAGE_MAX);
+    const offset = Math.max(Number(q("offset") ?? 0) || 0, 0);
+    return { caller, limit, offset, hidden: state === "all" ? null : state === "hidden" };
+  };
+  /** Each row's newest moderation, joined as m_admin, m_action, m_reason, m_at. */
+  const lastOf = (kind: string) => d.sql`
+    LEFT JOIN LATERAL (
+      SELECT admin AS m_admin, action AS m_action, reason AS m_reason, created_at AS m_at FROM moderation_log
+       WHERE target = ${`${kind}:`}::text || x.id ORDER BY created_at DESC, id DESC LIMIT 1
+    ) m ON true`;
+
+  // Calls or posts, newest first, `limit` at a time from `offset`. Each row carries its newest
+  // moderation, and the counts cover the whole table (`matching`: the filters).
   for (const kind of KINDS) {
     app.get(`/social/${kind}`, async (c) => {
-      const state = MODERATION_STATES.find((s) => s === c.req.query("state")) ?? "all";
-      const caller = (c.req.query("caller") ?? "").trim().toLowerCase().replace(/^@/, "") || null;
-      if (caller && !address.test(caller)) return c.json({ error: "bad caller" }, 400);
-      const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 50) || 50, 1), MODERATION_PAGE_MAX);
-      const offset = Math.max(Number(c.req.query("offset") ?? 0) || 0, 0);
-      const hidden = state === "all" ? null : state === "hidden";
+      const l = listing((k) => c.req.query(k));
+      if (!l) return c.json({ error: "bad caller" }, 400);
+      const { caller, limit, offset, hidden } = l;
       const filter = d.sql`(${caller}::text IS NULL OR x.caller = ${caller} OR cl.handle = ${caller}) AND (${hidden}::boolean IS NULL OR (x.hidden_at IS NOT NULL) = ${hidden}::boolean)`;
-      const last = d.sql`
-        LEFT JOIN LATERAL (
-          SELECT admin AS m_admin, action AS m_action, reason AS m_reason, created_at AS m_at FROM moderation_log
-           WHERE target = ${`${kind}:`}::text || x.id ORDER BY created_at DESC, id DESC LIMIT 1
-        ) m ON true`;
+      const last = lastOf(kind);
       const [rows, [counts]] = await Promise.all([
         kind === "calls"
           ? d.sql`
@@ -110,6 +129,42 @@ export function moderationRoutes(d: { sql: Sql }) {
     });
   }
 
+  // Paid signals, newest first, in the clear when this server holds the signals secret (the
+  // identifier is the market; "sealed" when it cannot open one).
+  app.get("/social/signals", async (c) => {
+    const l = listing((k) => c.req.query(k));
+    if (!l) return c.json({ error: "bad caller" }, 400);
+    const { caller, limit, offset, hidden } = l;
+    const filter = d.sql`(${caller}::text IS NULL OR x.leader = ${caller} OR cl.handle = ${caller}) AND (${hidden}::boolean IS NULL OR (x.hidden_at IS NOT NULL) = ${hidden}::boolean)`;
+    const [rows, [counts]] = await Promise.all([
+      d.sql<(SealedSignal & { id: string; handle: string | null; issued_at: string; reveal_at: string; commit_tx: string; hidden_at: Date | null; m_admin: string | null; m_action: string | null; m_reason: string | null; m_at: Date | null })[]>`
+        SELECT x.id, x.leader, cl.handle, x.commitment, x.epoch, x.iv, x.ciphertext, x.issued_at, x.reveal_at, x.commit_tx, x.hidden_at, m.*
+          FROM signals x JOIN callers cl ON cl.address = x.leader ${lastOf("signals")}
+         WHERE ${filter} ORDER BY x.id DESC LIMIT ${limit} OFFSET ${offset}`,
+      d.sql<{ total: number; hidden: number; matching: number }[]>`
+        SELECT count(*)::int AS total, count(*) FILTER (WHERE x.hidden_at IS NOT NULL)::int AS hidden, count(*) FILTER (WHERE ${filter})::int AS matching
+          FROM signals x JOIN callers cl ON cl.address = x.leader`,
+    ]);
+    const shaped = await Promise.all(
+      rows.map(async (r) => {
+        const s = d.open ? await d.open(r).catch(() => null) : null;
+        return {
+          id: Number(r.id),
+          caller: r.leader,
+          handle: r.handle,
+          identifier: s ? `${s.market}-PERP` : "sealed",
+          hiddenAt: stamp(r.hidden_at),
+          lastAction: lastAction(r),
+          issuedAt: Number(r.issued_at),
+          revealAt: Number(r.reveal_at),
+          commitTx: r.commit_tx,
+          signal: s ? { kind: s.kind, market: s.market, side: s.side, marginUsdc: s.marginUsdc, leverage: s.leverage, note: s.note, price: s.price } : null,
+        };
+      }),
+    );
+    return c.json({ ...counts!, limit, offset, rows: shaped });
+  });
+
   app.post("/social/callers/:address/profile", async (c) => {
     const who = c.req.param("address").toLowerCase();
     if (!address.test(who)) return c.json({ error: "bad address" }, 400);
@@ -131,9 +186,10 @@ export function moderationRoutes(d: { sql: Sql }) {
     return c.json({ caller: { address: who, handle: b.data.handle, bio: b.data.bio } });
   });
 
-  // Hiding and restoring: the row stays as signed, only whether the public sees it changes.
-  for (const kind of KINDS) {
-    const noun = kind === "calls" ? "call" : "post";
+  // Hiding and restoring: the row stays as signed, only whether the public sees it changes. Paid
+  // signals hide the same way (backend/src/signals): out of the feed, the channel counts and copying.
+  for (const kind of [...KINDS, "signals"] as const) {
+    const noun = kind === "calls" ? "call" : kind === "posts" ? "post" : "signal";
     for (const act of ["hide", "restore"] as const) {
       app.post(`/social/${kind}/:id/${act}`, async (c) => {
         const target = id(c.req.param("id"));

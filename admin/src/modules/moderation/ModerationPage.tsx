@@ -1,6 +1,6 @@
 "use client";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Megaphone, MessageSquare, RefreshCw, ScrollText, Search, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Megaphone, MessageSquare, Radio, RefreshCw, ScrollText, Search, Users } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/src/components/ui/Button";
@@ -9,15 +9,15 @@ import { Notice } from "@/src/components/ui/Notice";
 import { Tabs, type TabItem } from "@/src/components/ui/Tabs";
 import { api, type ContentQuery } from "@/src/lib/api";
 import { formatAge, formatNumber, plural, useDebounced, useNow } from "@/src/lib/format";
-import type { ContentKind, ContentPage, ModeratedCall, ModeratedPost, ModerationState, SocialCaller } from "@/src/types/admin";
+import type { ContentKind, ContentPage, ModeratedCall, ModeratedPost, ModeratedSignal, ModerationState, SocialCaller } from "@/src/types/admin";
 import { CallersTable } from "./CallersTable";
-import { CallRows, PostRows } from "./ContentList";
+import { CallRows, PostRows, SignalRows } from "./ContentList";
 import { type Moderating, ModerateDialog, RenameDialog } from "./dialogs";
 import { LogList } from "./LogList";
 import { CALLER, EmptyState, ListSkeleton, moderationKey } from "./parts";
 
 type Tab = ContentKind | "callers" | "log";
-const TABS: readonly Tab[] = ["posts", "calls", "callers", "log"];
+const TABS: readonly Tab[] = ["posts", "calls", "signals", "callers", "log"];
 const PANEL_ID = "moderation-panel";
 /** Rows per page; the backend serves up to 200. */
 const PAGE = 50;
@@ -64,9 +64,10 @@ export default function ModerationPage() {
   const contentOptions = { placeholderData: keepPreviousData, refetchInterval: 60_000 } as const;
   const posts = useQuery({ queryKey: [...moderationKey, "posts", query], queryFn: () => api.socialPosts(query), enabled: tab === "posts", ...contentOptions });
   const calls = useQuery({ queryKey: [...moderationKey, "calls", query], queryFn: () => api.socialCalls(query), enabled: tab === "calls", ...contentOptions });
+  const signals = useQuery({ queryKey: [...moderationKey, "signals", query], queryFn: () => api.socialSignals(query), enabled: tab === "signals", ...contentOptions });
   const callers = useQuery({ queryKey: [...moderationKey, "callers", q], queryFn: () => api.socialCallers(q), enabled: tab === "callers", placeholderData: keepPreviousData, refetchInterval: 60_000 });
   const log = useQuery({ queryKey: [...moderationKey, "log"], queryFn: () => api.moderationLog(), enabled: tab === "log", refetchInterval: 60_000 });
-  const shown: Shown = { posts, calls, callers, log }[tab];
+  const shown: Shown = { posts, calls, signals, callers, log }[tab];
 
   const selectTab = (next: Tab) => window.history.replaceState(null, "", next === "posts" ? "/moderation" : `/moderation?tab=${next}`);
   const showContentBy = (c: SocialCaller) => {
@@ -78,6 +79,7 @@ export default function ModerationPage() {
   const tabs: TabItem<Tab>[] = [
     { value: "posts", label: "Posts" },
     { value: "calls", label: "Calls" },
+    { value: "signals", label: "Signals" },
     { value: "callers", label: "Callers" },
     { value: "log", label: "Log" },
   ];
@@ -88,8 +90,8 @@ export default function ModerationPage() {
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight text-fg">Moderation</h1>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
-            Thread posts and calls, newest first. Hiding one takes it out of every public view: trend threads, profiles, the leaderboard and share links. Nothing is deleted: the signed
-            original stays, and restoring brings it back as it was.
+            Thread posts, calls and paid signals, newest first. Hiding one takes it out of every public view: trend threads, profiles, the leaderboard, share links and the signals feed.
+            Nothing is deleted: the signed original stays, and restoring brings it back as it was.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
@@ -105,7 +107,7 @@ export default function ModerationPage() {
       </div>
 
       <section id={PANEL_ID} role="tabpanel" aria-labelledby={`${PANEL_ID}-tab-${tab}`} className="mt-4">
-        {tab === "posts" || tab === "calls" ? (
+        {tab === "posts" || tab === "calls" || tab === "signals" ? (
           <>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="relative min-w-0 flex-1 sm:max-w-sm">
@@ -135,9 +137,13 @@ export default function ModerationPage() {
                 <ContentPanel kind="posts" query={posts} state={state} caller={caller} offset={offset} onOffset={setOffset}>
                   {(rows: ModeratedPost[]) => <PostRows rows={rows} now={now} onModerate={setModerating} />}
                 </ContentPanel>
-              ) : (
+              ) : tab === "calls" ? (
                 <ContentPanel kind="calls" query={calls} state={state} caller={caller} offset={offset} onOffset={setOffset}>
                   {(rows: ModeratedCall[]) => <CallRows rows={rows} now={now} onModerate={setModerating} />}
+                </ContentPanel>
+              ) : (
+                <ContentPanel kind="signals" query={signals} state={state} caller={caller} offset={offset} onOffset={setOffset}>
+                  {(rows: ModeratedSignal[]) => <SignalRows rows={rows} now={now} onModerate={setModerating} />}
                 </ContentPanel>
               )}
             </div>
@@ -249,19 +255,21 @@ function ContentPanel<T>({
   children: (rows: T[]) => React.ReactNode;
 }) {
   const page = query.data;
-  const one = kind === "calls" ? "call" : "post";
+  const one = kind === "calls" ? "call" : kind === "signals" ? "signal" : "post";
   const filtered = Boolean(caller) || state !== "all";
   if (query.isPending) return <ListSkeleton />;
   if (!page) return <LoadError what={`${one}s`} error={query.error} retry={() => void query.refetch()} retrying={query.isFetching} />;
   if (page.rows.length === 0) {
-    const Icon = kind === "calls" ? Megaphone : MessageSquare;
+    const Icon = kind === "calls" ? Megaphone : kind === "signals" ? Radio : MessageSquare;
     return (
       <EmptyState icon={<Icon size={20} aria-hidden />} title={filtered ? `No ${one}s match` : `No ${one}s yet`}>
         {filtered
           ? `Nothing ${state === "hidden" ? "hidden " : state === "visible" ? "visible " : ""}${caller ? `by ${caller}` : "here"}.`
           : kind === "calls"
             ? "Calls made on live trends show up here as callers make them."
-            : "Posts on trend threads show up here as callers write them."}
+            : kind === "signals"
+              ? "Paid signals show up here as leaders publish them."
+              : "Posts on trend threads show up here as callers write them."}
       </EmptyState>
     );
   }

@@ -32,6 +32,8 @@ export interface SessionView {
   expires_at: number;
   scope: { outcomes: boolean; perps: boolean; hyperliquid: boolean };
   daily_limit: string;
+  /** A gas key (the account funds its gas) or a plain key (a policy wallet's, or a relayer's). */
+  gas_key?: boolean;
 }
 
 export type SessionReader = (account: string, publicKey: string) => Promise<SessionView | null>;

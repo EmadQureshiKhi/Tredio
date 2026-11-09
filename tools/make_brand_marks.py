@@ -5,7 +5,7 @@
 The venv needs fontTools (`tools/.venv/bin/pip install fonttools`). Then run
 `assets/brand/export.sh icons` to render the PNG, ICO and app copies from these SVGs.
 
-- The T is the brush-stroke T, kept exactly as drawn; it is the glyph on its own and the first letter of the wordmark.
+- The T is the brush-stroke T; it is the glyph on its own and the first letter of the wordmark.
 - "REDIO" is outlined from Arial Bold at the T's cap height with the font's own spacing, so the wordmark reads as one word.
 - It prints the path data that the app, the admin panel and the website draw inline, and the footer band's
   letters spread across a 1856 x 304 box (`WIDE_*`), for landing-page/src/components/brand/Logo.jsx.
@@ -30,7 +30,7 @@ T_PATH = (
     "C149 720.013 125.5 278.338 315 157.838H0C0 157.606 0 59.0581 0 12.565Z"
 )
 CAP_TOP, BASE_LINE = 21.6558, 720.0  # the letters' cap height in the T's units
-T_GAP = 111  # from the T's right edge to the R, as in the original lockup
+T_GAP = 111  # from the T's right edge to the R
 
 INK, PAPER = "#09090B", "#FAFAFA"
 INDIGO, LAVENDER = "#5B4FD6", "#A49BF0"

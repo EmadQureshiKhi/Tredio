@@ -1,6 +1,6 @@
 -- Trend Autopilot, copy-trading and attention history. Re-applied on every start: idempotent.
 
--- TrendRegistry checkpoints (attention index history), mirrored for charts and backtests.
+-- Registry checkpoints (attention index history), mirrored for charts and backtests.
 CREATE TABLE IF NOT EXISTS index_points (
   trend_id      TEXT             NOT NULL,
   observed_at   BIGINT           NOT NULL,

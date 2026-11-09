@@ -9,10 +9,10 @@ import { Notice } from "@/src/components/ui/Notice";
 import { useToast } from "@/src/components/ui/Toasts";
 import { api, ApiError } from "@/src/lib/api";
 import { shortAddress } from "@/src/lib/format";
-import type { ModeratedCall, ModeratedPost, SocialCaller } from "@/src/types/admin";
-import { BIO_MAX, Direction, HANDLE, horizonLabel, moderationKey, noun, REASON_MAX } from "./parts";
+import type { ModeratedCall, ModeratedPost, ModeratedSignal, SocialCaller } from "@/src/types/admin";
+import { BIO_MAX, Direction, HANDLE, horizonLabel, moderationKey, noun, REASON_MAX, signalLine } from "./parts";
 
-export type Moderating = { kind: "posts"; item: ModeratedPost } | { kind: "calls"; item: ModeratedCall };
+export type Moderating = { kind: "posts"; item: ModeratedPost } | { kind: "calls"; item: ModeratedCall } | { kind: "signals"; item: ModeratedSignal };
 
 /** The reason every moderation action asks for; it is kept in the log with the admin's account. */
 function ReasonField({ id, value, onChange, placeholder }: { id: string; value: string; onChange: (v: string) => void; placeholder: string }) {
@@ -46,7 +46,15 @@ export function ModerateDialog({ target, onClose }: { target: Moderating; onClos
       notify({
         tone: "ok",
         title: `${hide ? "Hid" : "Restored"} ${what}`,
-        description: hide ? "It no longer shows in any public view." : kind === "calls" ? "It shows again and counts in the caller's record." : "It shows in the trend's thread again.",
+        description: hide
+          ? kind === "signals"
+            ? "It leaves the feed and the channel, and Autopilot stops copying it."
+            : "It no longer shows in any public view."
+          : kind === "calls"
+            ? "It shows again and counts in the caller's record."
+            : kind === "signals"
+              ? "It shows in the feed again."
+              : "It shows in the trend's thread again.",
       });
       void queryClient.invalidateQueries({ queryKey: moderationKey });
       onClose();
@@ -79,9 +87,13 @@ export function ModerateDialog({ target, onClose }: { target: Moderating; onClos
     >
       <div className="space-y-4">
         <p className="text-sm leading-6 text-muted">
-          {hide
-            ? `It leaves the trend's thread, the caller's profile${kind === "calls" ? " and record, the leaderboard and its share link" : ""}. The signed original stays, and restoring brings it back as it was.`
-            : `It shows again in the trend's thread and on the caller's profile${kind === "calls" ? ", and counts in their record and on the leaderboard" : ""}.`}
+          {kind === "signals"
+            ? hide
+              ? "It leaves the signals feed and the leader's channel, and Autopilot stops copying it (copies already open close as the leader's position no longer holds it). The signed original and its on-chain commitment stay."
+              : "It shows in the signals feed again, and Autopilot counts it in the leader's positions."
+            : hide
+              ? `It leaves the trend's thread, the caller's profile${kind === "calls" ? " and record, the leaderboard and its share link" : ""}. The signed original stays, and restoring brings it back as it was.`
+              : `It shows again in the trend's thread and on the caller's profile${kind === "calls" ? ", and counts in their record and on the leaderboard" : ""}.`}
         </p>
         <ContentPreview target={target} />
         <ReasonField id={reasonId} value={reason} onChange={setReason} placeholder={hide ? "Spam, abuse, off topic" : "Hidden by mistake"} />
@@ -94,6 +106,17 @@ export function ModerateDialog({ target, onClose }: { target: Moderating; onClos
 function ContentPreview({ target }: { target: Moderating }) {
   const box = "max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-raised px-3 py-2 text-sm leading-6 text-fg";
   if (target.kind === "posts") return <p className={box}>{target.item.body}</p>;
+  if (target.kind === "signals") {
+    const s = target.item.signal;
+    return s ? (
+      <div className={box}>
+        <p>{signalLine(s)}</p>
+        {s.note ? <p className="mt-1">{s.note}</p> : <p className="mt-1 text-subtle">No note.</p>}
+      </div>
+    ) : (
+      <p className={box}>Sealed: this API does not hold the signals secret.</p>
+    );
+  }
   const c = target.item;
   return (
     <div className={box}>

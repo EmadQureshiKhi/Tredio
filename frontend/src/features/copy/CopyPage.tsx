@@ -1,6 +1,7 @@
 "use client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bot, CirclePause, Fingerprint, SlidersHorizontal, Users } from "lucide-react";
+import { Bot, CirclePause, Fingerprint, Radio, SlidersHorizontal, Users } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Avatar } from "@/components/shell/AppShell";
 import { Badge, Button, Card, cn, Empty, ErrorNote, Skeleton } from "@/components/ui";
@@ -14,6 +15,9 @@ import { GrantSheet } from "@/features/autopilot/grant/GrantSheet";
 import { BOT_ACCOUNT, grantUsable, useFollows, useGrant, usePerformance } from "@/features/autopilot/shared/data";
 import { PageHeader, SectionTitle, StaleNote, useConfirm } from "@/features/autopilot/shared/kit";
 import { LeaderCard, LeaderCardSkeleton } from "@/features/autopilot/shared/LeaderCard";
+import { type SignalChannel } from "@/lib/api";
+import { SignalChannels } from "@/features/signals/SignalsSection";
+import { signalIdentity } from "@/features/signals/data";
 import { FollowSheet } from "./FollowSheet";
 import { useLeaderDirectory } from "./leaders";
 
@@ -55,7 +59,15 @@ export default function CopyPage() {
                 <ul className="flex flex-col gap-3" data-testid="follow-list">
                   {follows.data.follows.map((f) => (
                     <li key={f.id}>
-                      <FollowRow follow={f} name={dir.name(f.leader)} href={dir.href(f.leader)} bot={dir.isBot(f.leader)} monthPnl={dir.leader(f.leader)?.pnl ?? null} onEdit={() => show(f.leader, dir.name(f.leader))} />
+                      <FollowRow
+                        follow={f}
+                        name={dir.name(f.leader)}
+                        href={dir.href(f.leader)}
+                        bot={dir.isBot(f.leader)}
+                        signals={dir.isSignals(f.leader) ? (dir.channel(f.leader) ?? "unknown") : null}
+                        monthPnl={dir.leader(f.leader)?.pnl ?? null}
+                        onEdit={() => show(f.leader, dir.name(f.leader))}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -95,6 +107,7 @@ export default function CopyPage() {
               {!dir.loading && featured.length === 0 ? <ErrorNote className="sm:col-span-2" message="Hyperliquid's leaderboard is unavailable right now." /> : null}
             </div>
           </section>
+          <SignalChannels />
         </div>
         {account.authenticated ? (
           <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-24 lg:-m-1 lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto lg:overscroll-contain lg:p-1">
@@ -128,7 +141,24 @@ function Step({ n }: { n: number }) {
   return <span className="num flex size-5 shrink-0 items-center justify-center rounded-full bg-primary-soft font-strong text-[11px] text-primary">{n}</span>;
 }
 
-function FollowRow({ follow: f, name, href, bot, monthPnl, onEdit }: { follow: Follow; name: string; href: string; bot: boolean; monthPnl: number | null; onEdit: () => void }) {
+function FollowRow({
+  follow: f,
+  name,
+  href,
+  bot,
+  signals,
+  monthPnl,
+  onEdit,
+}: {
+  follow: Follow;
+  name: string;
+  href: string;
+  bot: boolean;
+  /** A paid signals channel ("unknown" while its channel has not loaded). */
+  signals: SignalChannel | "unknown" | null;
+  monthPnl: number | null;
+  onEdit: () => void;
+}) {
   const account = useAccount();
   const perf = usePerformance(bot ? BOT_ACCOUNT : null);
   const grant = useGrant();
@@ -162,13 +192,19 @@ function FollowRow({ follow: f, name, href, bot, monthPnl, onEdit }: { follow: F
               <Bot className="size-5" aria-hidden />
             </span>
           ) : (
-            <Avatar address={f.leader} size={40} />
+            <Avatar address={signals ? signalIdentity(f.leader) : f.leader} size={40} />
           )}
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <a href={href} target="_blank" rel="noreferrer" className="truncate font-strong text-[15px] leading-6 text-text hover:underline hover:underline-offset-4">
-                {name}
-              </a>
+              {signals ? (
+                <Link href={href} className="truncate font-strong text-[15px] leading-6 text-text hover:underline hover:underline-offset-4">
+                  {name}
+                </Link>
+              ) : (
+                <a href={href} target="_blank" rel="noreferrer" className="truncate font-strong text-[15px] leading-6 text-text hover:underline hover:underline-offset-4">
+                  {name}
+                </a>
+              )}
               <Badge tone={active ? "up" : "warn"} icon={active ? <span className="live-dot size-1.5 rounded-full bg-up" aria-hidden /> : undefined}>
                 {active ? "Copying" : "Paused"}
               </Badge>
@@ -176,10 +212,20 @@ function FollowRow({ follow: f, name, href, bot, monthPnl, onEdit }: { follow: F
             <p className="mt-0.5 text-[12.5px] text-text-3">Following since {new Date(f.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</p>
           </div>
         </div>
-        <div className="shrink-0 text-right">
-          <p className="text-[11.5px] uppercase tracking-[0.08em] text-text-3">{bot ? "Their PnL" : "Their month"}</p>
-          <p className={cn("num mt-0.5 font-strong text-[16px]", !pnl ? "text-text" : pnl > 0 ? "text-up" : "text-down")}>{pnl === null || pnl === undefined ? "-" : bot ? usdc(pnl, { sign: true }) : `${pnl >= 0 ? "+" : "-"}$${compact(Math.abs(pnl))}`}</p>
-        </div>
+        {signals ? (
+          <div className="shrink-0 text-right">
+            <p className="text-[11.5px] uppercase tracking-[0.08em] text-text-3">Signals</p>
+            <p className="num mt-0.5 flex items-center justify-end gap-1.5 font-strong text-[16px] text-text">
+              <Radio className="size-4 text-primary" aria-hidden />
+              {signals === "unknown" ? "-" : (signals.signals ?? 0)}
+            </p>
+          </div>
+        ) : (
+          <div className="shrink-0 text-right">
+            <p className="text-[11.5px] uppercase tracking-[0.08em] text-text-3">{bot ? "Their PnL" : "Their month"}</p>
+            <p className={cn("num mt-0.5 font-strong text-[16px]", !pnl ? "text-text" : pnl > 0 ? "text-up" : "text-down")}>{pnl === null || pnl === undefined ? "-" : bot ? usdc(pnl, { sign: true }) : `${pnl >= 0 ? "+" : "-"}$${compact(Math.abs(pnl))}`}</p>
+          </div>
+        )}
       </div>
       <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Your caps">
         {chips.map((c) => (

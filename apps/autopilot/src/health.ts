@@ -2,6 +2,7 @@ import type { WalletHealth } from "@tredio/chain";
 import { Hono } from "hono";
 import type { ExecutorDb } from "./db";
 import type { ExecutorStatus } from "./executor";
+import type { WalletCheck } from "./wallets";
 
 /** A session call attaches 300 Tgas, which a gas key prepays at 1e9 yocto per gas: 0.3 NEAR. */
 export const SESSION_CALL_GAS_NEAR = 0.3;
@@ -11,6 +12,8 @@ export interface HealthDeps {
   stats: ExecutorDb["stats"];
   /** The bot account with its session gas key, or null without a bot. */
   wallet: () => Promise<WalletHealth | null>;
+  /** The last check of each policy wallet the executor trades through (OutLayer custody or Agent API agents). */
+  policyWallets?: () => WalletCheck[];
   network: string;
   /** When the process started (unix seconds). */
   startedAt?: number;
@@ -23,7 +26,8 @@ export interface HealthDeps {
 /**
  * GET /health in the shape every Tredio service reports: `ok`, the wallets it sends from (the
  * bot's account and its session gas key), alerts, the last error, when it last did its work, facts
- * for the status page and flags that degrade it (the kill switch).
+ * for the status page and flags that degrade it (the kill switch). `policyWallets` lists the policy
+ * wallets that sign accounts' session calls, each with its freeze, its gas and why it waits.
  */
 export async function healthReport(d: HealthDeps): Promise<{ httpStatus: 200 | 503; body: Record<string, unknown> }> {
   const nowSec = Math.floor((d.now ?? Date.now)() / 1000);
@@ -36,6 +40,9 @@ export async function healthReport(d: HealthDeps): Promise<{ httpStatus: 200 | 5
   if (!stats.ok) alerts.database = `database unreachable: ${stats.error}`;
   if (stats.ok && stats.v.inFlight > 5) alerts.orders = `${stats.v.inFlight} orders are in flight`;
   if (stats.ok && stats.v.grants > 0 && d.sealKeyId === null) alerts.grants = `${stats.v.grants} active grants, but AUTOPILOT_SEAL_PRIVATE_KEY is not set`;
+  const policyWallets = d.policyWallets?.() ?? [];
+  const frozenWallets = policyWallets.filter((w) => w.frozen).length;
+  const waitingWallets = policyWallets.filter((w) => w.problem !== null).length;
   const gas = wallet?.gasKeys[0];
   if (wallet && (!gas || Number(gas.balance) < SESSION_CALL_GAS_NEAR)) alerts.gas = gas ? `the bot's session gas key holds ${gas.balance} NEAR, below the ${SESSION_CALL_GAS_NEAR} NEAR a session call prepays` : "the bot's session gas key is not on its account";
   const ok = ticking && stats.ok && s.failingTicks < 3 && !alerts.gas;
@@ -53,6 +60,9 @@ export async function healthReport(d: HealthDeps): Promise<{ httpStatus: 200 | 5
         ]
       : []),
     { label: "Bot", value: wallet ? wallet.account : "not configured", tone: wallet ? undefined : "neutral" },
+    ...(policyWallets.length > 0
+      ? [{ label: "Policy wallets", value: `${policyWallets.length} in use, ${frozenWallets} frozen by their accounts${waitingWallets > frozenWallets ? `, ${waitingWallets - frozenWallets} waiting` : ""}`, tone: waitingWallets > frozenWallets ? "warn" : undefined }]
+      : []),
     { label: "Seal key", value: d.sealKeyId ?? "not set", tone: d.sealKeyId ? undefined : "warn" },
   ];
   return {
@@ -63,6 +73,7 @@ export async function healthReport(d: HealthDeps): Promise<{ httpStatus: 200 | 5
       network: d.network,
       startedAt: d.startedAt ?? null,
       wallets: wallet ? [wallet] : [],
+      policyWallets,
       alerts,
       lastError: s.lastError,
       lastWorkAt: s.lastTickAt,

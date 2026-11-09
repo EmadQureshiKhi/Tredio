@@ -20,6 +20,7 @@
     "@tredio/autopilot": "workspace:*",
     "@tredio/chain": "workspace:*",
     "@tredio/contracts": "workspace:*",
+    "@tredio/custody": "workspace:*",
     "@tredio/hyperliquid": "workspace:*",
     "hono": "4.12.18",
     "postgres": "3.4.9",

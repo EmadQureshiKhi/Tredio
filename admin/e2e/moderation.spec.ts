@@ -12,10 +12,10 @@ const api = new AdminApi(adminAccount());
  * leaves its content hidden at the end, so nothing the test wrote stays public.
  */
 
-const row = (page: Page, kind: "posts" | "calls", id: number) => page.locator(`[data-testid="moderation-row"][data-kind="${kind}"][data-id="${id}"]`);
+const row = (page: Page, kind: "posts" | "calls" | "signals", id: number) => page.locator(`[data-testid="moderation-row"][data-kind="${kind}"][data-id="${id}"]`);
 
-async function moderate(page: Page, kind: "posts" | "calls", id: number, action: "Hide" | "Restore", reason: string) {
-  const noun = kind === "posts" ? "post" : "call";
+async function moderate(page: Page, kind: "posts" | "calls" | "signals", id: number, action: "Hide" | "Restore", reason: string) {
+  const noun = kind === "posts" ? "post" : kind === "calls" ? "call" : "signal";
   await row(page, kind, id).getByRole("button", { name: action }).click();
   const dialog = page.getByRole("dialog", { name: `${action} ${noun} #${id}?` });
   await expect(dialog).toBeVisible();
@@ -128,5 +128,28 @@ test("hides and restores a post and a call, edits a caller and logs every action
       const rows = await api.content(kind, caller.address);
       if (rows.rows.some((r) => r.id === id && r.hiddenAt === null)) await api.moderate(kind, id, "hide", "e2e check: test content");
     }
+  }
+});
+
+test("lists paid signals in the clear, and hides and restores one", async ({ page }) => {
+  const newest = (await api.content("signals", "")).rows[0] as { id: number; hiddenAt: string | null; identifier: string } | undefined;
+  test.skip(!newest || newest.hiddenAt !== null, "needs a visible paid signal (scripts/signals-demo.ts publishes one)");
+  try {
+    await signInAsAdmin(page, "/moderation?tab=signals");
+    await expect(page.getByRole("tab", { name: "Signals" })).toHaveAttribute("aria-selected", "true");
+    const signal = row(page, "signals", newest!.id);
+    // The API holds the signals secret, so the admin reads the signal itself, sealed or not.
+    await expect(signal).toContainText(newest!.identifier);
+    await expect(signal).toContainText(/(Open|Close) (long|short)/);
+    await moderate(page, "signals", newest!.id, "Hide", "e2e check: hide a signal");
+    await expect(signal).toHaveAttribute("data-hidden", "true");
+    await moderate(page, "signals", newest!.id, "Restore", "e2e check: restore a signal");
+    await expect(signal).toHaveAttribute("data-hidden", "false");
+    await page.getByRole("tab", { name: "Log" }).click();
+    await expect(page.locator(`[data-testid="log-row"][data-action="restore_signal"][data-target="signals:${newest!.id}"]`)).toContainText("signal #");
+  } finally {
+    // The signal ends as the test found it: visible.
+    const now = (await api.content("signals", "")).rows.find((r) => r.id === newest!.id);
+    if (now?.hiddenAt) await api.moderate("signals", newest!.id, "restore", "e2e check: put back");
   }
 });

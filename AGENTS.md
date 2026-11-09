@@ -8,11 +8,11 @@ The product overview is in [README.md](README.md); the judges' checklist is in [
 
 - `contracts/`: Rust contracts (near-sdk 5, one Cargo workspace), deployed under `tredio.testnet`; account ids in `deployments/testnet.json`.
 - `apps/`: Bun services, each with `/health`, `/live`, a `Dockerfile` and a `.env.example`: relayer (4100), keeper (4200), market-maker (4300), autopilot (4400), topup (4500), oracle (4600), indexer (4700), agent-market (4800: the attention check on the NEAR AI Agent Market, prepared and not listed).
-- `backend/`: the Hono API on Postgres (4000): radar, NEAR AI review, sign-in, Autopilot, deposits, social, status, x402.
+- `backend/`: the Hono API on Postgres (4000): radar, NEAR AI review, sign-in, Autopilot, deposits, social, paid signals, status, x402.
 - `frontend/` (the app, 3000), `admin/` (operator console), `landing-page/` (tredio.bid): Next.js.
-- `packages/`: `chain` (sender, viewer, proofs, the x402 paying client), `contracts-ts` (`@tredio/contracts`: typed calls and deployments), `hyperliquid`, `intents` (1Click), `autopilot` (rule engine), `mcp` (MCP server: read tools, and trade tools that send only within the user's policy, from a session key or an account's own key).
+- `packages/`: `chain` (sender, viewer, proofs, the x402 paying client), `contracts-ts` (`@tredio/contracts`: typed calls and deployments), `hyperliquid`, `intents` (1Click), `autopilot` (rule engine, copy-trading, sealed signals), `custody` (Autopilot's policy wallets: OutLayer custody on testnet, the NEAR Intents Agent API on mainnet), `mcp` (MCP server: read tools, and trade tools that send only within the user's policy, from a session key or an account's own key).
 - `skills/tredio/SKILL.md`: the agent skill for using Tredio.
-- `scripts/`: `dev.ts` (run everything), `verify.ts` (check the claims against testnet), `e2e-testnet.ts` (one full flow on testnet), `x402-demo.ts` (pay for an x402 route on testnet), `gas-keys.ts`.
+- `scripts/`: `dev.ts` (run everything), `verify.ts` (check the claims against testnet), `e2e-testnet.ts` (one full flow on testnet), `x402-demo.ts` (pay for an x402 route on testnet), `signals-demo.ts` (a paid signal on testnet), `policy-wallet.ts` (Autopilot on an OutLayer policy wallet on testnet), `gas-keys.ts`.
 - `contracts/scripts/`: `build.sh` (local, or `--reproducible [commit]` in SourceScan's Docker image) and `deploy.sh testnet|mainnet`.
 - [MAINNET.md](MAINNET.md): what changes on mainnet, the rehearsal and the deploy steps.
 - `tools/make_readme_art.py`: the README figures (Pillow, colours from `frontend/app/globals.css`).
@@ -54,6 +54,7 @@ pnpm coverage:contracts
 - Lines are long (about 160 columns) and code is not run through Prettier at its default width; match the file you are in.
 - Every service exposes `/health` (detailed, with alerts) and `/live` (process up).
 - Moderation hides calls and posts (`hidden_at`) and never deletes them: every public read of either table filters `hidden_at IS NULL`.
+- Paid signals: the backend and the Autopilot executor share `SIGNALS_SECRET` (the weekly viewing keys derive from it); a follow whose leader is `signals:<identity>` copies a channel's signals and needs the follower's early access, which the API checks and a job pauses when it ends.
 - Secrets live only in gitignored `.env` files; every app ships a `.env.example`.
 - Run `pnpm verify` and the touched packages' tests before you call a change done.
 
@@ -70,6 +71,7 @@ pnpm coverage:contracts
   Services, the indexer and the scripts take FastNEAR API keys in `FASTNEAR_API_KEYS` (comma-separated, one per request in turn, ahead of the public endpoints); the app takes origin-locked browser keys in `NEXT_PUBLIC_FASTNEAR_KEYS`.
   near-kit clients run with `retryConfig: { maxRetries: 0 }`, since its own retries wait up to 15 s on one provider before Tredio's failover moves on.
 - 1Click quotes need an existing mainnet recipient, and confidential quotes need a partner JWT.
+- OutLayer custody signs NEAR transactions only as the wallet's own implicit account, so a policy wallet acts for an account only through code that accepts its calls (`acceptsWalletSessions`, account code v3); store a wallet's policy before its API key goes anywhere (the first account to store it controls it), and never delete a policy (a wallet without one signs anything): freeze it.
 - Hyperliquid testnet has no leaderboard; leaders come from mainnet's.
 - Regular RPC nodes drop transactions after about five epochs (2.5 days): look recorded proofs up on an archival node (`archival-rpc.<network>.fastnear.com`), as `verify.ts` does.
 - Publishing global code burns 10 times the storage price: 31.55 NEAR for the 316 KB account code. Re-running `deploy.sh` never republishes it; `PUBLISH_ACCOUNT_CODE=1` does, on purpose.

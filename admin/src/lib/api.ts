@@ -11,6 +11,7 @@ import type {
   JobName,
   ModeratedCall,
   ModeratedPost,
+  ModeratedSignal,
   ModerationLogEntry,
   ModerationState,
   RotationBoard,
@@ -144,8 +145,10 @@ export const api = {
   /** A page of thread posts or calls, newest first; `caller` is an identity or a handle. */
   socialPosts: (q: ContentQuery) => admin<ContentPage<ModeratedPost>>("GET", `/v1/admin/social/posts?${contentParams(q)}`),
   socialCalls: (q: ContentQuery) => admin<ContentPage<ModeratedCall>>("GET", `/v1/admin/social/calls?${contentParams(q)}`),
+  /** A page of paid signals, newest first, in the clear where the API holds the signals secret. */
+  socialSignals: (q: ContentQuery) => admin<ContentPage<ModeratedSignal>>("GET", `/v1/admin/social/signals?${contentParams(q)}`),
 
-  /** Takes a call or post out of every public view, or brings it back; the reason goes to the log. */
+  /** Takes a call, post or signal out of every public view, or brings it back; the reason goes to the log. */
   moderate: (kind: ContentKind, id: number, action: "hide" | "restore", reason: string) =>
     admin<{ id: number; hiddenAt: string | null }>("POST", `/v1/admin/social/${kind}/${id}/${action}`, { reason }),
 

@@ -234,8 +234,8 @@ describe("keyless fallback through the routes", () => {
     const f = fakeFetch([[/./, answer(429)]]);
     const fetchVia = new ProxyFallback(proxies).wrap(f.impl);
     for (const url of [
-      "https://api.openai.com/v1/chat/completions",
-      "https://generativelanguage.googleapis.com/v1beta/models",
+      "https://cloud-api.near.ai/v1/chat/completions",
+      "https://api.example.com/v1/models",
       "https://api.nansen.ai/api/v1/smart-money/netflow",
       "https://api.elfa.ai/v2/data/keyword-mentions",
       "https://api.example.org/v1/orders",

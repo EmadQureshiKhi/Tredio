@@ -9,7 +9,7 @@ const text = (v: unknown) => (typeof v === "string" ? v : null);
 /** What the entry acted on: "post #12", "call #7", or a caller's identity (the handle may since have changed). */
 function Target({ e }: { e: ModerationLogEntry }) {
   const [kind, id] = e.target.split(":");
-  if ((kind === "posts" || kind === "calls") && id) return <span className="font-medium text-fg">{`${kind === "posts" ? "post" : "call"} #${id}`}</span>;
+  if ((kind === "posts" || kind === "calls" || kind === "signals") && id) return <span className="font-medium text-fg">{`${kind === "posts" ? "post" : kind === "calls" ? "call" : "signal"} #${id}`}</span>;
   return (
     <span className="font-mono text-[12px] text-fg" title={e.target}>
       {shortAddress(e.target)}
@@ -17,7 +17,7 @@ function Target({ e }: { e: ModerationLogEntry }) {
   );
 }
 
-/** The content as it stood before the action: a post's body, a call's direction and trend, or the old profile. */
+/** The content as it stood before the action: a post's body, a call's direction and trend, or the old profile (a signal's row is sealed). */
 function beforeOf(e: ModerationLogEntry): string | null {
   const b = e.before;
   if (e.action === "rename_caller") return `Was ${text(b.handle) ? `@${text(b.handle)}` : "without a handle"}${text(b.bio) ? `: ${text(b.bio)}` : ""}`;

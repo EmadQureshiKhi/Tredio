@@ -13,7 +13,7 @@ const FROM_CHAIN: Record<Trend["status"], ChainTrend["status"]> = { active: "Act
 const ASSET_CLASSES = ["crypto", "equity", "commodity", "fx", "person", "politics", "topic"] as const;
 
 export interface ChainTrend {
-  /** The trend's identifier (`topic:openai`), which is its id on NEAR. */
+  /** The trend's identifier (`topic:openai`), which is also its id. */
   id: string;
   identifier: string;
   assetClass: number;

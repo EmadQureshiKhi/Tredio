@@ -35,6 +35,13 @@ export const hlMarkMaxAge = (v: AccountVersion) => (v >= 2 ? HL_MARK_MAX_AGE_V2 
 export const keepsGasKeys = (v: AccountVersion) => v >= 2;
 /** v2's order guard refuses an order whose `asset_index` is not the mark's, and any order when the mark has none. */
 export const bindsMarkToAssetIndex = (v: AccountVersion) => v >= 2;
+/**
+ * Whether the account accepts a `session_call` sent directly by the implicit account of one of its
+ * session keys: how a policy wallet acts for the account, since its key, held in a custody enclave,
+ * signs only for its own implicit account. v1 and v2 accept session calls only from the account
+ * itself (`session keys only`); account code that also accepts these reports version 3.
+ */
+export const acceptsWalletSessions = (v: AccountVersion) => v >= 3;
 
 /**
  * Whether a failed `version` view means the contract ran and has no such method (v1 code), as

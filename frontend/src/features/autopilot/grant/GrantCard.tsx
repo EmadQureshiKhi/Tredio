@@ -1,16 +1,21 @@
 "use client";
 import { keepsGasKeys } from "@tredio/contracts";
-import { Fingerprint, ShieldCheck, ShieldOff } from "lucide-react";
+import { Cpu, Fingerprint, ShieldCheck, ShieldOff, Snowflake } from "lucide-react";
 import { useState } from "react";
-import { Badge, Button, Card, ErrorNote, Skeleton, TxStatus, cn } from "@/components/ui";
+import { Badge, Button, Card, ErrorNote, ExplorerLink, Row, Skeleton, TxStatus, cn } from "@/components/ui";
 import { useAccount } from "@/lib/account/AccountProvider";
 import { useAccountVersion } from "@/lib/account/version";
-import { countdown, usdc } from "@/lib/format";
+import type { GrantWallet } from "@/lib/api";
+import { explorerAddress } from "@/lib/config";
+import { countdown, shortAddress, usdc } from "@/lib/format";
 import { useTx } from "@/lib/trade/useTx";
 import { Meter, useConfirm } from "../shared/kit";
 import { useFollows, useGrant, useRules } from "../shared/data";
-import { useGrantActions } from "./grant";
+import { useGrantActions, WALLET_GAS_NEAR } from "./grant";
 import { GrantSheet, grantLabel, Scope } from "./GrantSheet";
+
+/** Below this the wallet cannot pay for a session call: OutLayer sends one only while the wallet holds the 0.15 NEAR of gas it attaches. */
+const WALLET_GAS_LOW = 0.16;
 
 const day = (sec: number) => new Date(sec * 1000).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 
@@ -105,6 +110,14 @@ export function GrantCard({ compact, className }: { compact?: boolean; className
             <Meter value={g.spentToday} max={g.dailyLimit} label="USDC used today" tone={g.spentToday >= g.dailyLimit * 0.9 ? "warn" : "primary"} />
           </div>
         ) : null}
+        {active && g.wallet && !compact ? (
+          <WalletPanel
+            wallet={g.wallet}
+            busy={actions.working || tx.busy}
+            onFreeze={(frozen) => void actions.setFrozen(tx, g.wallet!, frozen)}
+            onFund={() => void actions.fundWallet(tx, g.wallet!)}
+          />
+        ) : null}
         {g.state === "none" && !compact ? (
           <div className="rounded-2xl border border-line p-4">
             <Scope compact />
@@ -135,17 +148,65 @@ export function GrantCard({ compact, className }: { compact?: boolean; className
       </div>
       {confirm.armed === "revoke" ? (
         <p className="mt-3 text-[12.5px] leading-5 text-warn" role="status">
-          {keepsKeys ? "Revoking ends Autopilot\u2019s session (its key stays on your account, unable to trade)" : "Revoking removes the key from your account"}
+          {g.wallet
+            ? "Revoking ends Autopilot\u2019s session, so the account refuses the wallet\u2019s calls (the NEAR it holds for gas stays in it)"
+            : keepsKeys
+              ? "Revoking ends Autopilot\u2019s session (its key stays on your account, unable to trade)"
+              : "Revoking removes the key from your account"}
           {running + copying > 0 ? ` and pauses ${[running ? `${running} running rule${running === 1 ? "" : "s"}` : "", copying ? `${copying} cop${copying === 1 ? "y" : "ies"}` : ""].filter(Boolean).join(" and ")}` : ""}. Open positions stay on Hyperliquid until you close them.
         </p>
       ) : null}
       {tx.stage !== "idle" || actions.error ? (
         <div className="mt-3 flex flex-col gap-2">
-          <TxStatus tx={tx} filledLabel="Revoked" />
+          <TxStatus tx={tx} filledLabel="Done" />
           {actions.error ? <ErrorNote message={actions.error} /> : null}
         </div>
       ) : null}
       <GrantSheet open={sheet} onOpenChange={setSheet} />
     </Card>
+  );
+}
+
+/**
+ * A policy wallet behind the grant: where its key signs, whether the account froze it, its gas,
+ * and the account's own controls (each one passkey prompt, straight to the chain or the Agent API).
+ */
+function WalletPanel({ wallet, busy, onFreeze, onFund }: { wallet: GrantWallet; busy: boolean; onFreeze: (frozen: boolean) => void; onFund: () => void }) {
+  const frozen = wallet.frozen === true;
+  const gas = wallet.balance === null ? null : Number(BigInt(wallet.balance) / 10n ** 18n) / 1e6;
+  const low = gas !== null && gas < WALLET_GAS_LOW;
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-line p-4" data-testid="grant-wallet" data-frozen={frozen}>
+      <div className="flex flex-wrap items-center gap-2">
+        {frozen ? <Snowflake className="size-4 text-warn" aria-hidden /> : <Cpu className="size-4 text-primary" aria-hidden />}
+        <p className="font-strong text-[13.5px] text-text">{wallet.kind === "agent-api" ? "Signed by an Agent API agent in OutLayer\u2019s TEE" : "Signed in OutLayer\u2019s TEE"}</p>
+        <Badge tone={frozen ? "warn" : wallet.frozen === null ? "neutral" : "up"}>{frozen ? "Frozen" : wallet.frozen === null ? "Checking" : "Signing"}</Badge>
+      </div>
+      <p className="text-[12.5px] leading-5 text-text-2">
+        {frozen
+          ? "You froze the wallet, so its enclave signs nothing and rules and copies wait. Unfreeze it to let Autopilot trade again."
+          : "The wallet signs only Autopilot\u2019s session calls to your account, with no NEAR attached. Freezing it stops every signature at once, whatever Tredio\u2019s servers do."}
+      </p>
+      <div className="flex flex-col gap-1.5">
+        <Row
+          label="Wallet"
+          value={
+            <ExplorerLink href={explorerAddress(wallet.account)} className="text-text">
+              <span className="num">{shortAddress(wallet.account)}</span>
+            </ExplorerLink>
+          }
+        />
+        <Row label="Gas" value={gas === null ? "-" : `${gas.toFixed(3)} NEAR`} tone={low ? "warn" : undefined} />
+        {low ? <p className="text-[12px] leading-4 text-warn">Below what a call needs: Autopilot waits until the wallet has gas again.</p> : null}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button tone={frozen ? "primary" : "secondary"} size="sm" loading={busy} disabled={wallet.frozen === null} onClick={() => onFreeze(!frozen)} data-testid={frozen ? "grant-wallet-unfreeze" : "grant-wallet-freeze"}>
+          {frozen ? "Unfreeze" : "Freeze"}
+        </Button>
+        <Button tone="ghost" size="sm" disabled={busy} onClick={onFund} data-testid="grant-wallet-fund">
+          Add {WALLET_GAS_NEAR} NEAR of gas
+        </Button>
+      </div>
+    </div>
   );
 }

@@ -17,6 +17,7 @@ import { join } from "node:path";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58Decode, base58Encode, rpcEndpoints, Viewer } from "@tredio/chain";
 import { accountCodeHashes, deployment, type Network } from "@tredio/contracts";
+import { CUSTODY_CONTRACT, custodyKeyOf, nearKeyOf } from "@tredio/custody";
 
 const ROOT = join(import.meta.dir, "..");
 const NETWORK = (process.env.NEAR_NETWORK ?? "testnet") as Network;
@@ -38,8 +39,11 @@ const recorded = (existsSync(PROOFS_FILE) ? JSON.parse(readFileSync(PROOFS_FILE,
     attestations: string;
   };
   x402Payment: { tx: string; relayer: string; payer: string; amount: string };
+  curationClaim: { tx: string; account: string; amount: string };
+  signals: { leaderIdentity: string; leaderAccount: string; follower: string; commitTx: string; commitment: string; accessTx: string; relayer: string; price: string };
   settledSeries: { series: number; trend: string; window: number; openTx: string; settleTx: string; keeper: string };
   graduation: { trend: string; pool: number; keeper: string; steps: string[] };
+  policyWallet: { account: string; wallet: string; relayer: string; setupTx: string; sessionCallTx: string; freezeTx: string; unfreezeTx: string };
 } | null;
 class NoProofs extends Error {}
 const proofs = new Proxy({} as NonNullable<typeof recorded>, {
@@ -317,6 +321,49 @@ async function chain() {
     const data = (Array.isArray(transfer?.data) ? transfer.data[0] : transfer?.data) as { old_owner_id?: string; new_owner_id?: string; amount?: string } | undefined;
     if (!data || data.old_owner_id !== payer || data.new_owner_id !== D.treasury || data.amount !== amount) return fail(`${tx}: no ft_transfer of ${amount} from ${payer} to ${D.treasury}`);
     return ok(`${tx.slice(0, 10)}...: ${Number(amount) / 1e6} USDC from ${payer} to ${D.treasury}, a delegate action ${relayer} submitted`);
+  });
+
+  await check(S, "Curation reward claimed by its surfacer", async () => {
+    const { tx, account, amount } = proofs.curationClaim;
+    // A session gas key sends from the account itself.
+    const o = await archive.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: tx, sender_account_id: account, wait_until: "NONE" });
+    const claimed = events(o).find((e) => e.standard === "tredio-curation" && e.event === "claimed");
+    const paid = events(o)
+      .filter((e) => e.standard === "nep141" && e.event === "ft_transfer")
+      .flatMap((e) => (Array.isArray(e.data) ? e.data : [e.data]) as Array<{ old_owner_id?: string; new_owner_id?: string; amount?: string }>)
+      .find((t) => t.old_owner_id === D.contracts.curation && t.new_owner_id === account && t.amount === amount);
+    if (!claimed || !paid) return fail(`${tx}: no claimed event and transfer of ${amount} from ${D.contracts.curation} to ${account}`);
+    return ok(`${tx.slice(0, 10)}...: ${Number(amount) / 1e6} USDC from ${D.contracts.curation} to the surfacer, through its session key`);
+  });
+
+  await check(S, "Paid signal committed and bought", async () => {
+    const p = proofs.signals;
+    const transferOf = async (tx: string) => {
+      const o = await archive.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: tx, sender_account_id: p.relayer, wait_until: "NONE" });
+      return events(o)
+        .filter((e) => e.standard === "nep141" && e.event === "ft_transfer")
+        .flatMap((e) => (Array.isArray(e.data) ? e.data : [e.data]) as Array<{ old_owner_id?: string; new_owner_id?: string; amount?: string; memo?: string }>);
+    };
+    const commit = (await transferOf(p.commitTx)).find((t) => t.old_owner_id === p.leaderAccount && t.new_owner_id === D.treasury && t.memo === `tredio-signal:${p.commitment}`);
+    if (!commit) return fail(`${p.commitTx}: no transfer from ${p.leaderAccount} to ${D.treasury} with memo tredio-signal:${p.commitment}`);
+    const paid = (await transferOf(p.accessTx)).find((t) => t.old_owner_id === p.follower && t.new_owner_id === p.leaderAccount && t.memo === `tredio-signals:${p.leaderIdentity}` && BigInt(t.amount ?? 0) >= BigInt(p.price));
+    if (!paid) return fail(`${p.accessTx}: no payment of ${p.price} from ${p.follower} to ${p.leaderAccount} with memo tredio-signals:${p.leaderIdentity}`);
+    return ok(`commitment ${p.commitTx.slice(0, 10)}... from the leader's account, then ${Number(p.price) / 1e6} USDC from a follower to the leader in ${p.accessTx.slice(0, 10)}...`);
+  });
+
+  await check(S, "Autopilot's policy wallet belongs to its passkey account", async () => {
+    const p = proofs.policyWallet;
+    const outlayer = CUSTODY_CONTRACT[NETWORK];
+    const policy = await viewer.view<{ owner: string; frozen: boolean } | null>(outlayer, "get_wallet_policy", { wallet_pubkey: custodyKeyOf(p.wallet) });
+    if (policy?.owner !== p.account) return fail(`${outlayer} names ${policy?.owner ?? "no one"} as the wallet's controller, not ${p.account}`);
+    const session = await viewer.view<{ label: string; scope: { outcomes: boolean; perps: boolean; hyperliquid: boolean }; gas_key: boolean } | null>(p.account, "session", { public_key: nearKeyOf(p.wallet) }).catch(() => null);
+    const setup = await archive.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: p.setupTx, sender_account_id: p.relayer, wait_until: "NONE" });
+    const stored = setup.receipts_outcome.some((r) => r.outcome.executor_id === outlayer && r.outcome.logs.some((l) => l.includes("WalletPolicyUpdated") && l.includes(p.account)));
+    if (!stored) return fail(`${p.setupTx}: no WalletPolicyUpdated by ${p.account} on ${outlayer}`);
+    const call = await archive.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: p.sessionCallTx, sender_account_id: p.wallet, wait_until: "NONE" });
+    if (call.transaction.signer_id !== p.wallet || call.transaction.receiver_id !== p.account) return fail(`${p.sessionCallTx}: not sent by the wallet to the account`);
+    const live = session ? `a live ${session.label} session (${session.gas_key ? "gas key" : "plain key"}, Hyperliquid ${session.scope.hyperliquid ? "only" : "off"})` : "its session since ended";
+    return ok(`controller ${p.account.slice(0, 10)}..., ${policy.frozen ? "frozen" : "not frozen"}; the enclave-signed session_call ${p.sessionCallTx.slice(0, 10)}... reached the account; ${live}`);
   });
 
   if (args.has("--build")) {

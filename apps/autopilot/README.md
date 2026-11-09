@@ -24,6 +24,55 @@ For each order the executor:
 Every order is recorded as `pending` with a unique intent and its Hyperliquid nonce before anything is sent, then `sent` once the account has signed it, then `filled`, `unfilled` or `failed`.
 A retry sends the same action with the same nonce, which Hyperliquid runs at most once; an order Hyperliquid has seen, or one in flight for more than two minutes, is settled from the account's fills.
 
+## Policy wallets
+
+A grant can also run through a policy wallet, so the key that signs for Autopilot is never the executor's.
+The account's session stays exactly as it is, the on-chain limit; the wallet adds a second, independent one that the account owns.
+
+- **Testnet: OutLayer custody.** The app makes an OutLayer wallet in the browser, has its enclave encrypt Autopilot's policy and sign it for the account, and one passkey prompt stores the policy on `outlayer.testnet` (the account becomes its only controller), sends the wallet 0.2 NEAR for gas, and adds Autopilot's session for the wallet's own key (`gas_key: false`).
+  The executor holds only the wallet's API key, sealed to it like a session key, and asks the enclave to sign each `session_call` (rules and copies alike).
+- **Mainnet: the NEAR Intents Agent API.** The account gets one agent whose owner is its own passkey (the API's `passkey` owner type); the backend prepares the owner actions with the partner key (`AGENT_API_KEY`), the passkey signs them as WebAuthn assertions, and the executor holds a grant token and sends `session_call`s as the agent's native NEAR calls.
+  Wired and tested offline only (`packages/custody/test/agent-api.test.ts`, `backend/test/policy-wallets.test.ts`); it goes live with a partner key and the owner's go-ahead.
+
+| Checked by | What it enforces |
+| --- | --- |
+| The account contract (the session) | The session is live and unexpired, Hyperliquid scope only, the daily USDC cap, orders within 2% of a fresh oracle mark on the signed asset, at most 10x; the account's freeze; revoking ends it |
+| The enclave (the wallet's policy) | The wallet is not frozen, contract calls only, to the account alone, no NEAR attached, no message signing; with usage counts OutLayer's coordinator supplies, at most 120 calls an hour |
+| The executor (before it records an order) | The account controls the wallet's policy on chain, the decrypted policy is exactly Autopilot's, the wallet is not frozen and holds gas; otherwise rules and copies wait, or pause when the account must act |
+
+What the enclave does not check: what a call asks the account to do.
+It reads the receiver and the NEAR attached, not the arguments, so a `session_call` to the account passes it whatever the action; the session decides that.
+The enclave also has no expiry of its own: the session's expiry (at most 30 days) is the end date, and the freeze is the off switch.
+Freezing needs no wallet signature, so it works even if the API key leaks; the passkey sends `freeze_wallet` through an owner request.
+A frozen wallet makes rules and copies wait; `/health` lists every policy wallet with its freeze, its gas and why it waits.
+
+The account contract must accept the wallet's call.
+OutLayer's keystore signs every NEAR transaction as the wallet's own implicit account, never as another account's access key, so the session cannot be signed for as the account itself.
+Account code v1 and v2 take `session_call` only from the account (`session keys only`); code that also takes it when sent directly by the implicit account of one of the account's session keys reports version 3 (`acceptsWalletSessions`).
+Until an account runs that code the executor waits instead of sending, and the app shows the policy wallet option as unavailable.
+
+### On testnet
+
+Everything up to the account contract runs live today ([`scripts/policy-wallet.ts`](../../scripts/policy-wallet.ts); the passkey is a software passkey, the wallet a free anonymous OutLayer wallet):
+
+| Step | Transaction |
+| --- | --- |
+| A passkey account `0um1v5w8...` is created by the relayer | [`9reW6c3z...`](https://testnet.nearblocks.io/txns/9reW6c3zeaiVHxa2UvWJ9D3RVjGz9wjssEiFxRMTEGDb) |
+| One owner request: the policy is stored on `outlayer.testnet` with the account as controller, the wallet `4348f62d...` gets 0.1 NEAR, Autopilot's session is added for the wallet's key | [`C3vFoA6K...`](https://testnet.nearblocks.io/txns/C3vFoA6KMx1tVeSGtTCq7Yj59Jni8euELWMGzC9XiSLi) |
+| The account sends the wallet 0.12 NEAR more (a call needs its 0.15 NEAR of prepaid gas in the wallet) | [`5HJ2hrpC...`](https://testnet.nearblocks.io/txns/5HJ2hrpCR3vuAXNT7aKEAR5fVwjduUzhgNTps8joAj8A) |
+| The enclave signs and sends `session_call({hl_leverage})` from the wallet to the account; v2 code refuses it: `session keys only` | [`GT3RLHyR...`](https://testnet.nearblocks.io/txns/GT3RLHyRq5B6nMRfa2qhJheeUNy72CTsWn37eNAos2zM), again in [`5ounSLWn...`](https://testnet.nearblocks.io/txns/5ounSLWnKr6aqHQVFjQ19Jjr8YyQbceapqvXCiTz9z8e) |
+| Outside the policy, refused before signing (no transaction): a call to `usdc.tredio.testnet` (`Address 'usdc.tredio.testnet' is not in whitelist`) and a call attaching one yoctoNEAR (`Per-transaction limit exceeded for native: 1 > 0`) | none |
+| The passkey freezes the wallet: the executor's venue waits (`the account froze Autopilot's policy wallet`) and the enclave refuses (`wallet_frozen`) | [`HbcVYSJT...`](https://testnet.nearblocks.io/txns/HbcVYSJTRRZ7ES6PCKt9t94z2dFU6TiDZQGnt4BXDaKF) |
+| The passkey unfreezes it; the executor's gate passes again | [`3rLBDand...`](https://testnet.nearblocks.io/txns/3rLBDandCdTQAT2aS7kt1CFoP8CjzF34YTkwJ7QEZd9K) |
+
+`pnpm verify` checks the record in `deployments/testnet-proofs.json` (`policyWallet`).
+
+### Turning on the mainnet path
+
+1. A partner key from partners.near-intents.org in the backend's and the executor's `AGENT_API_KEY`, with `NEAR_NETWORK=mainnet` (and the owner's go-ahead).
+2. Account code that accepts the wallet's calls (version 3) published and named in `deployments/mainnet.json`.
+3. In the app: Autopilot, Grant access, then Policy wallet under "Who signs Autopilot's orders"; three passkey prompts create the agent, grant the executor, and add the session with the agent's gas.
+
 ## Each tick
 
 1. Finish orders left in flight by an earlier tick.
@@ -60,3 +109,5 @@ To check a deployment end to end, `bun run order` sends one order through a sess
   On v2 the mark must also name the asset index the order signs, so Autopilot waits while the oracle has not reported it.
 - Leaders trade mainnet and followers copy into their testnet accounts; testnet marks drift from mainnet's by a few tenths of a percent, so a tight slippage setting skips copies that would chase the leader's fill.
 - Fresh Hyperliquid testnet accounts hold no USDC (its faucet needs a mainnet history), so openings wait for margin until an account is funded.
+- A policy wallet pays its own gas, and OutLayer sends a call only while the wallet holds the gas it attaches (0.15 NEAR for 150 Tgas); below `POLICY_WALLET_GAS_MIN_NEAR` (0.16) Autopilot waits for the account to fund it.
+  Its policy allows no transfers, so the NEAR in a wallet stays there after the grant ends.

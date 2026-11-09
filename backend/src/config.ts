@@ -108,6 +108,13 @@ const schema = z.object({
   AUTOPILOT_SEAL_PUBLIC_KEY: optional(z.string().min(80)),
   /** The Tredio bot's own account: its rules (route "api") trade from it through its own Autopilot session. */
   AUTOPILOT_BOT_ACCOUNT: optional(accountId),
+  /**
+   * #mainnet: the NEAR Intents Agent API partner key (partners.near-intents.org): Autopilot grants on
+   * an agent the account's passkey owns. Server side only; unused on testnet, where policy wallets are
+   * OutLayer custody wallets the app makes itself.
+   */
+  AGENT_API_KEY: optional(z.string().min(8)),
+  AGENT_API_URL: optional(z.string().url()),
   /** Backtest costs: Hyperliquid's base taker fee and a slippage allowance, basis points per fill. */
   HL_TAKER_FEE_BPS: z.coerce.number().nonnegative().default(4.5),
   BACKTEST_SLIPPAGE_BPS: z.coerce.number().nonnegative().default(5),
@@ -157,6 +164,11 @@ const schema = z.object({
    * price per call in USDC atomic units (6 decimals): full index history, and a rule backtest.
    */
   X402_PAYEE: optional(accountId),
+  /**
+   * The secret paid signals' weekly viewing keys derive from (64 hex characters); Autopilot holds the
+   * same one to copy them. Signals are off without it (backend/src/signals).
+   */
+  SIGNALS_SECRET: optional(z.string().regex(/^[0-9a-f]{64}$/, "64 hex characters")),
   X402_PRICE: z.coerce.bigint().positive().default(10_000n),
   X402_BACKTEST_PRICE: z.coerce.bigint().positive().default(20_000n),
   /**

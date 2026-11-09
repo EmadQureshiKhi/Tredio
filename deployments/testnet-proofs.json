@@ -63,5 +63,30 @@
       "27P46fTHak6ATY8NxPJB4ZXeZMms8GgopQ181su9YtyN",
       "57W1Juk1XCA1LQMrmqeExmbiLwQHNGJyxnxacei94qpF"
     ]
+  },
+  "signals": {
+    "leaderIdentity": "cfce4df298d4481d5c019037018482fca52d12a7c00549317c7d6cec589d193a",
+    "leaderAccount": "0u0ecxjw907p8xdn30cw7stzmqtrrd10mez7axm73f5stap426qfag",
+    "follower": "0u7cbp92asa3py6v95btd96fnq0zycaqm86yng6t0dh7c59nkf9210",
+    "commitTx": "3PZMfvkSWy3ga6GW47ZXUBpASi24yRYg7sTbQ2NQsPf1",
+    "commitment": "aa9612cc98a4ff738aeffb7a236358995b96d89d77b515c2ed5b49b40e0447e0",
+    "accessTx": "9swKsrx7Z5xfR5HitX2BkcfhfX1DoMSLzFQA1ZhBk81g",
+    "relayer": "tredio-relayer.testnet",
+    "price": "1000000"
+  },
+  "curationClaim": {
+    "tx": "8zHEn4y9Hrq6DWw98UcvCHBXrTaNpnXRF6BUxB2ijeqM",
+    "account": "0u6xynn46jqv8rwe2r6we26zeakwcsnykzsr3bnxtyt32k5gvsdza0",
+    "amount": "12574"
+  },
+  "policyWallet": {
+    "about": "Autopilot on an OutLayer policy wallet (scripts/policy-wallet.ts): the passkey account stored the wallet's policy and added Autopilot's session for the wallet's own key in one owner request; the wallet's enclave signed a session_call, which the account's v2 code refused (it takes session calls only from its own keys); the passkey froze and unfroze the wallet.",
+    "account": "0um1v5w8egbz1jk93bfvmqy8t1jmr5krk0g8e7p8nwg4d8f15wskt0",
+    "wallet": "4348f62db35f111328e9affa98ffaf1c20004b19a287305056997dff4d61bbf2",
+    "relayer": "tredio-relayer.testnet",
+    "setupTx": "C3vFoA6KMx1tVeSGtTCq7Yj59Jni8euELWMGzC9XiSLi",
+    "sessionCallTx": "GT3RLHyRq5B6nMRfa2qhJheeUNy72CTsWn37eNAos2zM",
+    "freezeTx": "HbcVYSJTRRZ7ES6PCKt9t94z2dFU6TiDZQGnt4BXDaKF",
+    "unfreezeTx": "3rLBDandCdTQAT2aS7kt1CFoP8CjzF34YTkwJ7QEZd9K"
   }
 }

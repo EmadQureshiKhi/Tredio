@@ -6,6 +6,7 @@ import { cors } from "hono/cors";
 import { z } from "zod";
 import { assess } from "../ai/assess";
 import { reviewRoutes } from "../ai/routes";
+import { agentApi } from "@tredio/custody/agent-api";
 import { autopilotAdminRoutes, autopilotRoutes } from "../autopilot/routes";
 import type { AutopilotService } from "../autopilot/service";
 import type { AutopilotStore } from "../autopilot/store";
@@ -16,6 +17,7 @@ import type { Collector } from "../collector";
 import type { IndexHistory } from "../history";
 import { isPushEndpoint, type Push, TOPICS, type Topic } from "../notify/push";
 import { moderationRoutes } from "../social/moderation";
+import { openStoredSignal, paidSignalKeys, signalAccessActive, signalsRoutes } from "../signals/routes";
 import { socialRoutes } from "../social/routes";
 import { parseServices, serviceDetails, status } from "../status";
 import { AccountKeys, SIGNER_CHECK_TTL_MS, type SessionReader, userAuth } from "./user-auth";
@@ -727,6 +729,7 @@ export function createApp(d: AppDeps): Hono {
     if (name !== "radar" && name !== "collector" && name !== "history") return c.json({ error: "no such job" }, 404);
     return c.json({ started: d.jobs.trigger(name) }, 202);
   });
+  const signalsSecret = d.cfg.SIGNALS_SECRET ? new Uint8Array(Buffer.from(d.cfg.SIGNALS_SECRET, "hex")) : null;
   const autopilotDeps = {
     isRevoked: (h: string) => d.store.isRevoked(h),
     revoke: (h: string, expiresAt: number) => d.store.revoke(h, expiresAt),
@@ -737,29 +740,52 @@ export function createApp(d: AppDeps): Hono {
     accessKey: d.nearReads.accessKey,
     view: <T>(contractId: string, method: string, args: object) => d.chain.viewer.view<T>(contractId, method, args),
     signer: d.cfg.deployment.external.chainSignatures,
+    signalAccess: (follower: string, leader: string) => signalAccessActive(d.store.sql, follower, leader, Math.floor(now() / 1000)),
     keys,
     approvals,
     sessionSecret: d.adminSessionSecret,
     sealPublicKey: d.cfg.AUTOPILOT_SEAL_PUBLIC_KEY,
     botAccount: d.cfg.AUTOPILOT_BOT_ACCOUNT,
+    wallets: {
+      network: d.cfg.NEAR_NETWORK,
+      view: <T>(contractId: string, method: string, args: object) => d.chain.viewer.view<T>(contractId, method, args),
+      balance: (account: string) => d.chain.viewer.balance(account),
+      // #mainnet: grants on Agent API agents need the partner key.
+      agentApi: d.cfg.NEAR_NETWORK === "mainnet" && d.cfg.AGENT_API_KEY ? agentApi(d.cfg.AGENT_API_KEY, d.cfg.AGENT_API_URL ? { baseUrl: d.cfg.AGENT_API_URL } : {}) : null,
+    },
     log: d.log,
     now,
   };
   admin.route("/", autopilotAdminRoutes(autopilotDeps));
-  admin.route("/", moderationRoutes({ sql: d.store.sql }));
+  admin.route("/", moderationRoutes({ sql: d.store.sql, open: signalsSecret ? (x) => openStoredSignal(signalsSecret, x) : undefined }));
   admin.route("/", waitlistAdminRoutes({ sql: d.store.sql }));
   app.route("/v1/admin", admin);
   app.route("/v1", autopilotRoutes(autopilotDeps));
   // Any-chain deposits and withdrawals through NEAR Intents (dry quotes on testnet).
   app.route("/v1", depositRoutes({ sql: d.store.sql, oneClick: d.oneClick, network: d.cfg.NEAR_NETWORK, signedIn, log: d.log, now }));
   app.route("/v1", socialRoutes({ sql: d.store.sql, chain: d.chain, approvals, sessionSecret: d.adminSessionSecret, isRevoked: (h) => d.store.isRevoked(h), now }));
+  const signalMark = async (market: string) => (await d.autopilot.service.markets().catch(() => [])).find((m) => m.symbol === market)?.markPx ?? null;
+  app.route("/v1", signalsRoutes({ sql: d.store.sql, viewer: d.chain.viewer, deployment: d.cfg.deployment, secret: signalsSecret, signedIn, mark: signalMark, now }));
   app.route("/v1", ownerApprovalRoutes(approvals, signedIn, now));
   // Sign-up: the relayer pays for an activation only with this API's ticket.
   app.route("/v1", activationTicketRoutes(d.tickets ?? null, d.cfg.TRUSTED_PROXY_HOPS, now));
   // The Mainnet waitlist, from the app and the website. Client addresses are stored as keyed hashes.
   app.route("/v1", waitlistRoutes({ sql: d.store.sql, trustedProxyHops: d.cfg.TRUSTED_PROXY_HOPS, ipSecret: d.adminSessionSecret, now }));
   // Pay-per-call x402 routes for agents (USDC on NEAR, no sign-in): full index history, backtests.
-  app.route("/v1", x402Routes({ cfg: d.cfg, sql: d.store.sql, viewer: d.chain.viewer, trends: () => d.chain.trends(), history: d.history, backtest: (rule, days, nowSec) => d.autopilot.service.backtest(rule, days, nowSec), log: d.log, now }));
+  app.route(
+    "/v1",
+    x402Routes({
+      cfg: d.cfg,
+      sql: d.store.sql,
+      viewer: d.chain.viewer,
+      trends: () => d.chain.trends(),
+      history: d.history,
+      backtest: (rule, days, nowSec) => d.autopilot.service.backtest(rule, days, nowSec),
+      signalKeys: (leader, nowSec) => paidSignalKeys({ sql: d.store.sql, secret: signalsSecret }, leader, nowSec),
+      log: d.log,
+      now,
+    }),
+  );
 
   // Web Push subscriptions for the signed-in account's devices.
   const subscription = z.object({

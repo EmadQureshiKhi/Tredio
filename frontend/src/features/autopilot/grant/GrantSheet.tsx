@@ -1,14 +1,22 @@
 "use client";
-import { Check, Fingerprint, KeyRound, X } from "lucide-react";
+import { acceptsWalletSessions } from "@tredio/contracts";
+import { DEFAULT_CALLS_PER_HOUR } from "@tredio/custody";
+import { Check, Cpu, Fingerprint, KeyRound, X } from "lucide-react";
 import { useState } from "react";
 import { Button, ErrorNote, Segmented, Sheet, TxStatus } from "@/components/ui";
 import { useAccount } from "@/lib/account/AccountProvider";
+import { useAccountVersion } from "@/lib/account/version";
+import { NETWORK } from "@/lib/config";
 import { useTx } from "@/lib/trade/useTx";
 import { type GrantView, useGrant } from "../shared/data";
-import { DAILY_CAPS, useGrantActions, VALID_DAYS } from "./grant";
+import { DAILY_CAPS, useGrantActions, VALID_DAYS, WALLET_GAS_NEAR } from "./grant";
 
 type Cap = `${(typeof DAILY_CAPS)[number]}`;
 type Days = `${(typeof VALID_DAYS)[number]}`;
+type Signer = "key" | "wallet";
+
+/** Where Autopilot's policy wallet lives: OutLayer custody on testnet, a NEAR Intents Agent API agent (OutLayer custody too) on mainnet. */
+const WALLET_HOST = NETWORK === "mainnet" ? "an Agent API agent in OutLayer's TEE" : "OutLayer's TEE";
 
 /** The account contract's guard on every session order to Hyperliquid. */
 export const SESSION_MAX_LEVERAGE = 10;
@@ -30,6 +38,12 @@ export function GrantSheet({ open, onOpenChange, onGranted, reason }: { open: bo
   const [days, setDays] = useState<Days>("7");
   const [done, setDone] = useState(false);
   const renewing = grant.data?.state === "active";
+  // Renewing keeps how Autopilot signs: a policy wallet's session is renewed in place for the same wallet.
+  const current = grant.data?.wallet ?? null;
+  const [signer, setSigner] = useState<Signer>("key");
+  const signs: Signer = renewing ? (current ? "wallet" : "key") : signer;
+  const version = useAccountVersion(account.kind === "passkey" ? account.address : null).data;
+  const walletReady = acceptsWalletSessions(version ?? 1);
 
   const change = (o: boolean) => {
     onOpenChange(o);
@@ -42,8 +56,14 @@ export function GrantSheet({ open, onOpenChange, onGranted, reason }: { open: bo
   };
 
   const busy = actions.working || tx.busy;
+  const blocked = signs === "wallet" && !renewing && !walletReady;
   const submit = async () => {
-    const ok = await actions.grant(tx, Number(cap), Number(days));
+    const ok =
+      renewing && current
+        ? await actions.renewWallet(tx, current, Number(cap), Number(days))
+        : signs === "wallet"
+          ? await actions.grantWallet(tx, Number(cap), Number(days))
+          : await actions.grant(tx, Number(cap), Number(days));
     if (!ok) return;
     setDone(true);
     onGranted?.();
@@ -67,7 +87,7 @@ export function GrantSheet({ open, onOpenChange, onGranted, reason }: { open: bo
           <div className="flex flex-col gap-3">
             <TxStatus tx={tx} filledLabel={renewing ? "Renewed" : "Granted"} />
             {actions.error ? <ErrorNote message={actions.error} /> : null}
-            <Button block size="lg" loading={busy} data-testid="grant-approve" icon={<Fingerprint className="size-[18px]" aria-hidden />} onClick={() => void submit()}>
+            <Button block size="lg" loading={busy} disabled={blocked} data-testid="grant-approve" icon={<Fingerprint className="size-[18px]" aria-hidden />} onClick={() => void submit()}>
               {renewing ? "Renew with passkey" : "Approve with passkey"}
             </Button>
           </div>
@@ -84,7 +104,8 @@ export function GrantSheet({ open, onOpenChange, onGranted, reason }: { open: bo
             </span>
             <p className="font-strong text-[15px] text-text">Autopilot can trade for you</p>
             <p className="max-w-xs text-[13px] leading-5 text-text-2">
-              Hyperliquid orders only, for {days} {days === "1" ? "day" : "days"}. Revoke it any time from Autopilot.
+              Hyperliquid orders only, for {days} {days === "1" ? "day" : "days"}.
+              {signs === "wallet" ? ` Each one is signed in ${WALLET_HOST}, inside your policy. Freeze the wallet or revoke access any time from Autopilot.` : " Revoke it any time from Autopilot."}
             </p>
           </div>
         ) : (
@@ -99,17 +120,66 @@ export function GrantSheet({ open, onOpenChange, onGranted, reason }: { open: bo
               <p className="font-strong text-[12.5px] text-text-2">Ends after</p>
               <Segmented label="Access lasts" value={days} onChange={setDays} options={VALID_DAYS.map((d) => ({ value: `${d}` as Days, label: `${d} ${d === 1 ? "day" : "days"}` }))} />
             </div>
-            <div className="flex gap-3 rounded-2xl border border-line p-4">
-              <KeyRound className="mt-0.5 size-[18px] shrink-0 text-primary" aria-hidden />
-              <p className="text-[12.5px] leading-5 text-text-2">
-                Your device makes a separate key for Autopilot and seals it so only the Autopilot executor can open it: Tredio&rsquo;s servers never see it. Your passkey never leaves your device.
-                {renewing ? " Renewing adds a fresh key; the current one keeps trading until the new one is on chain." : ""}
-              </p>
-            </div>
+            {renewing ? null : (
+              <div className="flex flex-col gap-2">
+                <p className="font-strong text-[12.5px] text-text-2">Who signs Autopilot&rsquo;s orders</p>
+                <Segmented
+                  label="Who signs Autopilot's orders"
+                  value={signer}
+                  onChange={setSigner}
+                  options={[
+                    { value: "key" as Signer, label: "Sealed key" },
+                    { value: "wallet" as Signer, label: "Policy wallet" },
+                  ]}
+                />
+              </div>
+            )}
+            {signs === "wallet" ? <WalletTerms ready={renewing || walletReady} renewing={renewing} /> : (
+              <div className="flex gap-3 rounded-2xl border border-line p-4">
+                <KeyRound className="mt-0.5 size-[18px] shrink-0 text-primary" aria-hidden />
+                <p className="text-[12.5px] leading-5 text-text-2">
+                  Your device makes a separate key for Autopilot and seals it so only the Autopilot executor can open it: Tredio&rsquo;s servers never see it. Your passkey never leaves your device.
+                  {renewing ? " Renewing adds a fresh key; the current one keeps trading until the new one is on chain." : ""}
+                </p>
+              </div>
+            )}
           </>
         )}
       </div>
     </Sheet>
+  );
+}
+
+/**
+ * What a policy wallet adds, and what it does not check. Its enclave is a second limit beside the
+ * session: the account stores its policy and alone can freeze it.
+ */
+function WalletTerms({ ready, renewing }: { ready: boolean; renewing: boolean }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-line p-4" data-testid="grant-wallet-terms">
+      <div className="flex gap-3">
+        <Cpu className="mt-0.5 size-[18px] shrink-0 text-primary" aria-hidden />
+        <div className="flex flex-col gap-2 text-[12.5px] leading-5 text-text-2">
+          <p>
+            Autopilot&rsquo;s key lives in {WALLET_HOST} and signs only inside a policy your account stores and alone controls: calls to your own account, with no NEAR attached, at most {DEFAULT_CALLS_PER_HOUR} an hour, and nothing while you have frozen it.
+            Your account contract still checks every order against this session.
+          </p>
+          <p>The TEE does not read what a call asks your account to do; the session does: Hyperliquid orders only, within 2% of the mark, up to 10x.</p>
+          {renewing ? (
+            <p>Renewing extends the session for the same wallet; its policy stays as it is.</p>
+          ) : (
+            <p>
+              One passkey prompt stores the policy and moves {WALLET_GAS_NEAR} NEAR from your account to the wallet for gas{NETWORK === "mainnet" ? ", after two prompts that create the agent and let the executor use it" : ", plus about 0.01 NEAR for the policy's storage"}.
+            </p>
+          )}
+        </div>
+      </div>
+      {ready ? null : (
+        <p className="rounded-xl bg-warn-soft px-3 py-2 text-[12.5px] leading-5 text-warn" role="status" data-testid="grant-wallet-unavailable">
+          Your account&rsquo;s code takes session calls only from its own keys, so it would refuse the wallet&rsquo;s. This opens once your account runs code that accepts them; until then, use a sealed key.
+        </p>
+      )}
+    </div>
   );
 }
 

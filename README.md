@@ -73,6 +73,14 @@ Each of these is a NEAR primitive doing real work in the product, not a logo on 
    Premium API endpoints (full-resolution index history with every source reading, and Autopilot backtests) follow x402 v2's NEAR `exact` scheme: the API answers HTTP 402, the agent signs one USDC `ft_transfer` as a NEP-366 delegate action and sends it in `PAYMENT-SIGNATURE`, and Tredio's relayer submits it, so the agent needs no NEAR for gas.
    An MCP server and an agent skill describe the whole product to AI agents; the MCP server can also buy the paid history under a spending cap, and trade Up/Down, perps and coins and post calls for a user within the limits the user sets (an allowlist of tools, a USDC cap per call and a daily cap), from a passkey account's session key or the agent's own NEAR account.
    Code: [`backend/src/x402`](backend/src/x402), [`packages/chain/src/x402.ts`](packages/chain/src/x402.ts) (the paying client), [`packages/mcp`](packages/mcp), [`skills/tredio/SKILL.md`](skills/tredio/SKILL.md).
+9. **Paid private signals, committed on chain first.**
+   A leader publishes trade signals that stay sealed (AES-GCM under a weekly viewing key) until a delay the leader sets, and followers buy early access in USDC on NEAR, paid straight to the leader's account.
+   Before the API takes a signal, its SHA-256 goes on chain in the memo of a 0.000001 USDC transfer from the leader's account, so nobody can change or backdate it; payments and commitments are read from the NEP-141 events the USDC contract logged.
+   Autopilot copies each signal within the follower's caps while access lasts, and agents buy the same viewing keys over x402, paid to the leader.
+   Positions on chain stay public; what is private is the signal and its timing, and Tredio's server, which sells the keys, can read every signal.
+   Status on testnet: a channel, a committed signal ([`3PZMfvkS...`](https://testnet.nearblocks.io/txns/3PZMfvkSWy3ga6GW47ZXUBpASi24yRYg7sTbQ2NQsPf1)) and a follower's early-access payment ([`9swKsrx7...`](https://testnet.nearblocks.io/txns/9swKsrx7Z5xfR5HitX2BkcfhfX1DoMSLzFQA1ZhBk81g)), made by [`scripts/signals-demo.ts`](scripts/signals-demo.ts).
+   In the app: Signals on a caller's profile, and Paid signals on Copy.
+   Code: [`packages/autopilot/src/signals.ts`](packages/autopilot/src/signals.ts), [`backend/src/signals`](backend/src/signals), [`apps/autopilot/src/signals.ts`](apps/autopilot/src/signals.ts).
 
 ## How it works
 

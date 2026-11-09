@@ -14,6 +14,7 @@ import { isBot, useAccountHistory, useCaller, useFollows, useHlAddress, useLeade
 import { SectionTitle, StaleNote, StatTile } from "@/features/autopilot/shared/kit";
 import { EquityChart, StatsGrid } from "@/features/autopilot/shared/Performance";
 import { FollowSheet } from "@/features/copy/FollowSheet";
+import { SignalsSection } from "@/features/signals/SignalsSection";
 import { CallList } from "./CallList";
 import { CallSheet } from "./CallSheet";
 import { useCallerIdentity } from "./identity";
@@ -127,6 +128,8 @@ function Caller({ data }: { data: CallerData }) {
       ) : mine ? (
         <LinkHint />
       ) : null}
+
+      <SignalsSection identity={caller.address} linkedAccount={linked} mine={mine} />
 
       <section aria-labelledby="calls-title" className="flex flex-col gap-3">
         <SectionTitle

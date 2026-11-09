@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { ADMIN_RECIPIENT, adminMessage, randomNonce } from "../../src/lib/auth/message";
 import { type NearKey, signNep413 } from "./wallet";
-import type { Candidate, CandidateStatus, ContentKind, ContentPage, DecisionRequest, Health, ModeratedCall, ModeratedPost, SystemReport, WaitlistPage } from "../../src/types/admin";
+import type { Candidate, CandidateStatus, ContentKind, ContentPage, DecisionRequest, Health, ModeratedCall, ModeratedPost, ModeratedSignal, SystemReport, WaitlistPage } from "../../src/types/admin";
 
 /** The real local backend the panel talks to. */
 export const BACKEND_URL = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000").replace(/\/+$/, "");
@@ -80,7 +80,7 @@ export class AdminApi {
   }
 
   /** A caller's newest posts or calls, visible and hidden; `caller` is an identity or a handle. */
-  content(kind: ContentKind, caller: string): Promise<ContentPage<ModeratedPost | ModeratedCall>> {
+  content(kind: ContentKind, caller: string): Promise<ContentPage<ModeratedPost | ModeratedCall | ModeratedSignal>> {
     return this.call("GET", `/v1/admin/social/${kind}?caller=${encodeURIComponent(caller)}`);
   }
 

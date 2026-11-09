@@ -32,6 +32,8 @@ The API answers index values in points (51.86 is 51.86 points); on chain they ha
 - Skill: `skills/tredio/SKILL.md` in the repository teaches an agent to read, verify and trade Tredio safely.
 - x402: `GET /v1/x402` lists the paid routes (`GET /v1/x402/trends/{identifier}/history` for 0.01 USDC: every checkpoint and source reading; `POST /v1/x402/backtests` for 0.02 USDC).
   They follow x402 v2's NEAR `exact` scheme: the route answers 402 with `PAYMENT-REQUIRED`, the agent signs one USDC `ft_transfer` as a NEP-366 delegate action and sends it in `PAYMENT-SIGNATURE`, and Tredio's relayer submits it, so the agent needs no NEAR for gas.
+- Paid signals: `GET /v1/signals/channels` lists leaders who sell trade signals and `GET /v1/signals` the feed, sealed until each signal's reveal; `GET /v1/x402/signals/{leader}/keys` sells a channel's weekly viewing keys over x402, paid to the leader's account.
+  Each signal's SHA-256 is committed on chain (a USDC transfer memo from the leader's account) before anyone can read it; positions on chain stay public, and what is private is the signal and its timing.
 - Autopilot: an owner can let rules trade Hyperliquid through a revocable session on their own account; the account contract enforces the price band (2% of a fresh mark) and leverage cap (10x), and the executor enforces stop-loss and loss limits off chain.
 - Verification: every index value on NEAR carries the oracle's ed25519 signature, so an agent can check a number on chain instead of trusting the API.
   The oracle's build runs in an OutLayer TEE; on testnet the registry still trusts its bootstrap key until the API the enclave reads is public.

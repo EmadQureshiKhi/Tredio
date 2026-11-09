@@ -220,6 +220,7 @@ describe("paid routes", () => {
   const cfg = loadConfig({ DATABASE_URL: "postgres://unused@localhost/x", ORACLE_TOKEN: "test-oracle-token-123456", NEAR_NETWORK: "testnet" });
   const NOW = 1_793_940_000;
   const trend: ChainTrend = { id: "topic:world-cup", identifier: "topic:world-cup", assetClass: 6, status: "Active", createdAt: NOW - 86_400 * 10, updatedAt: NOW - 60, statusSince: NOW - 86_400 * 10, index: 51.88, peakIndex: 52.49, surfacer: "tredio.testnet", reviewHash: null, asset: null };
+  const SIGNAL_LEADER = "c".repeat(64);
   const settled: string[] = [];
   // Every settlement is its own transaction.
   const settle = async (): Promise<Settlement> => ({ status: "settled", transaction: `TxSettled${settled.length}` });
@@ -245,6 +246,7 @@ describe("paid routes", () => {
       now: () => NOW * 1000,
       state: chain(),
       settler: s,
+      signalKeys: async (leader) => (leader === SIGNAL_LEADER ? { payTo: "leader.testnet", amount: 2_000_000n, periodDays: 30, keys: async () => [{ epoch: 2966, key: "k".repeat(64) }] } : null),
     });
 
   beforeAll(async () => {
@@ -277,6 +279,7 @@ describe("paid routes", () => {
     expect(body.resources.map((r) => [r.path, r.amount, r.usdc])).toEqual([
       ["/v1/x402/trends/{identifier}/history", "10000", "0.01"],
       ["/v1/x402/backtests", "20000", "0.02"],
+      ["/v1/x402/signals/{leader}/keys", "per channel", "per channel"],
     ]);
   });
 
@@ -315,6 +318,20 @@ describe("paid routes", () => {
     expect(requiredOf(again).error).toBe("duplicate_settlement");
     expect(responseOf(again)).toMatchObject({ success: false, errorReason: "duplicate_settlement" });
     expect(settled.length).toBe(1);
+  });
+
+  test("a signals channel's viewing keys are paid to the leader's account, at the leader's price", async () => {
+    const unpaid = await get(`/x402/signals/${SIGNAL_LEADER}/keys`);
+    expect(unpaid.status).toBe(402);
+    const leaderPrice = { ...required, payTo: "leader.testnet", amount: "2000000" };
+    expect(requiredOf(unpaid).accepts).toEqual([leaderPrice]);
+    // Paying the treasury instead does not buy them.
+    expect((await get(`/x402/signals/${SIGNAL_LEADER}/keys`, await pay())).status).toBe(402);
+    const res = await get(`/x402/signals/${SIGNAL_LEADER}/keys`, await pay({ requirements: leaderPrice, nonce: KEY_NONCE + 2n }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ leader: SIGNAL_LEADER, keys: [{ epoch: 2966, key: "k".repeat(64) }] });
+    expect(responseOf(res)).toMatchObject({ success: true, amount: "2000000" });
+    expect((await get(`/x402/signals/${"d".repeat(64)}/keys`)).status).toBe(404);
   });
 
   test("a range narrows the history", async () => {

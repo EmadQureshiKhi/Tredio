@@ -3,7 +3,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { withFollowDefaults } from "@tredio/autopilot";
 import type { Session } from "@tredio/contracts";
 import { useAccount } from "@/lib/account/AccountProvider";
-import { ApiError, autopilot, type Grant, history, hyperliquid, social } from "@/lib/api";
+import { ApiError, autopilot, type Grant, type GrantWallet, history, hyperliquid, social } from "@/lib/api";
 import { view } from "@/lib/chain/client";
 import { BOT_ACCOUNT, isBot } from "@/lib/bot";
 
@@ -141,9 +141,11 @@ export interface GrantView {
   /** USDC moved so far today. */
   spentToday: number;
   backend: Grant | null;
+  /** The policy wallet that signs Autopilot's session calls, or null when the executor holds a sealed session key. */
+  wallet: GrantWallet | null;
 }
 
-const NONE: GrantView = { state: "none", sessionKey: null, validUntil: 0, dailyLimit: 0, spentToday: 0, backend: null };
+const NONE: GrantView = { state: "none", sessionKey: null, validUntil: 0, dailyLimit: 0, spentToday: 0, backend: null, wallet: null };
 
 const readSession = (account: string, key: string) => view<Session | null>(account, "session", { public_key: key });
 
@@ -167,6 +169,7 @@ export async function loadGrant(account: string): Promise<GrantView> {
     dailyLimit: Number(onChain?.daily_limit ?? grant.dailyLimit) / 1e6,
     spentToday: onChain && onChain.day === today ? Number(onChain.spent) / 1e6 : 0,
     backend: grant,
+    wallet: grant.wallet ?? null,
   };
   if (!onChain || grant.status === "revoked") return { ...base, state: "revoked" };
   if (onChain.expires_at <= now || grant.status === "expired") return { ...base, state: "expired" };

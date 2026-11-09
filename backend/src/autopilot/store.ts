@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { type BacktestResult, type ClosedTrade, type FollowSettings, type Rule, withFollowDefaults } from "@tredio/autopilot";
 import type { Sql } from "../db";
+import type { GrantWallet } from "./wallets";
 
 /** Autopilot, grants and copy-trading tables. */
 
@@ -29,6 +30,8 @@ export interface Grant {
   dailyLimit: bigint;
   /** A key requested while this grant is active; it takes over once the account adds it. */
   nextSessionKey: string | null;
+  /** The policy wallet whose key the grant's session is for, or null for a sealed session key. */
+  wallet: GrantWallet | null;
 }
 
 export interface Follow {
@@ -145,10 +148,38 @@ export class AutopilotStore {
   }
 
   async grant(owner: string): Promise<Grant | null> {
-    const rows = await this.sql<{ owner: string; session_key: string; status: Grant["status"]; valid_until: string; daily_limit: string; next_session_key: string | null }[]>`
-      SELECT owner, session_key, status, valid_until, daily_limit, next_session_key FROM autopilot_grants WHERE owner = ${owner.toLowerCase()}`;
+    const rows = await this.sql<
+      { owner: string; session_key: string; status: Grant["status"]; valid_until: string; daily_limit: string; next_session_key: string | null; kind: GrantWallet["kind"] | null; account: string | null; agent_id: string | null }[]
+    >`
+      SELECT g.owner, g.session_key, g.status, g.valid_until, g.daily_limit, g.next_session_key, w.kind, w.account, w.agent_id
+        FROM autopilot_grants g LEFT JOIN autopilot_grant_wallets w ON w.session_key = g.session_key
+       WHERE g.owner = ${owner.toLowerCase()}`;
     const r = rows[0];
-    return r ? { owner: r.owner, sessionKey: r.session_key, status: r.status, validUntil: Number(r.valid_until), dailyLimit: BigInt(r.daily_limit), nextSessionKey: r.next_session_key } : null;
+    return r
+      ? {
+          owner: r.owner,
+          sessionKey: r.session_key,
+          status: r.status,
+          validUntil: Number(r.valid_until),
+          dailyLimit: BigInt(r.daily_limit),
+          nextSessionKey: r.next_session_key,
+          wallet: r.kind && r.account ? { kind: r.kind, account: r.account, agentId: r.agent_id } : null,
+        }
+      : null;
+  }
+
+  /** The policy wallet a grant key is for, or null for a sealed session key. */
+  async grantWallet(sessionKey: string): Promise<GrantWallet | null> {
+    const rows = await this.sql<{ kind: GrantWallet["kind"]; account: string; agent_id: string | null }[]>`SELECT kind, account, agent_id FROM autopilot_grant_wallets WHERE session_key = ${sessionKey}`;
+    const r = rows[0];
+    return r ? { kind: r.kind, account: r.account, agentId: r.agent_id } : null;
+  }
+
+  /** Records that a requested grant key is a policy wallet's (the sealed box holds the wallet's credential). A key keeps its first owner's wallet. */
+  async setGrantWallet(owner: string, sessionKey: string, wallet: GrantWallet): Promise<void> {
+    await this.sql`
+      INSERT INTO autopilot_grant_wallets (session_key, owner, kind, account, agent_id) VALUES (${sessionKey}, ${owner.toLowerCase()}, ${wallet.kind}, ${wallet.account}, ${wallet.agentId})
+      ON CONFLICT (session_key) DO UPDATE SET kind = EXCLUDED.kind, account = EXCLUDED.account, agent_id = EXCLUDED.agent_id WHERE autopilot_grant_wallets.owner = EXCLUDED.owner`;
   }
 
   /**

@@ -112,7 +112,8 @@ export function calls(d: Deployment) {
     usdc: {
       faucet: () => call(c.usdc, "faucet", {}, ZERO, 30),
       mint: (accountId: string, amount: U128) => call(c.usdc, "mint", { account_id: accountId, amount }, ZERO, 30),
-      transfer: (receiverId: string, amount: U128) => call(c.usdc, "ft_transfer", { receiver_id: receiverId, amount }, ONE_YOCTO, 30),
+      /** A USDC transfer; the memo lands in the NEP-141 event, where paid signals read their commitments and purchases. */
+      transfer: (receiverId: string, amount: U128, memo?: string) => call(c.usdc, "ft_transfer", memo === undefined ? { receiver_id: receiverId, amount } : { receiver_id: receiverId, amount, memo }, ONE_YOCTO, 30),
       storageDeposit: (accountId: string) =>
         call(c.usdc, "storage_deposit", { account_id: accountId, registration_only: true }, "1250000000000000000000", 30),
     },

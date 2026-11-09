@@ -1,6 +1,6 @@
 import { generateSealKeyPair, type Holding, type Rule, seal } from "@tredio/autopilot";
 import type { AccountState, HlNetwork } from "@tredio/hyperliquid";
-import { Copier } from "../src/copier";
+import { Copier, type LeaderSource } from "../src/copier";
 import type { ExecutorDb } from "../src/db";
 import { Executor } from "../src/executor";
 import { silentLog } from "../src/log";
@@ -63,7 +63,8 @@ export class FakeLeaders {
   }
 }
 
-export async function world(db: ExecutorDb) {
+/** `leaderSource` wraps the fake leaders, for a source composed on top of them (signal channels). */
+export async function world(db: ExecutorDb, leaderSource: (fake: LeaderSource) => LeaderSource = (fake) => fake) {
   const exchange = new FakeExchange([market("SOL", 0, 2, 90, 10), market("BTC", 3, 5, 76_000, 40), market("ETH", 4, 4, 2_260, 25)]);
   const registry = new FakeRegistry();
   for (const m of exchange.markets) registry.set(m.symbol, m.markPx);
@@ -122,7 +123,7 @@ export async function world(db: ExecutorDb) {
     silentLog,
     async (ctx) => copier?.tick(ctx),
   );
-  copier = new Copier(db, executor, leaders.source(), silentLog, "testnet");
+  copier = new Copier(db, executor, leaderSource(leaders.source()), silentLog, "testnet");
 
   /** Grants Autopilot `a`'s session: the box sealed to the executor, as the app does, confirmed active. */
   const grant = async (a: FakeAccount) => {
