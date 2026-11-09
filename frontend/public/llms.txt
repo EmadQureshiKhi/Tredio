@@ -11,9 +11,9 @@
 - `/t/{identifier}`: one trend (for example `/t/topic:world-cup`), with its index history, trading and the calls people made on it.
 - `/portfolio`: what the signed-in account holds, valued live.
 - `/autopilot`: rules that trade Hyperliquid perps when a trend's attention moves.
-- `/copy`: follow a Hyperliquid trader's positions from your own account.
+- `/copy`: follow a Hyperliquid trader's positions from your own account, or copy a leader's paid signals.
 - `/leaders`: callers, traders and Autopilot rules ranked by settled results.
-- `/c/{account}`: a NEAR account's trading record, or a caller's public record.
+- `/c/{account}`: a NEAR account's trading record, or a caller's public record and paid signals channel.
 - `/radar`: approved topics waiting for a live market.
 - `/deposit`: move funds in and out through NEAR Intents (mainnet only; testnet shows previews).
 - `/status`: health of the oracle, NEAR, every service and the accounts they send from.

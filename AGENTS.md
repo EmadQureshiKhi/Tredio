@@ -41,7 +41,7 @@ pnpm coverage:contracts
 
 - The `registry` accepts an index report only with an ed25519 signature from the oracle key in its state; that key is held by OutLayer and bound to the enclave build's sha256.
 - A person's `0u...` account is owned by a passkey: `owner_execute` verifies a WebAuthn P-256 assertion over SHA-256("tredio-account:v1:" || request JSON) with `p256_verify`.
-- Trading goes through `session_call` with a session key (a NEP-611 gas key on the account): typed actions only, a gross daily USDC cap, anchored prices, and the Hyperliquid guard (2% of a fresh mark, at most 10x).
+- Trading goes through `session_call` with a session key (a NEP-611 gas key on the account): typed actions only, a gross daily USDC cap on what moves USDC on NEAR, anchored prices, and the Hyperliquid guard (2% of a fresh mark, at most 10x; Hyperliquid actions move no USDC on NEAR, so the cap does not count them).
 - The relayer pays for sign-ups (0.4 NEAR, with a backend activation ticket) and owner requests, after checking the passkey proof itself.
 - API sign-in is NEP-413 (recipient `tredio.bid`) by a full-access key or an active session key, both read on chain; admin sign-in is NEP-413 with recipient `admin.tredio.bid` by an allowlisted account.
 

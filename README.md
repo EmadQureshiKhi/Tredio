@@ -32,7 +32,7 @@ Each of these is a NEAR primitive doing real work in the product, not a logo on 
 1. **Face ID accounts with no seed phrase and no gas.**
    A passkey creates a NEP-655 universal account (`0u...`) whose id is derived from the passkey itself, from inside the `accounts` factory, on a global contract.
    The account checks the passkey's P-256 signature on chain with the `p256_verify` host function, so no server can act as the owner.
-   One prompt adds a week-long session key that is a NEP-611 gas key: it prepays its own gas and can only send typed trades under a daily USDC cap.
+   One prompt adds a week-long session key that is a NEP-611 gas key: it prepays its own gas and can only send typed trades, under a daily USDC cap for everything that moves USDC on NEAR (Hyperliquid actions move none on NEAR, so the price band and leverage limit below bound those).
    In the app: Sign in, then trade.
    Code: [`contracts/account`](contracts/account), [`contracts/accounts`](contracts/accounts), [`frontend/src/lib/account`](frontend/src/lib/account).
 2. **An oracle built for an enclave.**
@@ -44,15 +44,15 @@ Each of these is a NEAR primitive doing real work in the product, not a logo on 
 3. **AI review you can verify.**
    Every candidate the radar finds is reviewed by NEAR AI Cloud's verifiable models.
    An answer without a `provider_tee` signature is refused, and the hash of the signed evidence is written on the trend in the registry.
-   The API serves the exact request and response the signature covers, so anyone can recompute both hashes and check the signature without trusting Tredio.
-   Status on testnet: the radar's candidates are reviewed by NEAR AI Cloud, with evidence signed in the provider's TEE, and `equity:tsla`, `topic:godzilla-minus-zero` and `person:stephen-miller` were listed from those reviews.
+   The API serves the exact request and response the signature covers, so anyone can recompute both hashes and check the signature against the signing address in the evidence without trusting Tredio; that the address belongs to NEAR AI's TEE is checked against NEAR AI's own attestation at [cloud.near.ai/verify](https://cloud.near.ai/verify).
+   Status on testnet: the radar's candidates are reviewed by NEAR AI Cloud, with evidence signed in the provider's TEE, and `equity:tsla`, `topic:godzilla-minus-zero` and `person:stephen-miller` were listed from those reviews (live again as `.2` listings since the oracle outage of 2026-11-07, see JUDGES.md).
    Crypto candidates list only once smart-money inflow confirms them.
    In the app: the Verified chip on a reviewed trend opens the evidence.
    Code: [`backend/src/ai/nearai.ts`](backend/src/ai/nearai.ts), `GET /v1/reviews/:hash`.
 4. **Hyperliquid perps from a NEAR account.**
    Your account contract builds the Hyperliquid order (msgpack action, connection id, EIP-712 digest) and asks [Chain Signatures](https://docs.near.org/chain-abstraction/chain-signatures) (`v1.signer-prod.testnet`) to sign it with your account's own derived key.
    A session can only sign orders within 2% of a fresh oracle mark and up to 10x leverage, enforced on chain.
-   Status on testnet: account code v2, whose guard binds the mark to the signed asset ([AUDIT.md](contracts/AUDIT.md), H-1), is published; new accounts start on it, and older ones upgrade from Settings with one passkey prompt.
+   Status on testnet: account code v3, whose guard binds the mark to the signed asset ([AUDIT.md](contracts/AUDIT.md), H-1) and which requires the passkey's user verification, is published; new accounts start on it, and older ones upgrade from Settings with one passkey prompt.
    In the app: the Perp tab's Hyperliquid market, on a trend with an asset; today's live trends are topics, and crypto trends (NEAR and Hyperliquid are queued) list once Nansen confirms smart-money inflow.
    Code: [`contracts/account/src/hyperliquid.rs`](contracts/account/src/hyperliquid.rs), [`packages/hyperliquid`](packages/hyperliquid).
 5. **Deposits from any chain.**
@@ -64,11 +64,13 @@ Each of these is a NEAR primitive doing real work in the product, not a logo on 
    The relayer, keeper and market maker each send through a gas key with parallel nonce lanes, so one slow transaction never blocks the next; the top-up service refills those keys and every service wallet from the treasury.
    In the app: the status page lists every wallet, key and lane.
    Code: [`packages/chain`](packages/chain), [`apps`](apps).
-7. **Autopilot on a revocable on-chain grant.**
+7. **Autopilot on a revocable on-chain grant, optionally signed in a TEE.**
    Turning on Autopilot adds a session labelled `autopilot` that can only trade Hyperliquid, under the same on-chain price and leverage guard, confirmed by reading the account.
+   The session's key can live in an OutLayer custody wallet instead of with the executor: the account stores the wallet's policy (only the account itself as receiver, no NEAR attached, a call budget) as its controller and can freeze it with one passkey prompt, and account code v3 lets the wallet act for the session as its own implicit account.
    Stop-loss, take-profit and loss limits are enforced by the executor off chain.
-   In the app: Autopilot.
-   Code: [`apps/autopilot`](apps/autopilot), [`backend/src/autopilot`](backend/src/autopilot).
+   Status on testnet: an OutLayer enclave signed a `session_call` that a v3 account took as Autopilot's session and signed through Chain Signatures ([`ENCLocW8...`](https://testnet.nearblocks.io/txns/ENCLocW8Mk6KikN2nLgH56UQu8JoxFr2U56wPVn1ejKG)); the mainnet path through the NEAR Intents Agent API is tested offline.
+   In the app: Autopilot (grant access, then "Policy wallet").
+   Code: [`apps/autopilot`](apps/autopilot), [`backend/src/autopilot`](backend/src/autopilot), [`packages/custody`](packages/custody).
 8. **Paid data for agents, settled in USDC on NEAR.**
    Premium API endpoints (full-resolution index history with every source reading, and Autopilot backtests) follow x402 v2's NEAR `exact` scheme: the API answers HTTP 402, the agent signs one USDC `ft_transfer` as a NEP-366 delegate action and sends it in `PAYMENT-SIGNATURE`, and Tredio's relayer submits it, so the agent needs no NEAR for gas.
    An MCP server and an agent skill describe the whole product to AI agents; the MCP server can also buy the paid history under a spending cap, and trade Up/Down, perps and coins and post calls for a user within the limits the user sets (an allowlist of tools, a USDC cap per call and a daily cap), from a passkey account's session key or the agent's own NEAR account.
@@ -87,7 +89,7 @@ Each of these is a NEAR primitive doing real work in the product, not a logo on 
 <img src="assets/readme/pipeline.png" alt="How a trend becomes a market: the oracle's signed reports update the registry; the radar's NEAR AI review hash goes on the trend; markets read the registry; passkey accounts and the service fleet trade against the markets" width="960">
 
 The radar proposes trends from public sources and NEAR AI Cloud reviews each one.
-The oracle runs every minute: it reports a trend when its index moves 1% or at least every seven minutes, and Hyperliquid marks on every run; the signed report updates the index, opens and settles series, and records the marks.
+The oracle runs every minute: it reports a trend when its index moves 1% or at least every seven minutes, and Hyperliquid marks on every run; the signed report updates the index, records each series' opening and settlement values, and records the marks, and the keeper opens and settles series from them.
 Markets read the registry: Up/Down series settle from it, perps use it as their price, coins ratchet their floor from its peak.
 People trade from their own account contracts, and the services keep markets quoted, series settled and wallets funded.
 
@@ -108,7 +110,7 @@ People trade from their own account contracts, and the services keep markets quo
 
 Account ids, global code hashes and the oracle key are in [`deployments/testnet.json`](deployments/testnet.json).
 Demo trades on testnet were made by project-owned accounts, so activity you see there is not organic.
-The contracts were self-audited against the near-contract-audit checklist and then reviewed independently; findings, fixes, what is still open on testnet and the team's remaining powers are in [`contracts/AUDIT.md`](contracts/AUDIT.md).
+The contracts were self-audited against the near-contract-audit checklist and then reviewed again in a separate AI review pass; findings, fixes, what is still open on testnet and the team's remaining powers are in [`contracts/AUDIT.md`](contracts/AUDIT.md).
 
 ## Ready for mainnet
 
@@ -123,6 +125,11 @@ cd contracts && cargo test -p tredio-sandbox-tests --test mainnet
 What changes on mainnet, the steps and the budget are in [MAINNET.md](MAINNET.md).
 
 ## Repository
+
+- [`contracts/`](contracts): the Rust contracts (registry, outcomes, book, perps, coins and coin, curation, accounts and account, test USDC), their unit tests and sandbox flows.
+- [`apps/`](apps): the Bun services (relayer, keeper, market maker, Autopilot, top-up, oracle and its enclave build, indexer, Agent Market worker).
+- [`backend/`](backend): the API on Postgres; [`frontend/`](frontend), [`admin/`](admin) and [`landing-page/`](landing-page): the app, the operator console and the website.
+- [`packages/`](packages): shared TypeScript (NEAR client, typed contract calls, Hyperliquid, 1Click, Autopilot rules and signals, custody wallets, the MCP server); [`scripts/`](scripts): `verify`, the testnet demos and the dev runner.
 
 <img src="assets/readme/repository.png" alt="What is in the repository: Rust contracts, Bun services and shared packages, the Hono backend and three Next.js sites" width="960">
 
@@ -147,7 +154,7 @@ The launch film is a Remotion project in [`video/`](video).
 pnpm verify
 ```
 
-`pnpm verify` reads NEAR testnet and checks the claims in [JUDGES.md](JUDGES.md): every contract holds code, and that code hashes byte for byte like its build from this checkout (the reproducible build of the commit the contract names, or `pnpm build:contracts` for the global code); user accounts run published global code and derive from their passkeys, a live session gas key, the oracle key the registry trusts and how fresh its last report is, a Hyperliquid order signed through Chain Signatures, the OutLayer attestation of an enclave run, and an x402 payment; then it runs every test suite.
+`pnpm verify` reads NEAR testnet and checks the claims in [JUDGES.md](JUDGES.md): every contract holds code, and that code hashes byte for byte like its build from this checkout (the reproducible build of the commit the contract or the account code names, or `pnpm build:contracts` for the coin code); user accounts run published global code and derive from their passkeys, a live session gas key, the oracle key the registry trusts and how fresh its last report is, a Hyperliquid order signed through Chain Signatures, OutLayer's record of an enclave run (it carries a TDX quote), an x402 payment, a curation claim, a paid signal and the policy wallet; then it runs every test suite.
 
 ## Security
 
@@ -158,11 +165,11 @@ Details and how to rerun each one are in [SECURITY.md](SECURITY.md).
 | --- | --- |
 | Self-audit ([contracts/AUDIT.md](contracts/AUDIT.md)) | 11 findings, 10 fixed with a test each, 1 open by design |
 | Deployed code is this source (`pnpm verify`, `near contract verify`) | 10 of 10 code hashes match byte for byte; the 8 contracts are reproducible builds (SourceScan's Docker image, NEP-330) that NearBlocks can verify once the repository is public |
-| NEAR rules (`pnpm security`) | private callbacks, token receivers check their token, overflow checks, no `unsafe`: all hold |
+| NEAR rules (`pnpm security`) | private callbacks, token receivers check their token, overflow checks, no `unsafe`, the signer used only to require a direct call: all hold |
 | Clippy security lints on the wasm build | 0 panics; every truncating cast, unwrap and slice index reviewed |
 | BlockSec's Rustle, the NEAR static analyzer ([contracts/RUSTLE.md](contracts/RUSTLE.md)) | 0 high, 0 medium; 2 low findings, both fixed |
 | `cargo deny` on the deployed wasm's dependencies | advisories, bans and sources ok |
-| Tests | 169 unit tests (84% line coverage), 16 integration flows on a real NEAR node including a mainnet rehearsal, end to end on testnet |
+| Tests | 176 unit tests (84% line coverage), 17 integration flows on a real NEAR node including a mainnet rehearsal, end to end on testnet |
 
 ```bash
 pnpm security
@@ -173,8 +180,22 @@ pnpm security
 - [AGENTS.md](AGENTS.md): how the repository is laid out and how to work in it.
 - [`packages/mcp`](packages/mcp): an MCP server for trends, markets, accounts and index verification, with trade tools that are dry runs by default and send only within the user's spending policy.
 - [`skills/tredio/SKILL.md`](skills/tredio/SKILL.md): a skill that teaches an agent to read and trade Tredio safely.
-- [`apps/agent-market`](apps/agent-market): "attention check", a worker for the NEAR AI Agent Market that answers any topic with its attention index, the sources behind it and the NEAR AI review, paid per call (ready to list; a trial hire settled in testnet USDC).
+- [`apps/agent-market`](apps/agent-market): "attention check", a worker for the NEAR AI Agent Market that answers any topic with its attention index, the sources behind it and the NEAR AI review, paid per call (ready to list; a trial hire against a local stand-in of the market's API settled in testnet USDC).
 - [`llms.txt`](landing-page/public/llms.txt) and the x402 endpoints in the API.
+
+## Built with
+
+- Contracts: Rust with [near-sdk](https://github.com/near/near-sdk-rs) 5 and near-contract-standards, built with cargo-near (SourceScan's reproducible image), tested on a local node with near-workspaces.
+- NEAR: near-kit (transactions, gas keys, views), HOT's NEAR Connect for wallets, Chain Signatures (`v1.signer`), NEAR Intents 1Click and the Agent API SDK (`@near-intents-agent-api/sdk`), NEAR AI Cloud (`@nearai/inference-sdk`), OutLayer (the enclave oracle and custody wallets), and Rhea for coin pools.
+- Services and API: Bun, Hono, Postgres (postgres.js), zod, pino and web-push; the MCP server uses `@modelcontextprotocol/sdk`; cryptography is `@noble/curves` and `@noble/hashes`.
+- App and admin: Next.js and React, TanStack Query, zustand, framer-motion, lightweight-charts, vaul, sonner, NumberFlow and lucide icons; the website adds GSAP, Lenis and Swiper.
+- Media: the launch film is made with Remotion, and the README figures with Pillow.
+- Tests: bun test, Playwright and cargo test.
+- Claude and OpenCode were used to write the code.
+
+## Team
+
+Emad Qureshi built Tredio.
 
 ## License
 

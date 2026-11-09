@@ -15,13 +15,13 @@ Fixes are in the code in this repository; they reach testnet only when the contr
 ## Method
 
 - The `near-contract-audit` checklist: non-private callbacks, state changed after cross-contract calls, JSON integer types, unsaved collection changes, owner checks, one-yocto deposits, storage prefix collisions, init macros, unbounded loops, randomness, gas reserved for callbacks, storage cost coverage, unchecked math and floats.
-- No NEAR-specific static analyzer was available offline, so the checklist was applied by reading every source file, helped by searches (for example every `on_*`, `after_*` and resolver method, every `#[init]`, every storage key enum, every float).
+- At the time of the audit no NEAR-specific static analyzer ran here (BlockSec's Rustle was run afterwards, [RUSTLE.md](RUSTLE.md)), so the checklist was applied by reading every source file, helped by searches (for example every `on_*`, `after_*` and resolver method, every `#[init]`, every storage key enum, every float).
   The searchable rules now run as `pnpm security`, with Clippy's security lints and dependency scans ([SECURITY.md](../SECURITY.md)).
 - Manual review of business logic, access control, economic attacks and failure paths of every promise chain.
 - Each finding got a test first, run against the audited code to see it fail, then the fix.
   Tests are unit tests (near-sdk mocked blockchain) or sandbox tests (`near-workspaces` on a local nearcore node), including real gas-key transactions sent over JSON-RPC.
 - Verification: `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --check`, the sandbox suite (`cargo test -p tredio-sandbox-tests`) and a release build with `contracts/scripts/build.sh`.
-- Test counts: 126 unit tests and 7 sandbox tests before; 159 unit tests and 15 sandbox tests after (M-5, M-6 and M-7 added one each).
+- Test counts: 126 unit tests and 7 sandbox tests before; 159 unit tests and 15 sandbox tests after (M-5, M-6 and M-7 added one each); 176 unit tests and 17 sandbox tests with account code v3.
 
 ## Findings
 
@@ -51,8 +51,8 @@ Severity reflects impact and how easily it can be triggered on testnet as deploy
 - Fix: the oracle now reports each mark's Hyperliquid asset index (`marks[].asset_index`), the registry stores it per ticker (emitting `asset_index_set`) and returns it from `mark_of`, and account v2 refuses an order whose `asset_index` differs from the mark's, or any order when the mark has no index.
   The registry keeps the index under its own storage prefix outside the root state, so it needs no migration.
 - Tests: `account` `the_hyperliquid_guard_binds_the_mark_to_the_signed_asset` and `the_hyperliquid_guard_needs_the_marks_asset_index` (both failed on v1); `registry` `marks_carry_their_hyperliquid_asset_index`; sandbox `the_hyperliquid_guard_reads_the_asset_index_from_the_registry` (registry and account v2 together, real gas-key transactions).
-- Residual risk: accounts stay on v1 code until their owner upgrades, and the protection needs the oracle (runner and enclave) to report `asset_index`.
-  Until then v2 accounts refuse every Hyperliquid order, which fails closed.
+- Residual risk: accounts stay on v1 code until their owner upgrades.
+  The oracle (runner and enclave) reports `asset_index` with every mark, so v2 and v3 accounts sign orders; a mark without one is refused, which fails closed.
 
 ### M-1: concurrent `graduate` calls repeat graduation steps
 
@@ -132,7 +132,7 @@ Severity reflects impact and how easily it can be triggered on testnet as deploy
 ### M-6: `set_protocol` moves every passkey to a new address
 
 - Location: `accounts/src/lib.rs`, `set_protocol`.
-- Found after the self-audit, by an independent review: the same class as M-3, missed by it.
+- Found after the self-audit, by a second, separate AI review pass: the same class as M-3, missed by it.
 - The protocol (the contract accounts an account talks to) is part of the universal state init each account id derives from, like the code hash.
   The owner could change it at any time, and one call would have moved every passkey's `account_id_of` to a new, empty address; the factory had created 12 accounts.
 - Fix: the protocol is fixed once any account exists, as the code hash is.
@@ -220,12 +220,15 @@ Published as a new global contract; each account upgrades with its passkey (new 
 ## Deployment
 
 `registry`, `book`, `outcomes`, `coins` and `accounts` were redeployed in place on testnet on 2026-11-06 with these fixes (M-5, M-6 and M-7 included); their state read unchanged and the oracle's reports kept landing.
+On 2026-11-07 all eight contract accounts were redeployed again, with no change to their state, from the reproducible builds of commit `d976aea` ([SECURITY.md](../SECURITY.md), "Reproducible builds").
 The account v2 global code was published on testnet on 2026-11-06 (hash `BsFqhAcYESJ5Fyn55Xa6HwPyJaYy3VyEu4ZGh2iTdBMf`, 31.55 NEAR burned), and `deployments/testnet.json` names it as `globalCode.accountV2`.
-New accounts move onto it in their first request; accounts made earlier run v1, where H-1 and L-3 stay open, until their passkey upgrades them from Settings.
+Account code v3 was published on testnet on 2026-11-10 from the reproducible build of commit `18dd319` (hash `AiQw6Q2mS4cdSQUiRAADX36n4574JePScJSDXXDDyLhx`, 31.55 NEAR burned), and `deployments/testnet.json` names it as `globalCode.accountV3`.
+New accounts move onto the newest code in their first request; accounts made earlier keep v1 (where H-1 and L-3 stay open) or v2 until their passkey upgrades them from Settings.
+A v2 account moved to v3 on testnet ([`97TmqfGi...`](https://testnet.nearblocks.io/txns/97TmqfGiSzj8ws9WmMNEW1yX7bCG1XvKCcazY3ZY5bLA)) and its policy wallet's enclave-signed `session_call` then went through ([`ENCLocW8...`](https://testnet.nearblocks.io/txns/ENCLocW8Mk6KikN2nLgH56UQu8JoxFr2U56wPVn1ejKG)).
 
 | Contract | Change | Redeploy | State migration |
 | --- | --- | --- | --- |
-| `account` (global code) | v2, H-1, L-3 | Publish the new global code, then each account upgrades with its passkey | None |
+| `account` (global code) | v2, H-1, L-3; v3 (policy wallets, user verification) | Publish the new global code, then each account upgrades with its passkey | None |
 | `accounts` | M-2, M-3 | Yes (pause the relayer meanwhile: `on_created` takes new arguments) | None |
 | `registry` | H-1 | Yes, before the oracle reports `asset_index` | None |
 | `coins` | M-1 | Yes | None |

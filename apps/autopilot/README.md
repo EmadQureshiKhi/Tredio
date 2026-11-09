@@ -48,12 +48,12 @@ A frozen wallet makes rules and copies wait; `/health` lists every policy wallet
 
 The account contract must accept the wallet's call.
 OutLayer's keystore signs every NEAR transaction as the wallet's own implicit account, never as another account's access key, so the session cannot be signed for as the account itself.
-Account code v1 and v2 take `session_call` only from the account (`session keys only`); code that also takes it when sent directly by the implicit account of one of the account's session keys reports version 3 (`acceptsWalletSessions`).
-Until an account runs that code the executor waits instead of sending, and the app shows the policy wallet option as unavailable.
+Account code v1 and v2 take `session_call` only from the account (`session keys only`); account code v3 also takes it when sent directly by the implicit account of one of the account's session keys (`acceptsWalletSessions`), for a plain-key session only.
+Until an account runs v3 the executor waits instead of sending, and the app points to the upgrade in Settings (one passkey prompt).
 
 ### On testnet
 
-Everything up to the account contract runs live today ([`scripts/policy-wallet.ts`](../../scripts/policy-wallet.ts); the passkey is a software passkey, the wallet a free anonymous OutLayer wallet):
+It runs live end to end ([`scripts/policy-wallet.ts`](../../scripts/policy-wallet.ts); the passkey is a software passkey, the wallet a free anonymous OutLayer wallet):
 
 | Step | Transaction |
 | --- | --- |
@@ -61,6 +61,8 @@ Everything up to the account contract runs live today ([`scripts/policy-wallet.t
 | One owner request: the policy is stored on `outlayer.testnet` with the account as controller, the wallet `4348f62d...` gets 0.1 NEAR, Autopilot's session is added for the wallet's key | [`C3vFoA6K...`](https://testnet.nearblocks.io/txns/C3vFoA6KMx1tVeSGtTCq7Yj59Jni8euELWMGzC9XiSLi) |
 | The account sends the wallet 0.12 NEAR more (a call needs its 0.15 NEAR of prepaid gas in the wallet) | [`5HJ2hrpC...`](https://testnet.nearblocks.io/txns/5HJ2hrpCR3vuAXNT7aKEAR5fVwjduUzhgNTps8joAj8A) |
 | The enclave signs and sends `session_call({hl_leverage})` from the wallet to the account; v2 code refuses it: `session keys only` | [`GT3RLHyR...`](https://testnet.nearblocks.io/txns/GT3RLHyRq5B6nMRfa2qhJheeUNy72CTsWn37eNAos2zM), again in [`5ounSLWn...`](https://testnet.nearblocks.io/txns/5ounSLWnKr6aqHQVFjQ19Jjr8YyQbceapqvXCiTz9z8e) |
+| The passkey moves the account to account code v3 | [`97TmqfGi...`](https://testnet.nearblocks.io/txns/97TmqfGiSzj8ws9WmMNEW1yX7bCG1XvKCcazY3ZY5bLA) |
+| The enclave signs and sends the same kind of `session_call`; v3 takes it as Autopilot's session, the guard passes and Chain Signatures signs the Hyperliquid action | [`ENCLocW8...`](https://testnet.nearblocks.io/txns/ENCLocW8Mk6KikN2nLgH56UQu8JoxFr2U56wPVn1ejKG) |
 | Outside the policy, refused before signing (no transaction): a call to `usdc.tredio.testnet` (`Address 'usdc.tredio.testnet' is not in whitelist`) and a call attaching one yoctoNEAR (`Per-transaction limit exceeded for native: 1 > 0`) | none |
 | The passkey freezes the wallet: the executor's venue waits (`the account froze Autopilot's policy wallet`) and the enclave refuses (`wallet_frozen`) | [`HbcVYSJT...`](https://testnet.nearblocks.io/txns/HbcVYSJTRRZ7ES6PCKt9t94z2dFU6TiDZQGnt4BXDaKF) |
 | The passkey unfreezes it; the executor's gate passes again | [`3rLBDand...`](https://testnet.nearblocks.io/txns/3rLBDandCdTQAT2aS7kt1CFoP8CjzF34YTkwJ7QEZd9K) |
