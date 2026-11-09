@@ -44,7 +44,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 function Sidebar({ pathname }: { pathname: string }) {
   const status = useSystemStatus();
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[236px] flex-col border-r border-line bg-bg px-4 py-5 lg:flex" style={{ viewTransitionName: "site-sidebar" }}>
+    // On a short window the sidebar scrolls instead of squeezing its cards (every child keeps its height).
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[236px] flex-col overflow-y-auto overscroll-contain border-r border-line bg-bg px-4 py-5 lg:flex [&>*]:shrink-0" style={{ viewTransitionName: "site-sidebar" }}>
       <Link href="/" className="flex h-9 items-center px-2 text-text" aria-label="Tredio home">
         <Wordmark className="h-[15px] w-auto" />
       </Link>
