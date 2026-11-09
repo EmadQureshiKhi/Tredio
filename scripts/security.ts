@@ -55,7 +55,11 @@ rule("Every callback is #[private]", unguarded.map(at), `${callbacks.length} cal
 const receivers = sources.filter((l) => /fn (ft|mt)_on_transfer\(/.test(l.text));
 const unchecked = receivers.filter((r) => !byFile.get(r.file)!.slice(r.n, r.n + 12).some((l) => /predecessor_account_id\(\)/.test(l.text)));
 rule("Token receivers check the calling token", unchecked.map(at), `${receivers.length} receivers`);
-rule("No signer_account_id in contract logic", sources.filter((l) => /signer_account_id\(\)/.test(l.text)).map(at), "access checks use predecessor_account_id");
+// The signer may only be compared with the predecessor, to require a direct call (account code v3's policy
+// wallets: the caller must be the signer itself); it never grants access on its own.
+const signerUses = sources.filter((l) => /signer_account_id\(\)/.test(l.text));
+const directCall = (l: Line) => /\b(caller|predecessor)\s*==\s*env::signer_account_id\(\)/.test(l.text);
+rule("signer_account_id only to require a direct call", signerUses.filter((l) => !directCall(l)).map(at), `access checks use predecessor_account_id; ${signerUses.length} use${signerUses.length === 1 ? "" : "s"}, each predecessor == signer`);
 // `a.and(b)` is fine inside a chain that ends in `.then(...)`; returning the joint promise itself is not.
 const joint = sources.filter((l, i, all) => /\.and\(/.test(l.text) && !all.slice(i, i + 8).some((x) => x.file === l.file && /\.then\(/.test(x.text)));
 rule("No joint promise returned from a method", joint.map(at), "every .and() is followed by .then()");
