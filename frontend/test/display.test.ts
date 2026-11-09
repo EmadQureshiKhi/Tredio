@@ -66,6 +66,9 @@ describe("chart", () => {
   test("a flat line gets a minimum range around it, and the reference stays in view", () => {
     expect(fitRange(68.6, 68.6, 4)).toEqual({ minValue: 66.6, maxValue: 70.6 });
     expect(fitRange(60, 70, 4)).toEqual({ minValue: 60, maxValue: 70 });
+    // A trend at the index cap: the range stays at or below 100.
+    expect(fitRange(100, 100, 4, undefined, 100)).toEqual({ minValue: 96, maxValue: 100 });
+    expect(fitRange(97, 100, 4, 99, 100)).toEqual({ minValue: 96, maxValue: 100 });
     expect(fitRange(60, 62, 1, 80)).toEqual({ minValue: 60, maxValue: 80 });
   });
 
