@@ -259,7 +259,8 @@ function QuoteCard({ direction, assets, live, confidential }: { direction: Direc
         )}
       </div>
 
-      {confidential ? (
+      {/* A quote says what it got: 1Click may have taken it public while the partner JWT rested. */}
+      {(quote.data?.confidential ?? confidential) ? (
         <p className="flex items-start gap-2 text-[12.5px] leading-[18px] text-text-2">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-up" aria-hidden />
           Quotes ask for Confidential Intents: the route cannot be linked to the account it lands in.
