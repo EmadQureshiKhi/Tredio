@@ -36,7 +36,7 @@ The API answers index values in points (51.86 is 51.86 points); on chain they ha
   Each signal's SHA-256 is committed on chain (a USDC transfer memo from the leader's account) before anyone can read it; positions on chain stay public, and what is private is the signal and its timing.
 - Autopilot: an owner can let rules trade Hyperliquid through a revocable session on their own account; the account contract enforces the price band (2% of a fresh mark) and leverage cap (10x), and the executor enforces stop-loss and loss limits off chain.
 - Verification: every index value on NEAR carries the oracle's ed25519 signature, so an agent can check a number on chain instead of trusting the API.
-  The oracle's build runs in an OutLayer TEE; on testnet the registry still trusts its bootstrap key until the API the enclave reads is public.
+  The oracle runs in an OutLayer TEE, and the registry accepts only the key bound to that build, so every index value on chain was signed in the enclave.
 
 ## How it works
 

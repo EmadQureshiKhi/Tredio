@@ -44,7 +44,7 @@ The deployment file is `deployments/testnet.json`; the treasury is `tredio-treas
 
 The oracle's enclave build runs on OutLayer (a TEE) with a signing key bound to that build.
 The registry trusts exactly one key, the one `get_oracle` returns, and only its owner changes it, with `set_oracle` (logged as `oracle_changed`).
-On testnet it still trusts the bootstrap key it was deployed with (`oracle.publicKey` in `deployments/testnet.json`) until it is switched to the enclave's key.
+On testnet that has been the enclave's key since 2026-11-10 (`oracle.publicKey` in `deployments/testnet.json`), so a report the registry accepted was signed in the enclave.
 Tredio's API mirrors every checkpoint, so its history goes back further than the registry's 96.
 
 ### Verify, do not trust

@@ -24,27 +24,34 @@ The API token the enclave uses is an OutLayer secret that only this build can de
 
 ## Status on testnet
 
-- The registry (`registry.tredio.testnet`) still trusts the bootstrap key `ed25519:3vtthHwFoJBJQ48zkXxCU2Te4hHcDnVhg2zgVuEwebsr`, and the oracle service signs with it (`ORACLE_MODE=local`).
-- The enclave cannot do the job yet: the API compiled into the build, `https://api.tredio.bid`, is not hosted, so a run gets no readings or candidates and its report carries only Hyperliquid marks.
-- One run of the build is recorded in `deployments/testnet-proofs.json` (`outlayerRun`): tx `4WKiUBZ38SWfwT1ptEeHJNvWNX1ywRCK31Pa9gZp39D6`, wasm sha256 `434381e425292a8aaaf9edf0d74d27c0d8bfba3ad82794823e27e3959523b9ff`, built from commit `f2424fa` with rustc 1.98.1.
-- The key OutLayer holds for that build, which signed that run's report, is `ed25519:8qDVQ9AySqUWeWdSJSUfLEpNkxtsrhDUjxyPDGFVWXsk`.
-- The key is bound to the wasm hash, and the build already points at `https://api.tredio.bid`, so hosting the API needs no rebuild and keeps that key.
-- Once the API answers and its token is stored as the build's OutLayer secret, the switch is one `set_oracle` transaction by the registry owner (`{"tee_signer": {"public_key": "ed25519:8qDV..."}}`, with one yoctoNEAR attached, so it needs the owner's full-access key), then `ORACLE_MODE=outlayer` on the service.
-- `pnpm verify` prints which of the two keys the registry trusts.
+- Since 2026-11-10 the registry (`registry.tredio.testnet`) trusts only the enclave's key `ed25519:8qDVQ9AySqUWeWdSJSUfLEpNkxtsrhDUjxyPDGFVWXsk` (`set_oracle` `4hTjCm4NNoHMKqXpwNbow1FQao645KXJjN5ABbNHZ1Qv`), and the oracle service runs every report through OutLayer (`ORACLE_MODE=outlayer`), once a minute.
+  Before that it trusted a bootstrap key the team held, `ed25519:3vtthHwFoJBJQ48zkXxCU2Te4hHcDnVhg2zgVuEwebsr`.
+- The build is wasm sha256 `434381e425292a8aaaf9edf0d74d27c0d8bfba3ad82794823e27e3959523b9ff`, built from commit `f2424fa` with rustc 1.98.1; the key is bound to that hash.
+- The enclave's API token is the OutLayer secret `tredio.testnet/oracle`, bound to that wasm hash and readable only in runs `tredio-oracle.testnet` signs.
+- The service's first run after the switch is recorded in `deployments/testnet-proofs.json` (`outlayerRun`): OutLayer run `DPDbwyk9X3uXwTooQUjMqTGp88ySZMbYCeR4HqCneHbV` measured all 12 live trends, and the registry accepted its report in `C3KeBVLXUT1u5wubr2WDjpo3QEUFrDX8P3zS4bW4jsZ5`.
+
+## When OutLayer fails
+
+- A failed run is tried again inside its minute, after 3 and then 10 seconds; OutLayer refunds a run that fails before it executes.
+- Runs that still fail raise the oracle's `enclave` alert ("runs failing on OutLayer"), which the status page and the admin console show.
+- No other key signs in the meantime: an automatic fallback to a key outside the enclave would let whoever runs the service sign any value whenever it chose to call the enclave "down".
+  The index waits for OutLayer instead; series settle late and the Hyperliquid guard refuses orders until marks are fresh again.
+- OutLayer caches the build by its hash, so the download URL going away does not stop runs.
+- The break-glass is public: the registry owner can move the registry back to the bootstrap key with one `set_oracle` (`bun scripts/switch-oracle-key.ts --rollback`), visible on chain as `oracle_changed`, and forward again with `--send` once OutLayer recovers.
 
 ## Verify a report yourself
 
 1. Rebuild the enclave program with `apps/oracle/tee/build.sh`; its sources are the same as at the recorded commit `f2424fa`.
    `apps/oracle/tee/rust-toolchain.toml` pins rustc 1.98.1 with the `wasm32-wasip2` target, and rustup installs it on the first build.
    The script prints the toolchain, the compiled-in endpoints and the sha256, which for the recorded run is `434381e4...`.
-2. Fetch OutLayer's attestation of the run: `GET https://testnet-api.outlayer.ai/attestations/by-tx/4WKiUBZ38SWfwT1ptEeHJNvWNX1ywRCK31Pa9gZp39D6`.
+2. Fetch OutLayer's attestation of the run: `GET https://testnet-api.outlayer.ai/attestations/by-tx/DPDbwyk9X3uXwTooQUjMqTGp88ySZMbYCeR4HqCneHbV`.
    Its `wasm_hash` and `executed_wasm_sha256` must equal your build's sha256.
    Its `output_hash` is the sha256 of the run's output, recorded as `enclaveOutput`, which holds the enclave key and a report signed with it.
    Check the TDX quote itself with `github.com/out-layer/outlayer-verify`.
-3. Check whether the registry's `get_oracle` key is that enclave key; on testnet it is still the bootstrap key (see above).
+3. Check that the registry's `get_oracle` key is that enclave key, and that the registry transaction `C3KeBVLX...` carries the very `report_json` the run printed.
 4. For a later report, find the oracle's `submit_report` transaction on NearBlocks and the `request_execution` transaction just before it, and repeat step 2 with that hash.
 
-`pnpm verify --build` runs steps 1 to 3: it fails unless your build's sha256 equals the attested one, checks the recorded output against the attestation and its signature against the key, and says which key the registry trusts.
+`pnpm verify --build` runs steps 1 to 3: it fails unless your build's sha256 equals the attested one, checks the recorded output against the attestation and its signature against the key, checks that the registry accepted that report, and says which key the registry trusts.
 
 ## Cost
 

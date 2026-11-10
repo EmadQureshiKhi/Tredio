@@ -38,7 +38,7 @@ Each of these is a NEAR primitive doing real work in the product, not a logo on 
 2. **An oracle built for an enclave.**
    The attention index is computed by a WASI build made for [OutLayer](https://outlayer.ai)'s TEE, pinned by its sha256; OutLayer derives an ed25519 key bound to that exact build (`bind: wasm`).
    The `registry` contract accepts a report only with the signature of the one oracle key it trusts (`env::ed25519_verify`), checks its run id and time window, and clamps every move.
-   Status on testnet: the build runs on OutLayer with an attested TDX quote, but the registry still trusts a bootstrap key the team holds, because the enclave reads the collectors' readings from the public API, which goes live with hosting; the switch is one public `set_oracle` transaction, and `pnpm verify` prints which key is in use.
+   Status on testnet: since 2026-11-10 the registry trusts only the enclave's key (one public `set_oracle` transaction), so every index value on chain was computed and signed in the enclave, once a minute, with an attested TDX quote per run; `pnpm verify` prints the key in use and checks a recorded run end to end.
    In the app: every trend page shows its index history; the status page shows the oracle's last run.
    Code: [`apps/oracle/tee`](apps/oracle/tee), [`contracts/registry/src/oracle.rs`](contracts/registry/src/oracle.rs), method and trust model in [`apps/oracle/docs`](apps/oracle/docs).
 3. **AI review you can verify.**

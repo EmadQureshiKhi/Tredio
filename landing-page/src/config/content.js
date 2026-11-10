@@ -19,10 +19,10 @@ export const HOW_IT_WORKS = [
   },
   {
     image: "/assets/img/crypto-chart.jpg",
-    heading: "An oracle built for an OutLayer TEE scores its attention from 0 to 100 and writes it on NEAR.",
+    heading: "An oracle running in an OutLayer TEE scores its attention from 0 to 100 and writes it on NEAR.",
     label: "Oracle",
     detail: "OutLayer TEE",
-    description: "The registry accepts reports signed by its one oracle key only.",
+    description: "The registry accepts only reports signed by the key bound to that enclave build.",
   },
   {
     image: "/assets/img/topics-trend-every-day.jpg",
