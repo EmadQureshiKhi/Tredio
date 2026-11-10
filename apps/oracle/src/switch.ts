@@ -43,8 +43,10 @@ export function judgeRun(output: EnclaveOutput, expectedKey: string): RunVerdict
   }
   const measured = (report.updates?.length ?? 0) + (report.new_trends?.length ?? 0);
   const marks = report.marks?.length ?? 0;
-  // A run that measured nothing read no readings: its API (compiled into the build) did not answer it.
-  if (measured === 0) problems.push(`the run measured no trend (only ${marks} marks): the enclave got no readings from its API`);
+  // A run measures a trend only when it moved past the deviation or its heartbeat is due, so a run right after the
+  // bootstrap oracle reported has nothing to measure even when its API answered (it warns when the API fails).
+  if (measured === 0)
+    problems.push(`the run measured no trend (only ${marks} marks): either its API gave it no readings or nothing was due, as when the oracle service reported within the heartbeat; stop the service for one heartbeat and run again`);
   for (const w of output.warnings ?? []) if (/api|backend|token|unauthor/i.test(w)) problems.push(`enclave warning: ${w}`);
   return { ok: problems.length === 0, problems, measured, marks };
 }
