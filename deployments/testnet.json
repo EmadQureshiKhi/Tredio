@@ -26,7 +26,7 @@
   },
   "oracle": {
     "mode": "tee_signer",
-    "publicKey": "ed25519:3vtthHwFoJBJQ48zkXxCU2Te4hHcDnVhg2zgVuEwebsr"
+    "publicKey": "ed25519:8qDVQ9AySqUWeWdSJSUfLEpNkxtsrhDUjxyPDGFVWXsk"
   },
   "params": {
     "usdcDecimals": 6,
