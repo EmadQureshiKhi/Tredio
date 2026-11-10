@@ -33,6 +33,36 @@ export interface RunResult {
 const PAGE = 100;
 
 /**
+ * Waits between tries of a failed enclave run. OutLayer workers and RPCs fail transiently, and every
+ * missed run leaves the index and the Hyperliquid marks one interval staler.
+ */
+export const ENCLAVE_RETRY_MS = [3_000, 10_000] as const;
+
+/**
+ * Runs `attempt` until it succeeds, waiting `delaysMs` between tries, and gives up with the last
+ * error once the delays run out or the next try would start after `deadline` (ms since the epoch):
+ * a retry is worth it only while it still lands inside its run's interval.
+ */
+export async function retryUntil<T>(
+  attempt: () => Promise<T>,
+  o: { delaysMs: readonly number[]; deadline: number; now?: () => number; sleep?: (ms: number) => Promise<void>; onRetry?: (attempt: number, err: Error) => void },
+): Promise<T> {
+  const now = o.now ?? Date.now;
+  const sleep = o.sleep ?? ((ms: number) => Bun.sleep(ms));
+  for (let i = 0; ; i++) {
+    try {
+      return await attempt();
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      const wait = o.delaysMs[i];
+      if (wait === undefined || now() + wait >= o.deadline) throw err;
+      o.onRetry?.(i + 2, err);
+      await sleep(wait);
+    }
+  }
+}
+
+/**
  * One oracle run: read the candidate queue and the live trends, measure a sample through the
  * collector, decide what changed enough to report, add Hyperliquid marks, sign the report and
  * submit it. A run with nothing to report and no marks sends nothing.
@@ -40,6 +70,9 @@ const PAGE = 100;
 export class Oracle {
   lastRun: (RunResult & { at: number }) | null = null;
   lastError: string | null = null;
+  /** Outlayer mode: enclave runs that failed in a row (each after its retries), and when one last succeeded (s). */
+  enclaveFailures = 0;
+  enclaveOkAt: number | null = null;
 
   constructor(
     private readonly viewer: Viewer,
@@ -68,11 +101,35 @@ export class Oracle {
     }
   }
 
-  /** Outlayer mode: the enclave computes and signs; this submits what it signed. */
-  async runEnclave(enclave: OutLayerRunner): Promise<RunResult> {
-    const { output, tx: enclaveTx } = await enclave.run();
+  /**
+   * Outlayer mode: the enclave computes and signs; this submits what it signed. A failed run is tried
+   * again inside its interval (`deadline`, ms); the report is never signed anywhere else, so when
+   * OutLayer is down the index waits for it, and /health says so.
+   */
+  async runEnclave(enclave: Pick<OutLayerRunner, "run">, opts: { deadline?: number; sleep?: (ms: number) => Promise<void> } = {}): Promise<RunResult> {
+    let ran: Awaited<ReturnType<OutLayerRunner["run"]>>;
+    try {
+      ran = await retryUntil(
+        async () => {
+          const r = await enclave.run();
+          if (r.output.error) throw new Error(`enclave: ${r.output.error}`);
+          return r;
+        },
+        {
+          delaysMs: ENCLAVE_RETRY_MS,
+          deadline: opts.deadline ?? Date.now() + 60_000,
+          sleep: opts.sleep,
+          onRetry: (attempt, err) => this.log({ err: err.message.slice(0, 300), attempt }, "enclave run failed; trying again"),
+        },
+      );
+    } catch (e) {
+      this.enclaveFailures += 1;
+      throw e;
+    }
+    this.enclaveFailures = 0;
+    this.enclaveOkAt = Math.floor(Date.now() / 1000);
+    const { output, tx: enclaveTx } = ran;
     const nowSec = Math.floor(Date.now() / 1000);
-    if (output.error) throw new Error(`enclave: ${output.error}`);
     for (const w of output.warnings ?? []) this.log({ warning: w, enclaveTx }, "enclave warning");
     if (!output.report_json || !output.signature) {
       this.lastRun = { runId: 0, sampled: 0, created: [], updated: 0, marks: 0, tx: null, skipped: "nothing to report", at: nowSec };
