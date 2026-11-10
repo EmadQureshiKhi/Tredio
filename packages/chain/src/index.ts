@@ -167,9 +167,12 @@ export class Viewer {
           this.rotation.answered(provider);
           return result;
         } catch (e) {
-          last = e;
-          if (isRefused(e)) this.rotation.refused(provider);
-          else if (!isTransient(e)) throw e;
+          // A resting key's refusal says less than another provider's rate limit: report that one.
+          if (isRefused(e)) {
+            this.rotation.refused(provider);
+            last ??= e;
+          } else if (!isTransient(e)) throw e;
+          else last = e;
         }
       }
     }
@@ -365,9 +368,13 @@ export class Sender {
             this.rotation.answered(provider);
             break;
           } catch (e) {
-            signError = e;
-            if (isRefused(e)) this.rotation.refused(provider);
-            else if (!isTransient(e)) break;
+            if (isRefused(e)) {
+              this.rotation.refused(provider);
+              signError ??= e;
+            } else {
+              signError = e;
+              if (!isTransient(e)) break;
+            }
           }
         }
         if (signError && !tx && !isTransient(signError) && !isRefused(signError)) break;
