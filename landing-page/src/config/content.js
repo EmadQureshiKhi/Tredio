@@ -152,7 +152,7 @@ export const NUMBERS = [
   {
     number: "38",
     heading: "Chains you can deposit from",
-    content: "On mainnet, NEAR Intents brings USDC in from 38 chains, confidentially, straight to your account.",
+    content: "On mainnet, NEAR Intents brings USDC in from 38 chains straight to your account.",
     image: "/assets/img/topics-wave.jpg",
     alt: "A wave of violet and lime particles flowing across a dark field",
   },

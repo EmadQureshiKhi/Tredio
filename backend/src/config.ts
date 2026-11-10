@@ -20,8 +20,8 @@ const schema = z.object({
   /** NEAR Intents 1Click API for any-chain deposits and withdrawals (mainnet). */
   ONECLICK_API_BASE: z.string().url().default("https://1click.chaindefuser.com"),
   /**
-   * Partner JWT from the NEAR Intents Partner Dashboard (https://partners.near-intents.org/home). With it every 1Click quote
-   * is confidential and uses the partner fee schedule; without it quotes are public and pay 1Click's extra 0.25%.
+   * Partner JWT from the NEAR Intents Partner Dashboard (https://partners.near-intents.org/home), a distribution channel key.
+   * With it every 1Click quote is confidential; without it, or while 1Click refuses it, quotes are public at the same fee.
    */
   ONECLICK_JWT: optional(z.string().min(20)),
   /** Comma-separated app origins allowed by CORS. */

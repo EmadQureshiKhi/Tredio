@@ -245,6 +245,8 @@ export function createApp(d: AppDeps): Hono {
       geckoterminal: state(d.feeds?.geckoterminal?.http.available),
       proxyFallback: d.feeds?.proxyFallback?.stats ?? null,
     };
+    // 1Click's partner JWT: none, in use, or resting after a refusal (quotes go out public meanwhile).
+    checks.oneClick = d.oneClick.partner;
     checks.jobs = ok ? await d.store.jobs() : [];
     return { ok, ...checks };
   };
@@ -892,7 +894,9 @@ export function createApp(d: AppDeps): Hono {
   // hash is what the registry stores with the trend.
   app.route("/v1", reviewRoutes(d.store));
 
-  // Public status: every service, the oracle and the chain head, as up or down. Cached briefly.
+  // Public status: every service, the oracle and the chain head, as up or down. Cached briefly. It answers
+  // 503 when something is down, for uptime monitors; `?soft=1` answers 200 with the same body, so the
+  // app, which shows what is down, logs no failed request in the browser.
   let statusCache: { at: number; body: Awaited<ReturnType<typeof status>> } | null = null;
   app.get("/v1/status", async (c) => {
     if (!statusCache || now() - statusCache.at > 10_000) {
@@ -902,7 +906,7 @@ export function createApp(d: AppDeps): Hono {
         body: await status(d.chain, parseServices(d.cfg.STATUS_SERVICES), { oracleStaleSec: d.cfg.ORACLE_STALE_SEC, rotating: new Set(rotating ? [rotating.identifier] : []) }, Math.floor(now() / 1000)),
       };
     }
-    return c.json(statusCache.body, statusCache.body.ok ? 200 : 503);
+    return c.json(statusCache.body, statusCache.body.ok || c.req.query("soft") === "1" ? 200 : 503);
   });
 
   return app;
