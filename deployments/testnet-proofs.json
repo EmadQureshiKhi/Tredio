@@ -13,10 +13,11 @@
     "sender": "0ugt5v5y5rdhyhndtyhrwrkp5rxrmxhpfbrcx9ets3g94pjsdjt330"
   },
   "outlayerRun": {
-    "about": "One OutLayer run of the enclave build, requested as the oracle service requests it (request_execution with WasmUrl pinned by sha256, so no project). enclaveOutput is the run's stdout, which hashes to the attestation's output_hash.",
-    "tx": "4WKiUBZ38SWfwT1ptEeHJNvWNX1ywRCK31Pa9gZp39D6",
+    "about": "The oracle service's first OutLayer run after the registry switched to the enclave's key (2026-11-10), requested as it requests every run (request_execution with WasmUrl pinned by sha256, so no project, and the API token from the OutLayer secret tredio.testnet/oracle). enclaveOutput is the run's stdout, which hashes to the attestation's output_hash; acceptedReportTx is the registry transaction that accepted its report.",
+    "tx": "DPDbwyk9X3uXwTooQUjMqTGp88ySZMbYCeR4HqCneHbV",
+    "acceptedReportTx": "C3KeBVLXUT1u5wubr2WDjpo3QEUFrDX8P3zS4bW4jsZ5",
     "project": null,
-    "caller": "tredio.testnet",
+    "caller": "tredio-oracle.testnet",
     "wasmUrl": "https://test.fastfs.io/tredio.testnet/outlayer.testnet/434381e425292a8aaaf9edf0d74d27c0d8bfba3ad82794823e27e3959523b9ff.wasm",
     "wasmSha256": "434381e425292a8aaaf9edf0d74d27c0d8bfba3ad82794823e27e3959523b9ff",
     "commit": "f2424fa34864c42117e707809d2ab1c71bcc9041",
@@ -29,13 +30,11 @@
     },
     "enclavePublicKey": "ed25519:8qDVQ9AySqUWeWdSJSUfLEpNkxtsrhDUjxyPDGFVWXsk",
     "enclaveOutput": {
-      "observed_at": 1793950664,
+      "observed_at": 1794298495,
       "public_key": "ed25519:8qDVQ9AySqUWeWdSJSUfLEpNkxtsrhDUjxyPDGFVWXsk",
-      "report_json": "{\"run_id\":1793950664,\"observed_at\":1793950664,\"new_trends\":[],\"updates\":[],\"marks\":[{\"asset\":\"SOL\",\"price\":\"8952000000\",\"asset_index\":0},{\"asset\":\"BTC\",\"price\":\"7578400000000\",\"asset_index\":3},{\"asset\":\"ETH\",\"price\":\"222870000000\",\"asset_index\":4},{\"asset\":\"NEAR\",\"price\":\"365870000\",\"asset_index\":54},{\"asset\":\"HYPE\",\"price\":\"7907200000\",\"asset_index\":135}]}",
-      "signature": "C+/76fiTrbiKvp+AWk3oPdM57qYzCpbSj/jY47wA5q3hIenme7TY47lLaehYIDAo8hV8WfAb6hc2V8vSlKt9Dw==",
-      "warnings": [
-        "no BACKEND_TOKEN secret: no candidates or readings"
-      ]
+      "report_json": "{\"run_id\":1794298495,\"observed_at\":1794298495,\"new_trends\":[],\"updates\":[{\"id\":\"equity:nvda\",\"index\":91930000},{\"id\":\"equity:tsla.2\",\"index\":58570000},{\"id\":\"person:jensen-huang\",\"index\":89830000},{\"id\":\"person:katy-perry\",\"index\":76700000},{\"id\":\"person:stephen-miller.2\",\"index\":88770000},{\"id\":\"politics:hegseth-impeachment-vote\",\"index\":90680000},{\"id\":\"politics:hegseth-officer-promotions\",\"index\":88510000},{\"id\":\"politics:ukraine-russia-peace-talks.2\",\"index\":99420000},{\"id\":\"topic:ai-agents.2\",\"index\":68180000},{\"id\":\"topic:booker-prize-winner\",\"index\":77070000},{\"id\":\"topic:godzilla-minus-zero.2\",\"index\":78660000},{\"id\":\"topic:world-cup.2\",\"index\":54410000}],\"marks\":[{\"asset\":\"SOL\",\"price\":\"8601600000\",\"asset_index\":0},{\"asset\":\"BTC\",\"price\":\"7515400000000\",\"asset_index\":3},{\"asset\":\"ETH\",\"price\":\"211240000000\",\"asset_index\":4},{\"asset\":\"NEAR\",\"price\":\"362890000\",\"asset_index\":54},{\"asset\":\"HYPE\",\"price\":\"7448800000\",\"asset_index\":135}]}",
+      "signature": "0qUSYhnG1muUVP8g4DfqT8wFnWXEdA35pGgJSHA2vNArh3s5Mojo8CE4ZnyPKS0Ujtr+Lw2XFbPtoI+TA7wGCg==",
+      "warnings": []
     },
     "attestations": "https://testnet-api.outlayer.ai/attestations/by-tx/"
   },
