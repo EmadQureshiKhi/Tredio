@@ -37,6 +37,8 @@ const recorded = (existsSync(PROOFS_FILE) ? JSON.parse(readFileSync(PROOFS_FILE,
     /** The run's stdout as the enclave printed it; its sha256 is the attestation's output_hash. */
     enclaveOutput: { public_key: string; report_json: string; signature: string };
     attestations: string;
+    /** The registry transaction that accepted this run's report, submitted by the caller. */
+    acceptedReportTx?: string;
   };
   x402Payment: { tx: string; relayer: string; payer: string; amount: string };
   curationClaim: { tx: string; account: string; amount: string };
@@ -241,10 +243,12 @@ async function chain() {
   });
 
   await check(S, "Index reports are recent", async () => {
-    const last = await viewer.view<number>(D.contracts.registry, "last_run_id");
+    const [last, o] = await Promise.all([viewer.view<number>(D.contracts.registry, "last_run_id"), viewer.view<Record<string, { public_key: string }>>(D.contracts.registry, "get_oracle")]);
     const age = nowSec() - last;
     const text = age < 120 ? `${age} s ago` : `${Math.round(age / 60)} min ago`;
-    return age <= 30 * 60 ? ok(`last accepted report ${text}`) : fail(`last accepted report ${text}; is the oracle running?`);
+    // The registry takes a report only under the key it trusts, so with the enclave's key every accepted report came from the enclave.
+    const by = Object.values(o)[0]?.public_key === proofs.outlayerRun.enclavePublicKey ? ", signed in the enclave" : "";
+    return age <= 30 * 60 ? ok(`last accepted report ${text}${by}`) : fail(`last accepted report ${text}; is the oracle running?`);
   });
 
   await check(S, "Live trends on chain", async () => {
@@ -288,7 +292,17 @@ async function chain() {
     if (out.public_key !== run.enclavePublicKey) return fail(`the run printed key ${out.public_key}, recorded ${run.enclavePublicKey}`);
     const signed = ed25519.verify(Buffer.from(out.signature, "base64"), sha256(out.report_json), base58Decode(out.public_key.replace(/^ed25519:/, "")));
     if (!signed) return fail("the run's report signature does not verify under the key it printed");
-    return ok(`tx ${run.tx.slice(0, 10)}...: TDX quote over wasm ${run.wasmSha256.slice(0, 12)}... (the recorded build); its report verifies under ${run.enclavePublicKey.slice(0, 18)}...`);
+    let accepted = "";
+    if (run.acceptedReportTx) {
+      // The very report the attested run printed went to the registry and was accepted.
+      const t = await archive.rpc<Outcome & { transaction: { actions: Array<{ FunctionCall?: { method_name: string; args: string } }> } }>("EXPERIMENTAL_tx_status", { tx_hash: run.acceptedReportTx, sender_account_id: run.caller, wait_until: "NONE" });
+      const fc = t.transaction.actions.find((a) => a.FunctionCall?.method_name === "submit_report")?.FunctionCall;
+      const sent = fc ? (JSON.parse(Buffer.from(fc.args, "base64").toString()) as { report_json?: string }).report_json : undefined;
+      if (t.transaction.receiver_id !== D.contracts.registry || !("SuccessValue" in t.status)) return fail(`report tx ${run.acceptedReportTx} did not succeed on ${D.contracts.registry}`);
+      if (sent !== out.report_json) return fail(`report tx ${run.acceptedReportTx} carries another report than the attested run printed`);
+      accepted = `, and the registry accepted that same report in ${run.acceptedReportTx.slice(0, 10)}...`;
+    }
+    return ok(`tx ${run.tx.slice(0, 10)}...: OutLayer's record carries a TDX quote for wasm ${run.wasmSha256.slice(0, 12)}... (the recorded build); its report verifies under ${run.enclavePublicKey.slice(0, 18)}...${accepted}`);
   });
 
   await check(S, "An Up/Down series settled from the registry", async () => {
@@ -361,8 +375,11 @@ async function chain() {
     const setup = await archive.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: p.setupTx, sender_account_id: p.relayer, wait_until: "NONE" });
     const stored = setup.receipts_outcome.some((r) => r.outcome.executor_id === outlayer && r.outcome.logs.some((l) => l.includes("WalletPolicyUpdated") && l.includes(p.account)));
     if (!stored) return fail(`${p.setupTx}: no WalletPolicyUpdated by ${p.account} on ${outlayer}`);
+    // The enclave signed as the wallet's own account, the account (code v3) took the call as its session's, and Chain Signatures signed.
     const call = await archive.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: p.sessionCallTx, sender_account_id: p.wallet, wait_until: "NONE" });
     if (call.transaction.signer_id !== p.wallet || call.transaction.receiver_id !== p.account) return fail(`${p.sessionCallTx}: not sent by the wallet to the account`);
+    const signed = call.receipts_outcome.some((r) => r.outcome.executor_id === p.account && r.outcome.logs.some((l) => l.includes("hyperliquid_signed")));
+    if (!signed) return fail(`${p.sessionCallTx}: the account did not sign the wallet's Hyperliquid action`);
     const live = session ? `a live ${session.label} session (${session.gas_key ? "gas key" : "plain key"}, Hyperliquid ${session.scope.hyperliquid ? "only" : "off"})` : "its session since ended";
     return ok(`controller ${p.account.slice(0, 10)}..., ${policy.frozen ? "frozen" : "not frozen"}; the enclave-signed session_call ${p.sessionCallTx.slice(0, 10)}... was signed through Chain Signatures; ${live}`);
   });
@@ -378,8 +395,6 @@ async function chain() {
       return hash === attested ? ok(`sha256 ${hash.slice(0, 16)}... with ${toolchain}, the attested build`) : fail(`local build ${hash} with ${toolchain}, attested ${attested} (${proofs.outlayerRun.toolchain})`);
     });
   }
-    const signed = call.receipts_outcome.some((r) => r.outcome.executor_id === p.account && r.outcome.logs.some((l) => l.includes("hyperliquid_signed")));
-    if (!signed) return fail(`${p.sessionCallTx}: the account did not sign the wallet's Hyperliquid action`);
 
   const api = await apiUrl();
   await check(S, "NEAR AI review on a listed trend", async () => {
