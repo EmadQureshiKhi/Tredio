@@ -108,6 +108,10 @@ describe("outcomes", () => {
     // FastNEAR's JSON-RPC rate limit and near.org's deprecation answer, as Viewer.rpc words them.
     expect(isTransient(new Error("Rate limits exceeded, please slow down (-429)"))).toBe(true);
     expect(isTransient(new Error("WARNING! THIS ENDPOINT IS DEPRECATED! (-429)"))).toBe(true);
+    // A provider's own 500, as near-kit and Viewer.rpc word it; a contract's message naming 500 is not one.
+    expect(isTransient(new Error("HTTP 500: Internal Server Error"))).toBe(true);
+    expect(isTransient(new Error("rpc 500"))).toBe(true);
+    expect(isTransient(new Error("Smart contract panicked: amount 500 is below the minimum"))).toBe(false);
   });
 
   test("formats yoctoNEAR without float rounding", () => {
@@ -171,7 +175,7 @@ describe("RPC providers", () => {
 
   test("keyed providers take turns, keyless ones follow from the last that answered, a refused key waits at the back", () => {
     let now = 0;
-    const r = new RpcRotation([{ url: "k", headers: { a: "1" } }, { url: "k", headers: { a: "2" } }, { url: "o1" }, { url: "o2" }], () => now);
+    const r = new RpcRotation([{ url: "k", headers: { a: "1" } }, { url: "k", headers: { a: "2" } }, { url: "o1" }, { url: "o2" }], () => now, new Map());
     expect(r.order()).toEqual([0, 1, 2, 3]);
     expect(r.order()).toEqual([1, 0, 2, 3]);
     r.answered(3);
@@ -183,12 +187,51 @@ describe("RPC providers", () => {
     expect(r.order()).toEqual([1, 0, 3, 2]);
   });
 
+  test("a refused key rests for every client in the process, and is reported once", () => {
+    let now = 0;
+    const shared = new Map<string, number>();
+    const endpoints = [{ url: "k", headers: { a: "1" } }, { url: "o1" }];
+    const a = new RpcRotation(endpoints, () => now, shared);
+    const b = new RpcRotation(endpoints, () => now, shared);
+    const warn = console.warn;
+    let warnings = 0;
+    console.warn = () => void warnings++;
+    try {
+      a.refused(0);
+      b.refused(0);
+    } finally {
+      console.warn = warn;
+    }
+    expect(warnings).toBe(1);
+    expect(b.order()).toEqual([1, 0]);
+    expect(new RpcRotation([{ url: "k", headers: { a: "2" } }, { url: "o1" }], () => now, shared).order()).toEqual([0, 1]);
+    now += 10 * 60_000;
+    expect(b.order()).toEqual([0, 1]);
+  });
+
   test("a refusal is an HTTP 401 or 403 or FastNEAR's invalid key answer, never a contract's message", () => {
     expect(isRefused(new Error("HTTP 403: Forbidden"))).toBe(true);
     expect(isRefused(new Error("rpc 401"))).toBe(true);
     expect(isRefused(new Error("Invalid API key"))).toBe(true);
     expect(isRefused(new Error("Smart contract panicked: 403 is not a market"))).toBe(false);
     expect(isRefused(new Error("rpc 429"))).toBe(false);
+  });
+
+  test("when every provider fails, the error is the rate limit, not a resting key's refusal", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) => (req.headers.get("authorization") ? new Response("Invalid API key", { status: 403 }) : new Response("Too Many Requests", { status: 429 })),
+    });
+    const url = `http://localhost:${server.port}`;
+    const warn = console.warn;
+    console.warn = () => undefined;
+    try {
+      const v = new Viewer("testnet", [{ url, headers: { authorization: "Bearer refused-in-this-test" } }, url]);
+      await expect(v.head()).rejects.toThrow("rpc 429");
+    } finally {
+      console.warn = warn;
+      server.stop(true);
+    }
   });
 
   test("reads rotate across keys, carry each key in its header and get past a refused key", async () => {
