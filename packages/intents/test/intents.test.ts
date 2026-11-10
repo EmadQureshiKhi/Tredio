@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { depositRequest, hyperliquidFundingRequest, hyperliquidReturnRequest, HYPERLIQUID_USDC_ASSET, isFinal, NEAR_USDC_ASSET, OneClick, OneClickError, withdrawalRequest } from "../src";
+import { depositRequest, hyperliquidFundingRequest, hyperliquidReturnRequest, HYPERLIQUID_USDC_ASSET, isFinal, JWT_REST_MS, NEAR_USDC_ASSET, OneClick, OneClickError, withdrawalRequest } from "../src";
 import mainnet from "../../../deployments/mainnet.json" with { type: "json" };
 
 describe("1Click requests", () => {
@@ -66,6 +66,58 @@ describe("OneClick client", () => {
     expect((bodies[1] as { confidentiality?: string }).confidentiality).toBeUndefined();
     expect(new OneClick({ jwt: "j" }).confidential(req)).toBe(true);
     expect(new OneClick().confidential(req)).toBe(false);
+  });
+
+  test("a refused partner JWT rests for ten minutes while quotes go out public", async () => {
+    let t = 0;
+    const sent: Array<{ key: string | undefined; confidentiality?: string }> = [];
+    const client = new OneClick({
+      jwt: "jwt-1",
+      now: () => t,
+      fetchImpl: async (_, init) => {
+        const key = (init?.headers as Record<string, string>)["x-api-key"];
+        sent.push({ key, confidentiality: (JSON.parse(String(init?.body)) as { confidentiality?: string }).confidentiality });
+        return key ? new Response(JSON.stringify({ message: "Invalid token" }), { status: 401 }) : new Response(JSON.stringify({ quoteRequest: {}, quote: {} }));
+      },
+    });
+    const req = depositRequest({ originAsset: "x", amount: "1", account: "a.near", refundTo: "b", dry: true });
+    expect(client.partner).toBe("ok");
+    await client.quote(req);
+    expect(sent).toEqual([{ key: "jwt-1", confidentiality: "basic" }, { key: undefined, confidentiality: undefined }]);
+    expect(client.authenticated).toBe(false);
+    expect(client.partner).toBe("refused");
+    expect(client.confidential(req)).toBe(false);
+    await client.quote(req);
+    expect(sent).toHaveLength(3);
+    t = JWT_REST_MS;
+    expect(client.partner).toBe("ok");
+    await client.quote(req);
+    expect(sent.slice(3).map((s) => s.key)).toEqual(["jwt-1", undefined]);
+  });
+
+  test("never makes a quote public that asked for confidentiality", async () => {
+    const keys: Array<string | undefined> = [];
+    const client = new OneClick({
+      jwt: "jwt-1",
+      fetchImpl: async (_, init) => {
+        const key = (init?.headers as Record<string, string>)["x-api-key"];
+        keys.push(key);
+        return new Response(JSON.stringify({ message: key ? "Invalid token" : "User authentication is required for confidential intent quotes" }), { status: 401 });
+      },
+    });
+    const req = { ...depositRequest({ originAsset: "x", amount: "1", account: "a.near", refundTo: "b", dry: true }), confidentiality: "basic" as const };
+    const err = await client.quote(req).catch((e) => e);
+    expect((err as OneClickError).status).toBe(401);
+    expect((err as OneClickError).message).toContain("authentication is required");
+    expect(keys).toEqual(["jwt-1", undefined]);
+  });
+
+  test("keeps the JWT through other failures", async () => {
+    let calls = 0;
+    const client = new OneClick({ jwt: "jwt-1", fetchImpl: async () => (calls++, new Response(JSON.stringify({ message: "amount is too low" }), { status: 400 })) });
+    await client.quote(depositRequest({ originAsset: "x", amount: "1", account: "a.near", refundTo: "b", dry: true })).catch(() => null);
+    expect(calls).toBe(1);
+    expect(client.partner).toBe("ok");
   });
 
   test("caches the token list", async () => {
