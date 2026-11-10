@@ -70,25 +70,33 @@ const FAILOVER_BACKOFF_MS = 500;
 const REFUSED_REST_MS = 10 * 60_000;
 
 /**
+/** When each refused provider (URL and headers, so one key) may be tried again, shared by every client in the process. */
+const REFUSED_UNTIL = new Map<string, number>();
+
  * The order to try providers in for one request. Keyed providers take turns, so several API keys
  * carry equal shares; keyless ones follow, the last that answered first. A provider that refuses
- * its key sits out for ten minutes at the back of the line, so a revoked key costs one request
- * every ten minutes rather than one per call.
+ * its key sits out for ten minutes at the back of the line, for every client in the process, so a
+ * revoked key costs one request every ten minutes rather than one per call or per client.
  */
 export class RpcRotation {
   private turn = 0;
   private lead = 0;
   private readonly keyed: number[];
   private readonly open: number[];
-  private readonly restUntil: number[];
+  private readonly ids: string[];
 
   constructor(
     readonly endpoints: readonly RpcEndpoint[],
     private readonly now: () => number = Date.now,
   ) {
+    private readonly refusedUntil: Map<string, number> = REFUSED_UNTIL,
     this.keyed = endpoints.flatMap((e, i) => (e.headers ? [i] : []));
     this.open = endpoints.flatMap((e, i) => (e.headers ? [] : [i]));
-    this.restUntil = endpoints.map(() => 0);
+    this.ids = endpoints.map((e) => `${e.url} ${JSON.stringify(e.headers ?? {})}`);
+  }
+
+  private resting(provider: number, now: number): boolean {
+    return (this.refusedUntil.get(this.ids[provider]!) ?? 0) > now;
   }
 
   /** Provider indexes for the next request, best first. */
@@ -99,7 +107,7 @@ export class RpcRotation {
     if (k > 0) this.turn = (this.turn + 1) % k;
     const all = [...keyed, ...Array.from({ length: o }, (_, j) => this.open[(this.lead + j) % o]!)];
     const now = this.now();
-    return [...all.filter((i) => this.restUntil[i]! <= now), ...all.filter((i) => this.restUntil[i]! > now)];
+    return [...all.filter((i) => !this.resting(i, now)), ...all.filter((i) => this.resting(i, now))];
   }
 
   answered(provider: number): void {
@@ -108,7 +116,10 @@ export class RpcRotation {
   }
 
   refused(provider: number): void {
-    this.restUntil[provider] = this.now() + REFUSED_REST_MS;
+    const now = this.now();
+    // Requests in flight together may all be refused: the first one says so.
+    if (this.resting(provider, now)) return;
+    this.refusedUntil.set(this.ids[provider]!, now + REFUSED_REST_MS);
     console.warn(JSON.stringify({ msg: "rpc provider refused its key", url: this.endpoints[provider]!.url, keyed: Boolean(this.endpoints[provider]!.headers), restSec: REFUSED_REST_MS / 1000 }));
   }
 }
