@@ -70,9 +70,11 @@ pnpm coverage:contracts
 - Public RPCs rate-limit per IP and answer a browser's 429 without CORS headers; keep polling modest and use the failover lists.
   Services, the indexer and the scripts take FastNEAR API keys in `FASTNEAR_API_KEYS` (comma-separated, one per request in turn, ahead of the public endpoints); the app takes origin-locked browser keys in `NEXT_PUBLIC_FASTNEAR_KEYS`.
   near-kit clients run with `retryConfig: { maxRetries: 0 }`, since its own retries wait up to 15 s on one provider before Tredio's failover moves on.
-- 1Click quotes need an existing mainnet recipient, and confidential quotes need a partner JWT.
+  A refused key (FastNEAR answers 403 "Invalid API key") sits out ten minutes for every client in the process; FastNEAR's archival RPC and tx API accept any key, so only rpc.* proves one works.
+- 1Click quotes need an existing mainnet recipient, and confidential quotes need a partner JWT (`ONECLICK_JWT`); a refused JWT sits out ten minutes while quotes go out public.
 - OutLayer custody signs NEAR transactions only as the wallet's own implicit account, so a policy wallet acts for an account only through code that accepts its calls (`acceptsWalletSessions`, account code v3); store a wallet's policy before its API key goes anywhere (the first account to store it controls it), and never delete a policy (a wallet without one signs anything): freeze it.
 - Hyperliquid testnet has no leaderboard; leaders come from mainnet's.
+- On testnet the registry trusts only the enclave's key: an oracle in `ORACLE_MODE=local` signs reports the registry refuses. OutLayer caches a build by its wasm hash, so a run with a dead `OUTLAYER_WASM_URL` still runs; a wrong hash fails.
 - Regular RPC nodes drop transactions after about five epochs (2.5 days): look recorded proofs up on an archival node (`archival-rpc.<network>.fastnear.com`), as `verify.ts` does.
 - Publishing global code burns 10 times the storage price: 31.55 NEAR for the 316 KB account code. Re-running `deploy.sh` never republishes it; `PUBLISH_ACCOUNT_CODE=1` does, on purpose.
 - A reproducible build records its commit, so never rewrite history past a deployed commit: NearBlocks and `pnpm verify` need that commit in the public repository.
