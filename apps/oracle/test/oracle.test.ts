@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { AUTOPILOT_MARKETS } from "@tredio/autopilot";
 import type { Trend } from "@tredio/contracts";
 import { loadConfig } from "../src/config";
+import { ENCLAVE_RETRY_MS, Oracle, retryUntil } from "../src/oracle";
+import type { EnclaveOutput } from "../src/outlayer";
 import { boostedPoints, normalizeCount, toIndexUnits } from "../src/index-method";
 import { METHOD, measure } from "../src/method";
 import { allocate, assetClassOf, type Candidate, decide, freeListing, type LiveTrend, payableSurfacer, reportMarks } from "../src/plan";
@@ -146,3 +148,61 @@ describe("marks", () => {
   });
 });
 
+
+describe("enclave runs", () => {
+  test("a failed try is retried after each delay while the next try still fits before the deadline", async () => {
+    let clock = 0;
+    const waits: number[] = [];
+    const sleep = async (ms: number) => {
+      waits.push(ms);
+      clock += ms;
+    };
+    let tries = 0;
+    const flaky = async () => {
+      tries += 1;
+      if (tries < 3) throw new Error(`worker busy ${tries}`);
+      return "signed";
+    };
+    expect(await retryUntil(flaky, { delaysMs: [3_000, 10_000], deadline: 60_000, now: () => clock, sleep })).toBe("signed");
+    expect(waits).toEqual([3_000, 10_000]);
+
+    // Out of delays: the last error comes back.
+    tries = -10;
+    await expect(retryUntil(flaky, { delaysMs: [1, 1], deadline: 60_000, now: () => clock, sleep })).rejects.toThrow("worker busy -7");
+    // A wait that would end past the deadline is not taken: the next interval's run comes sooner.
+    clock = 55_000;
+    tries = 0;
+    waits.length = 0;
+    await expect(retryUntil(flaky, { delaysMs: [3_000, 10_000], deadline: 60_000, now: () => clock, sleep })).rejects.toThrow("worker busy 2");
+    expect(waits).toEqual([3_000]);
+  });
+
+  test("the oracle counts enclave runs that failed after their retries and clears the count on the next good one", async () => {
+    const none = {} as never;
+    const oracle = new Oracle(none, none, null, none, none, none);
+    let calls = 0;
+    const outputs: EnclaveOutput[] = [];
+    const enclave = {
+      run: async () => {
+        calls += 1;
+        return { output: outputs.shift() ?? { report_json: null, error: "Execution failed: worker unavailable" }, tx: null };
+      },
+    };
+    const sleep = async () => {};
+    await expect(oracle.runEnclave(enclave, { deadline: Date.now() + 60_000, sleep })).rejects.toThrow("enclave: Execution failed: worker unavailable");
+    expect(calls).toBe(1 + ENCLAVE_RETRY_MS.length);
+    expect(oracle.enclaveFailures).toBe(1);
+    await expect(oracle.runEnclave(enclave, { deadline: Date.now() + 60_000, sleep })).rejects.toThrow();
+    expect(oracle.enclaveFailures).toBe(2);
+    expect(oracle.enclaveOkAt).toBeNull();
+
+    // One failure, then a run with nothing to report: it counts as good and nothing is submitted.
+    calls = 0;
+    outputs.push({ report_json: null, error: "Execution failed: timeout" }, { report_json: null });
+    const result = await oracle.runEnclave(enclave, { deadline: Date.now() + 60_000, sleep });
+    expect(result.skipped).toBe("nothing to report");
+    expect(calls).toBe(2);
+    expect(oracle.enclaveFailures).toBe(0);
+    expect(oracle.enclaveOkAt).not.toBeNull();
+  });
+});
