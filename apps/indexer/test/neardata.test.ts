@@ -69,6 +69,25 @@ describe("Neardata", () => {
     expect(seen).toEqual(["Bearer k1", "Bearer bad", "Bearer k1", "Bearer k2", "Bearer k1"]);
   });
 
+  test("a refused last key gives way to requests without one, at the keyless rate", async () => {
+    const seen: string[] = [];
+    const fetch = (async (_: RequestInfo | URL, init?: RequestInit) => {
+      const auth = new Headers(init?.headers).get("authorization") ?? "";
+      seen.push(auth);
+      return auth ? new Response("Invalid API key", { status: 403 }) : new Response("null");
+    }) as typeof globalThis.fetch;
+    const nd = new Neardata({ baseUrl: "https://testnet.neardata.example", rpm: 6000, keylessRpm: 6000, log: silentLog, fetch, apiKeys: ["bad"], throttleMs: 50 });
+    expect(await nd.block(1)).toEqual({ kind: "skipped", height: 1 });
+    expect(await nd.block(2)).toEqual({ kind: "skipped", height: 2 });
+    expect(seen).toEqual(["Bearer bad", "", ""]);
+    expect(nd.refusedKeys).toBe(1);
+
+    // Refused without a key too: that is fatal.
+    const shut = (async () => new Response("Unauthorized", { status: 401 })) as unknown as typeof globalThis.fetch;
+    const none = new Neardata({ baseUrl: "https://testnet.neardata.example", rpm: 6000, keylessRpm: 6000, log: silentLog, fetch: shut, apiKeys: ["bad"], throttleMs: 50 });
+    await expect(none.block(1)).rejects.toBeInstanceOf(FatalError);
+  });
+
   test("a height below the archive is fatal", async () => {
     const low = (async () => Response.json({ error: "too low", type: "BLOCK_HEIGHT_TOO_LOW" }, { status: 404 })) as unknown as typeof globalThis.fetch;
     await expect(client(low).block(1)).rejects.toBeInstanceOf(FatalError);
@@ -83,5 +102,14 @@ describe("RateLimiter", () => {
     const ms = Date.now() - t0;
     expect(ms).toBeGreaterThanOrEqual(280);
     expect(ms).toBeLessThan(1_000);
+  });
+
+  test("a new rate applies from the next request", async () => {
+    const l = new RateLimiter(60_000); // a burst of 5, then 1,000 a second
+    for (let i = 0; i < 5; i++) await l.take();
+    l.setRate(300); // 5 a second from an empty bucket
+    const t0 = Date.now();
+    for (let i = 0; i < 3; i++) await l.take();
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(380);
   });
 });
