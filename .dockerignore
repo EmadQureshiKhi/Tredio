@@ -16,3 +16,14 @@
 **/*.log
 **/.DS_Store
 **/Thumbs.db
+# Never in a build context: private notes and keys, local service state, and folders no image uses.
+internal
+CLAUDE.local.md
+**/.*-state.json
+deployments/.exchange-prepared
+**/e2e/.state
+**/test-results
+contracts
+tools
+video
+deploy/env
