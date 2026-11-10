@@ -1,0 +1,34 @@
+# Vercel CLI uploads from the repository root (the sites import packages/ and deployments/) and does
+# not read .gitignore, so only what the three sites and the pnpm workspace need goes up: never .env
+# files, keys, internal notes or contract builds.
+/*
+!/package.json
+!/pnpm-lock.yaml
+!/pnpm-workspace.yaml
+!/patches
+!/packages
+!/deployments
+!/frontend
+!/admin
+!/landing-page
+!/apps
+!/backend
+
+**/node_modules
+**/.next*
+**/.vercel
+**/.env
+**/.env.*
+!**/.env.example
+**/target
+**/.*-state.json
+/deployments/.exchange-prepared
+**/e2e/.state
+**/e2e-results
+**/test-results
+**/playwright-report
+**/coverage
+**/*.tsbuildinfo
+**/next-env.d.ts
+**/*.log
+**/.DS_Store
