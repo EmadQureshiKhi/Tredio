@@ -63,6 +63,11 @@ export class TxApi {
     return this.http.requests;
   }
 
+  /** API keys dropped after FastNEAR refused them. */
+  get refusedKeys(): number {
+    return this.http.refusedKeys;
+  }
+
   private post<T>(what: string, path: string, body: unknown): Promise<T> {
     return this.http.retrying(what, async () => {
       const res = await this.http.send(new URL(path, this.o.baseUrl), { method: "POST", body: JSON.stringify(body) });

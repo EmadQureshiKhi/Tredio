@@ -8,8 +8,9 @@
  *   request (1 s doubling to 30 s, with jitter). Both retry until the stop signal fires.
  * - An API key goes in `Authorization: Bearer`, several keys in turn. Redirects drop that header,
  *   so they are followed by hand and the header is sent again.
- * - A 401 or 403 drops the key that drew it and the request goes again with the next; it is fatal
- *   only for the last key (or without one).
+ * - A 401 or 403 drops the key that drew it and the request goes again with the next. When the
+ *   last key goes, requests carry on without one at `keylessRpm` (fatal without that option, or
+ *   when a request without a key is refused).
  */
 import type { Log } from "./log";
 
@@ -61,6 +62,8 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
+const burstOf = (perMinute: number) => Math.max(1, Math.min(5, Math.floor(perMinute / 60)));
+
 /** A token bucket shared by every request of one client. */
 export class RateLimiter {
   private tokens: number;
@@ -69,10 +72,17 @@ export class RateLimiter {
   pausedUntil = 0;
 
   constructor(
-    private readonly perMinute: number,
-    private readonly burst = Math.max(1, Math.min(5, Math.floor(perMinute / 60))),
+    private perMinute: number,
+    private burst = burstOf(perMinute),
   ) {
     this.tokens = this.burst;
+  }
+
+  /** A new rate from now on (the bucket keeps what it holds, up to the new burst). */
+  setRate(perMinute: number) {
+    this.perMinute = perMinute;
+    this.burst = burstOf(perMinute);
+    this.tokens = Math.min(this.tokens, this.burst);
   }
 
   /** Holds every request until `until`. */
@@ -101,6 +111,8 @@ export interface RequesterOptions {
   /** FastNEAR API keys, taken in turn. */
   apiKeys?: readonly string[];
   rpm: number;
+  /** The rate once every key is refused, carrying on without one; unset, the last refusal is fatal. */
+  keylessRpm?: number;
   log: Log;
   signal?: AbortSignal;
   /** Per-request timeout (default 30 s). */
@@ -125,6 +137,8 @@ export class Requester {
   private turn = 0;
   private readonly keyOf = new WeakMap<Response, string>();
   requests = 0;
+  /** Keys dropped after a refusal. */
+  refusedKeys = 0;
 
   constructor(private readonly o: RequesterOptions) {
     this.keys = [...new Set(o.apiKeys ?? [])];
@@ -160,11 +174,18 @@ export class Requester {
     const text = (await res.text().catch(() => "")).slice(0, 200);
     if (res.status === 401 || res.status === 403) {
       const key = this.keyOf.get(res);
-      if (key && this.keys.length > 1) {
+      if (key && this.keys.includes(key) && (this.keys.length > 1 || this.o.keylessRpm)) {
         this.keys = this.keys.filter((k) => k !== key);
-        this.o.log.warn(`${this.o.name} refused an API key; going on with the others`, { status: res.status, keysLeft: this.keys.length });
+        this.refusedKeys++;
+        if (this.keys.length > 0) this.o.log.warn(`${this.o.name} refused an API key; going on with the others`, { status: res.status, keysLeft: this.keys.length });
+        else {
+          this.limiter.setRate(this.o.keylessRpm!);
+          this.o.log.warn(`${this.o.name} refused its last API key; going on without one`, { status: res.status, rpm: this.o.keylessRpm });
+        }
         throw new KeyRefusedError();
       }
+      // A key already dropped by a request in flight alongside: go again with what is left.
+      if (key && !this.keys.includes(key)) throw new KeyRefusedError();
       throw new FatalError(`${this.o.name} refused the request (${res.status}): check the API key`);
     }
     throw new HttpError(res.status, text, res.headers.get("retry-after"));

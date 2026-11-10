@@ -2,6 +2,7 @@
  * Tredio indexer: follows FastNEAR's transactions API (default) or neardata's block stream into
  * Postgres and serves /health and /live.
  */
+import { FREE_RPM, TX_FREE_RPM } from "./config";
 import { healthApp } from "./health";
 import { Ingestor, type IngestStatus } from "./ingest";
 import { createLog } from "./log";
@@ -24,8 +25,10 @@ const common = { sql, tracker, network: cfg.NEAR_NETWORK, startBlock: rt.startBl
 
 let feed: { status: IngestStatus; beat(): void; run(): Promise<void> };
 let source: Record<string, unknown>;
+let keys: { configured: number; refused: () => number };
 if (cfg.INDEXER_SOURCE === "txs") {
-  const api = new TxApi({ baseUrl: cfg.txApiUrl, apiKeys: cfg.txApiKeys, rpm: cfg.TX_API_RPM, log, signal: stop.signal, onAttempt: () => beat() });
+  const api = new TxApi({ baseUrl: cfg.txApiUrl, apiKeys: cfg.txApiKeys, rpm: cfg.TX_API_RPM, keylessRpm: TX_FREE_RPM, log, signal: stop.signal, onAttempt: () => beat() });
+  keys = { configured: cfg.txApiKeys.length, refused: () => api.refusedKeys };
   const core = [...new Set([...tracker.coreAccounts(), ...cfg.relayers])];
   feed = new TxIngestor({
     ...common,
@@ -40,7 +43,8 @@ if (cfg.INDEXER_SOURCE === "txs") {
   });
   source = { source: "txs", txApi: cfg.txApiUrl, apiKeys: cfg.txApiKeys.length, rpm: cfg.TX_API_RPM, relayers: cfg.relayers };
 } else {
-  const neardata = new Neardata({ baseUrl: cfg.neardataUrl, apiKeys: cfg.neardataKeys, rpm: cfg.NEARDATA_RPM, log, signal: stop.signal, onAttempt: () => beat() });
+  const neardata = new Neardata({ baseUrl: cfg.neardataUrl, apiKeys: cfg.neardataKeys, rpm: cfg.NEARDATA_RPM, keylessRpm: FREE_RPM, log, signal: stop.signal, onAttempt: () => beat() });
+  keys = { configured: cfg.neardataKeys.length, refused: () => neardata.refusedKeys };
   feed = new Ingestor({ ...common, neardata, concurrency: cfg.NEARDATA_CONCURRENCY, pollMs: cfg.POLL_MS });
   source = { source: "blocks", neardata: cfg.neardataUrl, apiKeys: cfg.neardataKeys.length, rpm: cfg.NEARDATA_RPM };
 }
@@ -54,6 +58,7 @@ const server = Bun.serve({
     running: () => running,
     maxLagSec: cfg.MAX_LAG_SEC,
     liveTimeoutSec: cfg.LIVE_TIMEOUT_SEC,
+    keys,
   }).fetch,
 });
 log.info("indexer up", { network: cfg.NEAR_NETWORK, schema: cfg.INDEXER_SCHEMA, ...source, startBlock: rt.startBlock, port: server.port });

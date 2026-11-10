@@ -51,6 +51,11 @@ export class Neardata {
     return this.http.requests;
   }
 
+  /** API keys dropped after FastNEAR refused them. */
+  get refusedKeys(): number {
+    return this.http.refusedKeys;
+  }
+
   /** The block at `height`, a skipped height, or a height not produced yet. */
   async block(height: number): Promise<BlockResult> {
     return this.http.retrying(`block ${height}`, async () => {
