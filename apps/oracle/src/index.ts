@@ -56,7 +56,7 @@ void (async () => {
   while (!stopped) {
     const started = Date.now();
     try {
-      await (enclave ? oracle.runEnclave(enclave) : oracle.run());
+      await (enclave ? oracle.runEnclave(enclave, { deadline: started + cfg.RUN_INTERVAL_SEC * 1000 }) : oracle.run());
     } catch (e) {
       oracle.lastError = e instanceof Error ? e.message.slice(0, 300) : String(e);
       log({ err: oracle.lastError }, "run failed");
@@ -76,6 +76,13 @@ app.get("/health", async (c) => {
   const recent = oracle.lastRun !== null && Date.now() / 1000 - oracle.lastRun.at < cfg.RUN_INTERVAL_SEC * 5;
   const ok = funded && recent;
   const r = oracle.lastRun;
+  const alerts: Record<string, string> = {};
+  if (!funded) alerts.balance = `below ${cfg.MIN_BALANCE_NEAR} NEAR`;
+  // Reads after its key, as the status page shows it: "enclave runs failing on OutLayer (2 in a row, ...)".
+  if (oracle.enclaveFailures > 0) {
+    const since = oracle.enclaveOkAt ? `; last good run ${new Date(oracle.enclaveOkAt * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC` : "";
+    alerts.enclave = `runs failing on OutLayer (${oracle.enclaveFailures} in a row, each after its retries${since})`;
+  }
   return c.json(
     {
       ok,
@@ -84,13 +91,14 @@ app.get("/health", async (c) => {
       startedAt: STARTED_AT,
       signer: signer ? { kind: signer.kind, publicKey: signer.publicKey } : { kind: "outlayer-tee", wasmHash: cfg.OUTLAYER_WASM_HASH, trustedKey: trusted?.tee_signer?.public_key ?? null },
       wallets: [wallet],
-      alerts: funded ? {} : { balance: `below ${cfg.MIN_BALANCE_NEAR} NEAR` },
+      alerts,
       lastError: oracle.lastError,
       lastWorkAt: r?.at ?? null,
       lastRun: r,
       facts: [
         ...(r ? [{ label: "Last run", at: r.at }, { label: "Last report", value: r.tx ? `run ${r.runId}: ${r.updated} updates, ${r.created.length} new, ${r.marks} marks` : (r.skipped ?? "none") }] : []),
         { label: "Report key", value: signer ? "local key (bootstrap)" : `OutLayer enclave, build ${cfg.OUTLAYER_WASM_HASH!.slice(0, 12)}`, tone: signer ? "warn" : "ok" },
+        ...(enclave ? [{ label: "Last enclave run", ...(oracle.enclaveOkAt ? { at: oracle.enclaveOkAt } : { value: "none yet" }), tone: oracle.enclaveFailures > 0 ? "warn" : "ok" }] : []),
       ],
       flags: [],
     },
