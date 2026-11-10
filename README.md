@@ -11,7 +11,7 @@ You sign up with Face ID, get a NEAR account with no seed phrase, and trade for 
 [App](https://app.tredio.bid) · [Website](https://tredio.bid) · [API status](https://api.tredio.bid/v1/status) · [Judges' guide](JUDGES.md) · [For AI agents](AGENTS.md) · [llms.txt](https://tredio.bid/llms.txt)
 
 Everything runs on NEAR testnet: the contracts, the oracle, the accounts and every service.
-The hosted app, website and API at tredio.bid go live before judging; until then everything runs locally against testnet (see [Run it](#run-it)), and every on-chain claim can be checked with `pnpm verify`.
+The app, website and API are live at tredio.bid; everything also runs locally against testnet (see [Run it](#run-it)), and every on-chain claim can be checked with `pnpm verify`.
 
 <img src="assets/readme/app-trend.png" alt="A trend page in the app: the World Cup's attention index over 24 hours, its stats, and the Up/Down ticket with Up at 79.3 cents" width="960">
 

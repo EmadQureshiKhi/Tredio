@@ -3,7 +3,7 @@
 Tredio is an attention market built on NEAR primitives: passkey universal accounts, gas-key sessions, an oracle built for an OutLayer enclave, NEAR AI Cloud review, Chain Signatures for Hyperliquid, and NEAR Intents for deposits.
 This page lists every claim with the place to see it and a way to check it yourself, and ends with what is not finished.
 Everything runs on NEAR testnet.
-The hosted app at app.tredio.bid goes live before judging; until then, run it locally (README, "Run it") and check the on-chain claims with `pnpm verify`, which needs no hosting.
+The app is live at app.tredio.bid, with its API at api.tredio.bid; it also runs locally (README, "Run it"), and `pnpm verify` checks the on-chain claims without either.
 
 ## In five minutes
 
