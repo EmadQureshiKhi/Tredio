@@ -56,8 +56,9 @@ const endpointOf = (e: string | RpcEndpoint): RpcEndpoint => (typeof e === "stri
 /** True for errors worth retrying on another provider or later (network, rate limit, timeout). */
 export function isTransient(e: unknown): boolean {
   const m = String((e as Error)?.message ?? e).toLowerCase();
-  // FastNEAR answers a rate limit with HTTP 200 and a JSON-RPC error (code -429, "Rate limits exceeded").
-  return /fetch failed|network|timeout|timed out|429|too many|rate limit|deprecated|503|502|504|econnreset|socket|unavailable/.test(m);
+  // FastNEAR answers a rate limit with HTTP 200 and a JSON-RPC error (code -429, "Rate limits exceeded"); a provider's
+  // own HTTP 500 is its fault too (contract failures come back as JSON-RPC errors with HTTP 200).
+  return /fetch failed|network|timeout|timed out|429|too many|rate limit|deprecated|503|502|504|^(http|rpc) 500\b|internal server error|econnreset|socket|unavailable/.test(m);
 }
 
 /** True when a provider turned the request away for its key: an HTTP 401 or 403 (FastNEAR: 403 "Invalid API key"). */
@@ -69,10 +70,10 @@ const FAILOVER_ROUNDS = 3;
 const FAILOVER_BACKOFF_MS = 500;
 const REFUSED_REST_MS = 10 * 60_000;
 
-/**
 /** When each refused provider (URL and headers, so one key) may be tried again, shared by every client in the process. */
 const REFUSED_UNTIL = new Map<string, number>();
 
+/**
  * The order to try providers in for one request. Keyed providers take turns, so several API keys
  * carry equal shares; keyless ones follow, the last that answered first. A provider that refuses
  * its key sits out for ten minutes at the back of the line, for every client in the process, so a
@@ -88,8 +89,8 @@ export class RpcRotation {
   constructor(
     readonly endpoints: readonly RpcEndpoint[],
     private readonly now: () => number = Date.now,
-  ) {
     private readonly refusedUntil: Map<string, number> = REFUSED_UNTIL,
+  ) {
     this.keyed = endpoints.flatMap((e, i) => (e.headers ? [i] : []));
     this.open = endpoints.flatMap((e, i) => (e.headers ? [] : [i]));
     this.ids = endpoints.map((e) => `${e.url} ${JSON.stringify(e.headers ?? {})}`);
