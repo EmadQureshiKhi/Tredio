@@ -5,9 +5,10 @@
  * the origin and route of a deposit cannot be linked to the account it lands in; the destination
  * transfer itself stays public. 1Click refuses that flag without the JWT ("User authentication is
  * required for confidential intent quotes", checked 2026-11-09), so without one quotes go out public.
- * The JWT also replaces 1Click's extra 0.25% platform fee on unauthenticated quotes with the partner
- * schedule (typically 0.2%, 0.01% on stablecoin and same-asset routes). It comes from the Partner
- * Dashboard, https://partners.near-intents.org/home, and travels as `X-API-Key`.
+ * 1Click's fee is the same with or without it (0.2% on an ETH route, 0.01% on USDC to USDC,
+ * measured 2026-11-10). It comes from the Partner Dashboard, https://partners.near-intents.org/home,
+ * as a distribution channel key, and travels as `X-API-Key`. When 1Click refuses it (revoked or
+ * expired), it rests for ten minutes and quotes go out public meanwhile.
  *
  * 1Click runs on NEAR mainnet only. On testnet the app shows dry quotes (`dry: true`, no deposit
  * address) at mainnet prices, so the flow is visible without moving funds, and testnet USDC comes
@@ -113,17 +114,23 @@ type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
 export interface OneClickOptions {
   baseUrl?: string;
-  /** A partner JWT from https://partners.near-intents.org/home: confidential quotes and the partner fee schedule. */
+  /** A partner JWT from https://partners.near-intents.org/home (a distribution channel key): confidential quotes. */
   jwt?: string | null;
   fetchImpl?: Fetch;
   timeoutMs?: number;
+  now?: () => number;
 }
+
+/** How long a partner JWT 1Click refused sits out before it is tried again. */
+export const JWT_REST_MS = 10 * 60_000;
 
 export class OneClick {
   private readonly base: string;
   private readonly jwt: string | null;
   private readonly fetchImpl: Fetch;
   private readonly timeoutMs: number;
+  private readonly now: () => number;
+  private jwtRestUntil = 0;
   private tokenCache: { at: number; tokens: Token[] } | null = null;
 
   constructor(o: OneClickOptions = {}) {
@@ -131,18 +138,47 @@ export class OneClick {
     this.jwt = o.jwt ?? null;
     this.fetchImpl = o.fetchImpl ?? fetch;
     this.timeoutMs = o.timeoutMs ?? 20_000;
+    this.now = o.now ?? Date.now;
   }
 
-  /** Whether quotes carry a partner JWT (confidential, partner fees). */
+  /** Whether quotes carry a partner JWT (confidential): one is set and 1Click has not refused it lately. */
   get authenticated(): boolean {
-    return this.jwt !== null;
+    return this.jwt !== null && this.now() >= this.jwtRestUntil;
   }
 
-  private async call<T>(path: string, init: RequestInit = {}): Promise<T> {
+  /** The partner JWT's state for health checks: none set, in use, or resting after 1Click refused it. */
+  get partner(): "none" | "ok" | "refused" {
+    return this.jwt === null ? "none" : this.authenticated ? "ok" : "refused";
+  }
+
+  /**
+   * One request, with the partner JWT while it is good. When 1Click refuses the JWT (401: revoked,
+   * expired or mistyped), it rests for ten minutes and the request goes again without it, so
+   * deposits keep working as public quotes at 1Click's own fees; `body` builds the request for
+   * either case.
+   */
+  private async call<T>(path: string, init: { method?: string; body?: (authed: boolean) => unknown } = {}): Promise<T> {
+    const authed = this.authenticated;
+    try {
+      return await this.send<T>(path, init.method, init.body?.(authed), authed);
+    } catch (e) {
+      if (!authed || !(e instanceof OneClickError) || e.status !== 401) throw e;
+      this.jwtRestUntil = this.now() + JWT_REST_MS;
+      console.warn(JSON.stringify({ msg: "1Click refused the partner JWT; quotes go out public", err: e.message, restSec: JWT_REST_MS / 1000 }));
+      return this.send<T>(path, init.method, init.body?.(false), false);
+    }
+  }
+
+  private async send<T>(path: string, method: string | undefined, body: unknown, authed: boolean): Promise<T> {
     const headers: Record<string, string> = { accept: "application/json" };
-    if (init.body) headers["content-type"] = "application/json";
-    if (this.jwt) headers["x-api-key"] = this.jwt;
-    const res = await this.fetchImpl(`${this.base}${path}`, { ...init, headers: { ...headers, ...(init.headers as Record<string, string>) }, signal: AbortSignal.timeout(this.timeoutMs) });
+    if (body !== undefined) headers["content-type"] = "application/json";
+    if (authed && this.jwt) headers["x-api-key"] = this.jwt;
+    const res = await this.fetchImpl(`${this.base}${path}`, {
+      method,
+      headers,
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
     const text = await res.text();
     if (!res.ok) {
       let message = text.slice(0, 300);
@@ -166,13 +202,14 @@ export class OneClick {
 
   /** Requests a quote; confidential when the client has a partner JWT and the request does not say otherwise. */
   quote(req: QuoteRequest): Promise<QuoteResponse> {
-    const body = req.confidentiality === undefined && this.jwt ? { ...req, confidentiality: "basic" as const } : req;
-    return this.call<QuoteResponse>("/v0/quote", { method: "POST", body: JSON.stringify(body) });
+    // An explicit `confidentiality` is kept as asked, so a refused JWT fails that quote rather than make it public.
+    const body = (authed: boolean) => (req.confidentiality === undefined && authed ? { ...req, confidentiality: "basic" as const } : req);
+    return this.call<QuoteResponse>("/v0/quote", { method: "POST", body });
   }
 
   /** Whether a quote this client makes is confidential. */
   confidential(req: Pick<QuoteRequest, "confidentiality">): boolean {
-    const mode = req.confidentiality ?? (this.jwt ? "basic" : "public");
+    const mode = req.confidentiality ?? (this.authenticated ? "basic" : "public");
     return mode !== "public";
   }
 
@@ -183,7 +220,7 @@ export class OneClick {
 
   /** Tells 1Click about a deposit transaction so it starts before the chain watcher sees it. */
   submitDeposit(txHash: string, depositAddress: string, memo?: string): Promise<StatusResponse> {
-    return this.call<StatusResponse>("/v0/deposit/submit", { method: "POST", body: JSON.stringify({ txHash, depositAddress, ...(memo ? { memo } : {}) }) });
+    return this.call<StatusResponse>("/v0/deposit/submit", { method: "POST", body: () => ({ txHash, depositAddress, ...(memo ? { memo } : {}) }) });
   }
 }
 
