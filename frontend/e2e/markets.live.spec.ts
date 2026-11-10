@@ -110,8 +110,11 @@ test("a trend coin buys and sells on its curve, one prompt each", async ({ live 
   await page.goto(`/t/${TREND}`);
   const panel = page.getByTestId("trade-panel");
   await panel.getByRole("radio", { name: "Coin" }).click();
+  // The Up/Down ticket, with its own Buy, stays mounted while the tabs animate: wait for the coin ticket.
+  await expect(panel.getByTestId("coin-amount")).toBeVisible();
+  await expect(panel.getByTestId("outcome-side-up")).toHaveCount(0);
   const before = await passkeyUses(live);
-  await panel.getByRole("radio", { name: "Buy" }).click();
+  await panel.getByRole("radio", { name: "Buy", exact: true }).click();
   await panel.getByTestId("coin-amount").fill("1");
   const submit = panel.getByTestId("coin-submit");
   await expect(submit).toBeEnabled({ timeout: 30_000 });
@@ -119,7 +122,7 @@ test("a trend coin buys and sells on its curve, one prompt each", async ({ live 
   await landed(panel.getByTestId("coin-tx"));
   expect(await passkeyUses(live)).toBe(before + 1);
 
-  await panel.getByRole("radio", { name: "Sell" }).click();
+  await panel.getByRole("radio", { name: "Sell", exact: true }).click();
   await panel.getByRole("button", { name: /Max/ }).click();
   await expect(submit).toBeEnabled({ timeout: 30_000 });
   await submit.click();
