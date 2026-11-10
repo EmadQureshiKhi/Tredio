@@ -56,6 +56,9 @@ services:
     <<: *service
     build: { context: .., dockerfile: apps/market-maker/Dockerfile }
     env_file: env/market-maker.env
+    # Order ids and burn history outlive rebuilds; this wins over any STATE_FILE in the env file.
+    environment: { STATE_FILE: /data/mm-state.json }
+    volumes: ["mm-state:/data"]
     healthcheck: { <<: *live, test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4300/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"] }
 
   autopilot:
@@ -68,6 +71,8 @@ services:
     <<: *service
     build: { context: .., dockerfile: apps/topup/Dockerfile }
     env_file: env/topup.env
+    environment: { STATE_FILE: /data/topup-state.json }
+    volumes: ["topup-state:/data"]
     healthcheck: { <<: *live, test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4500/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"] }
 
   oracle:
@@ -109,5 +114,7 @@ services:
 
 volumes:
   pgdata:
+  mm-state:
+  topup-state:
   caddy-data:
   caddy-config:
