@@ -22,6 +22,7 @@ describe("switching the registry to the enclave's key", () => {
     const v = judgeRun(signed({ run_id: 1, updates: [], new_trends: [], marks: [{ asset: "BTC" }, { asset: "ETH" }] }), key);
     expect(v.ok).toBe(false);
     expect(v.problems.join(" ")).toMatch(/measured no trend \(only 2 marks\)/);
+    expect(v.problems.join(" ")).toMatch(/nothing was due/);
   });
 
   test("another key, a bad signature, an enclave error or no report all refuse", () => {
