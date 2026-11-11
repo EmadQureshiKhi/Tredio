@@ -1,7 +1,7 @@
 # Tredio attention check (NEAR AI Agent Market)
 
 A worker agent for the [NEAR AI Agent Market](https://market.near.ai): given any topic, it answers with Tredio's attention index for it, the sources behind the index, the registry checkpoint on NEAR, and the NEAR AI review evidence, paid per call.
-It is prepared to be listed; it is not listed.
+It is live as [`@tredio`](https://tredio.market.near.ai), self-hosted on Tredio's server, with the market's webhook at `https://agent.tredio.bid/market/webhook`.
 Publishing is one command the owner runs after their OK (see [Publishing](#publishing)).
 
 ## What a call returns
@@ -109,7 +109,7 @@ docker build -f apps/agent-market/Dockerfile .   # from the repository root
 Only the owner publishes, after their OK; the script refuses `--publish` unless `AGENT_MARKET_PUBLISH=yes` is set.
 On the live market, callers pay in mainnet USDC for answers about Tredio's testnet deployment until mainnet is live; the listing's description says so.
 
-1. Choose the account: sign in on [market.near.ai](https://market.near.ai), accept its terms, create a self-hosted agent with the handle `tredio-attention`, and mint its API token; put `MARKET_API_TOKEN` and `AGENT_MARKET_AGENT_ID` in `apps/agent-market/.env`.
+1. Choose the account: sign in on [market.near.ai](https://market.near.ai), accept its terms, create a self-hosted agent with the handle `tredio`, and mint its API token; put `MARKET_API_TOKEN` and `AGENT_MARKET_AGENT_ID` in `apps/agent-market/.env`.
    Without them the script registers the agent itself, writes its token to that `.env`, and prints a single-use adoption link for the owner.
 2. Run the worker where it stays up (`bun run start`, or the Docker image) with that token, `BACKEND_URL` pointing at Tredio's API, and `PUBLIC_API_URL` at its public address.
    For webhooks, also set `MARKET_WEBHOOK_SECRET` (32 characters or more) and `WORKER_PUBLIC_URL` (the worker's public HTTPS origin).
@@ -121,6 +121,7 @@ cd apps/agent-market
 AGENT_MARKET_PUBLISH=yes bun scripts/list.ts --publish
 ```
 
-The listing settings, all optional: `AGENT_MARKET_HANDLE` (`tredio-attention`), `AGENT_MARKET_NAME` (`Tredio attention check`), `AGENT_MARKET_CATEGORY` (`data`), `AGENT_MARKET_EMAIL`, `PRICE_USDC` (`0.05`, also the worker's own floor), `SLA_SECONDS` (`120`).
+The listing settings, all optional: `AGENT_MARKET_HANDLE` (`tredio`), `AGENT_MARKET_NAME` (`Tredio attention check`), `AGENT_MARKET_CATEGORY` (`data`), `AGENT_MARKET_EMAIL`, `PRICE_USDC` (`0.05`, also the worker's own floor), `SLA_SECONDS` (`120`).
 The script sends the profile, the webhook and its test ping (when set), the per-call plan (kept when an identical one exists), and `listing_status: "live"`, stopping at the first required step the market refuses.
-The live card is then at `https://tredio-attention.market.near.ai/.well-known/agent-card.json`.
+A token minted on the website runs work but cannot change the listing (the market answers 403 `agent_token_scope_forbidden`), so for an agent created there, as `@tredio` was, the profile, webhook URL and signing secret are set on its edit page instead; tags and the input and output schemas have no field there.
+The live card is then at `https://tredio.market.near.ai/.well-known/agent-card.json`.

@@ -11,6 +11,7 @@ Any Linux host with Docker and 2 GB of memory or more works; Tredio runs on a Go
 Caddy gets its certificates over HTTP-01 through the proxy and redirects to HTTPS itself, so Cloudflare's "Always Use HTTPS" stays off.
 The `Caddyfile` takes the visitor's address from `CF-Connecting-IP` only on requests from those ranges and passes it on as the one `X-Forwarded-For` entry, so the API and relayer run with `TRUSTED_PROXY_HOPS=1`.
 Without a proxy in front, point the names straight at the machine and open 80 and 443 to everyone; nothing else changes.
+`agent.tredio.bid` (proxied the same way) carries only the Agent Market's signed webhook to the `agent-market` worker; Caddy answers 404 for every other path.
 
 ```bash
 git clone <this repository> tredio && cd tredio/deploy
@@ -30,6 +31,7 @@ Create one env file per service in `deploy/env/`, starting from the `.env.exampl
 | `topup.env` | `apps/topup/.env.example` | |
 | `oracle.env` | `apps/oracle/.env.example` | `BACKEND_URL=http://backend:4000` |
 | `indexer.env` | `apps/indexer/.env.example` | `DATABASE_URL=...@postgres:5432/tredio_indexer` |
+| `agent-market.env` | `apps/agent-market/.env.example` | `BACKEND_URL=http://backend:4000`, `PUBLIC_API_URL=https://api.tredio.bid`, `WORKER_PUBLIC_URL=https://agent.tredio.bid`, the agent's token and webhook secret from market.near.ai |
 
 Then:
 
