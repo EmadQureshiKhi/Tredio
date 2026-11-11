@@ -21,6 +21,13 @@ api.tredio.bid {
 }
 
 relay.tredio.bid {
-	encode zstd gzip
-	reverse_proxy relayer:4100
+	import service relayer:4100
+}
+
+# The Agent Market worker: only the market's signed webhook is public; its health stays on the internal network.
+agent.tredio.bid {
+	handle /market/webhook {
+		import service agent-market:4800
+	}
+	respond 404
 }
