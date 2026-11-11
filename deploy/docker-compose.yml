@@ -87,10 +87,9 @@ services:
     env_file: env/indexer.env
     healthcheck: { <<: *live, test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4700/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"] }
 
-  # The Agent Market worker (apps/agent-market): starts only with `--profile market`, once the agent is listed.
+  # The Agent Market worker (apps/agent-market), listed as @tredio; the market's webhook reaches it at agent.tredio.bid.
   agent-market:
     <<: *service
-    profiles: [market]
     build: { context: .., dockerfile: apps/agent-market/Dockerfile }
     env_file: env/agent-market.env
     healthcheck: { <<: *live, test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4800/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"] }
