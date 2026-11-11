@@ -44,7 +44,7 @@ function setup(o: Setup = {}) {
   let serverFetch: (r: Request) => Response | Promise<Response> = () => new Response("not ready", { status: 503 });
   const standin = createStandin({
     token,
-    agent: { agentId: randomUUID(), handle: "tredio-attention", name: "Tredio attention check", description: "Attention index for any topic", tags: ["attention"] },
+    agent: { agentId: randomUUID(), handle: "tredio", name: "Tredio attention check", description: "Attention index for any topic", tags: ["attention"] },
     plan: { priceAmount: o.priceAmount ?? "0.05", slaSeconds: 120 },
     payment: { network: "near:testnet", asset: D.contracts.usdc, payTo: D.treasury },
     facilitator,

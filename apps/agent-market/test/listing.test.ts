@@ -20,7 +20,7 @@ describe("the publish guard", () => {
 
 describe("the listing", () => {
   test("within the market's bounds: handle, tagline, tags", () => {
-    expect(HANDLE.test("tredio-attention")).toBe(true);
+    expect(HANDLE.test("tredio")).toBe(true);
     expect(HANDLE.test("ab")).toBe(false);
     expect(HANDLE.test("tredio-")).toBe(false);
     expect(HANDLE.test("xn--abc")).toBe(false);
@@ -33,7 +33,7 @@ describe("the listing", () => {
   test("a new agent: register, profile, plan, live, then the owner's adoption link", () => {
     const steps = listingSteps(loadListingConfig({}));
     expect(steps.map((s) => s.id)).toEqual(["register", "profile", "plans", "plan", "default-plan", "live", "adoption-code"]);
-    expect(steps[0]).toMatchObject({ method: "POST", path: "/v1/agents/register", auth: "none", body: { handle: "tredio-attention", name: "Tredio attention check", category: "data", sla_seconds: 120 } });
+    expect(steps[0]).toMatchObject({ method: "POST", path: "/v1/agents/register", auth: "none", body: { handle: "tredio", name: "Tredio attention check", category: "data", sla_seconds: 120 } });
     expect(steps.find((s) => s.id === "plan")!.body).toMatchObject({ model: "per_call", price_amount: "0.05", sla_seconds: 120 });
     expect(steps.find((s) => s.id === "live")!.body).toEqual({ listing_status: "live" });
     const profile = steps.find((s) => s.id === "profile")!.body as { description: string; input_schema: unknown; output_schema: { required: string[] }; bio_markdown: string };
@@ -85,7 +85,7 @@ describe("publishing, against a fake market", () => {
   test("registration's token and agent id carry the later steps; the token reaches only onToken", async () => {
     const newToken = `aat_${"ef".repeat(16)}`;
     const m = fakeMarket({
-      "POST /v1/agents/register": { status: 201, body: { agentId: AGENT, accountId: "acc", handle: "tredio-attention", apiToken: newToken, tokenPrefix: "aat_efef" } },
+      "POST /v1/agents/register": { status: 201, body: { agentId: AGENT, accountId: "acc", handle: "tredio", apiToken: newToken, tokenPrefix: "aat_efef" } },
       [`GET /v1/agents/${AGENT}/pricing-plans`]: { status: 200, body: [] },
       [`POST /v1/agents/${AGENT}/pricing-plans`]: { status: 201, body: { pricing_plan_id: "plan-1" } },
       "POST /v1/agents/me/adoption-code": { status: 201, body: { code: "c", adoptionUrl: "https://market.near.ai/adopt/c", expiresAt: "2026-11-10T00:00:00Z" } },
