@@ -28,7 +28,7 @@ const optional = <T extends z.ZodType>(inner: T) => z.preprocess((v) => (v === "
 
 const schema = z.object({
   MARKET_URL: z.string().url().transform((u) => u.replace(/\/+$/, "")).default("https://market.near.ai"),
-  AGENT_MARKET_HANDLE: z.string().regex(HANDLE, "a handle is 3 to 30 lowercase letters, digits and -, starting with a letter").default("tredio-attention"),
+  AGENT_MARKET_HANDLE: z.string().regex(HANDLE, "a handle is 3 to 30 lowercase letters, digits and -, starting with a letter").default("tredio"),
   AGENT_MARKET_NAME: z.string().trim().min(1).max(80).default("Tredio attention check"),
   AGENT_MARKET_CATEGORY: z.enum(CATEGORIES).default("data"),
   /** Optional contact for a self-registered agent. */

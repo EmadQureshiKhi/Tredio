@@ -48,7 +48,7 @@ const usdcOf = (account: string) => viewer.view<string>(D.contracts.usdc, "ft_ba
 // 1. The stand-in market, settling through a real relayer on NEAR testnet.
 const standin = createStandin({
   token,
-  agent: { agentId: randomUUID(), handle: "tredio-attention", name: "Tredio attention check", description: "Attention index for any topic, with its sources, registry checkpoint and NEAR AI review", tags: ["attention", "near"] },
+  agent: { agentId: randomUUID(), handle: "tredio", name: "Tredio attention check", description: "Attention index for any topic, with its sources, registry checkpoint and NEAR AI review", tags: ["attention", "near"] },
   plan: { priceAmount: PRICE, slaSeconds: 120 },
   payment: { network: "near:testnet", asset: D.contracts.usdc, payTo: D.treasury },
   facilitator: nearFacilitator({ viewer, relayer: senderFor(RELAYER) }),

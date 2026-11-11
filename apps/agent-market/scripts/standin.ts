@@ -530,7 +530,7 @@ if (import.meta.main) {
   const D = deployment("testnet");
   const s = createStandin({
     token,
-    agent: { agentId: randomUUID(), handle: "tredio-attention", name: "Tredio attention check", description: "Attention index for any topic", tags: ["attention"] },
+    agent: { agentId: randomUUID(), handle: "tredio", name: "Tredio attention check", description: "Attention index for any topic", tags: ["attention"] },
     plan: { priceAmount: process.env.PRICE_USDC ?? "0.05", slaSeconds: 120 },
     payment: { network: "near:testnet", asset: D.contracts.usdc, payTo: D.treasury },
     facilitator: { verify: async () => ({ ok: false, reason: "this stand-in takes no payments: scripts/trial.ts runs a settled call" }), settle: async () => ({ ok: false, reason: "no settlement" }) },
