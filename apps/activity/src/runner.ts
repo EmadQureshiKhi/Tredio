@@ -1,5 +1,5 @@
 import { Sender, type Viewer } from "@tredio/chain";
-import { AccountVersions, calls, type Deployment, type Series, type SessionAction, sessionCallTgas } from "@tredio/contracts";
+import { AccountVersions, calls, type Deployment, type Depth, type Series, type SessionAction, sessionCallTgas } from "@tredio/contracts";
 import { callNote, postBody } from "./content";
 import type { Persona } from "./personas";
 import { type Action, type Holding, isAwake, nextAction, type PerpPosition, type Rng, type State, type TrendView } from "./plan";
@@ -132,7 +132,7 @@ export class Runner {
       const thread = await this.api<{ calls: Array<{ id: number; caller: string; handle: string | null; direction: "up" | "down"; outcome: string }> }>(`/v1/trends/${encodeURIComponent(t.identifier)}/thread`).catch(() => ({ calls: [] }));
       const theirs = thread.calls.filter((c) => c.caller !== p.identity && c.outcome === "open" && c.handle);
       const c = theirs[Math.floor(this.rng() * theirs.length)];
-      if (c) callToAnswer = { id: c.id, identifier: t.identifier, handle: c.handle!, direction: c.direction };
+      if (c) callToAnswer = { id: Number(c.id), identifier: t.identifier, handle: c.handle!, direction: c.direction };
     }
     const day = new Date(this.now()).toISOString().slice(0, 10);
     const made = this.calls.get(p.handle);
@@ -188,6 +188,12 @@ export class Runner {
     }
   }
 
+  /** Whether the book has anything to fill a buy (asks) or a sell (bids) of that side right now. */
+  private async fillable(series: number, side: "up" | "down", buy: boolean): Promise<boolean> {
+    const d = await this.viewer.view<Depth | null>(this.d.contracts.book, "depth", { series, side, levels: 1 }).catch(() => null);
+    return (buy ? d?.asks : d?.bids)?.length ? true : false;
+  }
+
   private balanceOf = (account: string, series: number, side: "up" | "down") =>
     this.viewer.view<string>(this.d.contracts.outcomes, "mt_balance_of", { account_id: account, token_id: `${series}:${side}` }).then(BigInt);
 
@@ -201,15 +207,21 @@ export class Runner {
         if (up === 0n && down === 0n) return { detail: `series ${a.series} already redeemed`, ref: null };
         return { detail: `redeemed series ${a.series}`, ref: await this.session(p, { redeem_winnings: { series: a.series, up: up.toString(), down: down.toString() } }) };
       }
-      case "buy":
+      case "buy": {
+        // Nobody offers that side: take the other one if it is offered, as a trader at the screen would.
+        const other = a.side === "up" ? "down" : "up";
+        const side = (await this.fillable(a.series, a.side, true)) ? a.side : (await this.fillable(a.series, other, true)) ? other : null;
+        if (!side) return { detail: `no offers on ${a.trend.identifier}`, ref: null };
         return {
-          detail: `bought ${a.side.toUpperCase()} on ${a.trend.identifier} for ${usd(a.amount)} USDC`,
-          ref: await this.session(p, { swap: { series: a.series, side: a.side, buy: true, amount: a.amount.toString(), min_out: "1" } }),
+          detail: `bought ${side.toUpperCase()} on ${a.trend.identifier} for ${usd(a.amount)} USDC`,
+          ref: await this.session(p, { swap: { series: a.series, side, buy: true, amount: a.amount.toString(), min_out: "1" } }),
         };
+      }
       case "sell": {
         const held = await this.balanceOf(p.account, a.holding.series, a.side);
         const amount = a.amount < held ? a.amount : held;
         if (amount === 0n) return { detail: `nothing left to sell in series ${a.holding.series}`, ref: null };
+        if (!(await this.fillable(a.holding.series, a.side, false))) return { detail: `no bids for ${a.holding.trend}`, ref: null };
         return {
           detail: `sold ${usd(amount)} ${a.side.toUpperCase()} of ${a.holding.trend}`,
           ref: await this.session(p, { swap: { series: a.holding.series, side: a.side, buy: false, amount: amount.toString(), min_out: "1" } }),
@@ -249,6 +261,10 @@ export class Runner {
       action = nextAction(p, await this.state(p, trends), this.rng);
       if (!action) return null;
       const r = await this.act(p, action);
+      if (r.ref === null) {
+        this.log({ persona: p.handle, kind: action.kind, detail: r.detail }, "skipped");
+        return null;
+      }
       const done: Done = { at: this.nowSec(), persona: p.handle, kind: action.kind, detail: r.detail, ref: r.ref };
       this.counts[action.kind] = (this.counts[action.kind] ?? 0) + 1;
       this.lastActionAt = done.at;
