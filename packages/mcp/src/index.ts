@@ -85,7 +85,7 @@ export function tradingFromEnv(env: Record<string, string | undefined>, network:
 
 /**
  * The server as `tredio-mcp` runs it, configured from env:
- * - `TREDIO_API_URL` (default http://localhost:4000), `NEAR_NETWORK` (testnet), `NEAR_RPC_URLS`
+ * - `TREDIO_API_URL` (default the hosted API on testnet, https://api.tredio.bid), `NEAR_NETWORK` (testnet), `NEAR_RPC_URLS`
  *   (comma-separated; FastNEAR and NEAR's own by default), `FASTNEAR_API_KEYS` (comma-separated,
  *   taken in turn ahead of those), `NEAR_TX_API_URL` (FastNEAR's transactions API, to find oracle
  *   reports).
@@ -98,6 +98,9 @@ export function tradingFromEnv(env: Record<string, string | undefined>, network:
  *   `TREDIO_LEDGER_FILE` (default ~/.tredio-mcp/ledger-<network>.json), and `TREDIO_RELAYER_URL`
  *   for a session's gas and storage refills.
  */
+/** The hosted API per network. #mainnet: Tredio's API serves testnet only, so on mainnet set TREDIO_API_URL. */
+export const DEFAULT_API: Record<"testnet" | "mainnet", string> = { testnet: "https://api.tredio.bid", mainnet: "http://localhost:4000" };
+
 export function serverFromEnv(env: Record<string, string | undefined>): McpServer {
   const network = env.NEAR_NETWORK === "mainnet" ? "mainnet" : "testnet";
   if (env.NEAR_NETWORK && env.NEAR_NETWORK !== network) throw new Error("NEAR_NETWORK is testnet or mainnet");
@@ -108,7 +111,7 @@ export function serverFromEnv(env: Record<string, string | undefined>): McpServe
   const key = env.TREDIO_X402_PRIVATE_KEY?.trim();
   if (Boolean(account) !== Boolean(key)) throw new Error("set both TREDIO_X402_ACCOUNT and TREDIO_X402_PRIVATE_KEY, or neither");
   return createServer({
-    api: new TredioApi(env.TREDIO_API_URL || "http://localhost:4000"),
+    api: new TredioApi(env.TREDIO_API_URL || DEFAULT_API[network]),
     chain: viewer,
     txIndex: new FastNearTxIndex(txApi),
     deployment: deploymentOf(network),

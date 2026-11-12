@@ -8,7 +8,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 /**
  * The trade tools through the real `tredio-mcp` binary over stdio, sending real transactions on
  * NEAR testnet (test USDC, no value). Runs only with TREDIO_LIVE_TRADE=1 and one trading key in
- * env, against the API at TREDIO_API_URL (default http://localhost:4000):
+ * env, against the API at TREDIO_API_URL (default the hosted https://api.tredio.bid):
  *
  *   TREDIO_LIVE_TRADE=1 TREDIO_TRADER_ACCOUNT=<account> TREDIO_TRADER_PRIVATE_KEY=ed25519:... bun test test/live-trade.test.ts
  *   TREDIO_LIVE_TRADE=1 TREDIO_SESSION_ACCOUNT=0u... TREDIO_SESSION_KEY=ed25519:... bun test test/live-trade.test.ts
@@ -19,7 +19,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
  * also posts a call through the API.
  */
 const live = process.env.TREDIO_LIVE_TRADE === "1";
-const API = process.env.TREDIO_API_URL ?? "http://localhost:4000";
+const API = process.env.TREDIO_API_URL ?? "https://api.tredio.bid";
 const POLICY = {
   dailyCapUsdc: "10",
   tools: { buy_outcome: { maxUsdc: "2" }, sell_outcome: true, open_perp: { maxUsdc: "3" }, close_perp: true, add_perp_margin: { maxUsdc: "1" }, buy_coin: { maxUsdc: "1" }, sell_coin: true, post_call: true },

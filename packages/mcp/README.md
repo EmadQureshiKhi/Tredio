@@ -109,7 +109,7 @@ All settings come from env.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `TREDIO_API_URL` | `http://localhost:4000` | The Tredio API |
+| `TREDIO_API_URL` | `https://api.tredio.bid` on testnet | The Tredio API (`http://localhost:4000` for a local stack) |
 | `NEAR_NETWORK` | `testnet` | `testnet` (Tredio has no mainnet deployment yet) |
 | `NEAR_RPC_URLS` | FastNEAR, Intear, dRPC | Comma-separated RPC endpoints, tried in order |
 | `FASTNEAR_API_KEYS` | unset | FastNEAR API keys, taken in turn ahead of those |
@@ -140,7 +140,6 @@ Add this to `claude_desktop_config.json` (Settings, Developer, Edit Config), wit
       "command": "bun",
       "args": ["/absolute/path/to/Tredio/packages/mcp/src/bin.ts"],
       "env": {
-        "TREDIO_API_URL": "http://localhost:4000",
         "NEAR_NETWORK": "testnet",
         "TREDIO_TRADER_ACCOUNT": "my-agent.testnet",
         "TREDIO_TRADER_PRIVATE_KEY": "ed25519:...",
@@ -156,15 +155,15 @@ Leave out the trading variables for a read-only server.
 ## Claude Code
 
 ```sh
-claude mcp add tredio --env TREDIO_API_URL=http://localhost:4000 -- bun /absolute/path/to/Tredio/packages/mcp/src/bin.ts
+claude mcp add tredio -- bun /absolute/path/to/Tredio/packages/mcp/src/bin.ts
 ```
 
-Or share it with the project in `.mcp.json` at the repository root:
+The repository's own `.mcp.json` already registers it, read-only, for an agent working in a checkout:
 
 ```json
 {
   "mcpServers": {
-    "tredio": { "command": "bun", "args": ["packages/mcp/src/bin.ts"], "env": { "TREDIO_API_URL": "http://localhost:4000" } }
+    "tredio": { "command": "bun", "args": ["packages/mcp/src/bin.ts"], "env": { "NEAR_NETWORK": "testnet" } }
   }
 }
 ```

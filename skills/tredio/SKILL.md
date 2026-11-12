@@ -58,7 +58,7 @@ Tredio's API mirrors every checkpoint, so its history goes back further than the
 
 ## API
 
-The API serves JSON at `TREDIO_API_URL` (locally `http://localhost:4000`; `GET /` lists the main routes).
+The API serves JSON at `https://api.tredio.bid` on testnet (`TREDIO_API_URL`; a local stack answers at `http://localhost:4000`; `GET /` lists the main routes).
 
 | Route | Answer |
 | --- | --- |
@@ -85,12 +85,13 @@ Signed-in routes (alerts, Autopilot rules, links) take a NEP-413 sign-in at `POS
 `packages/mcp` (`tredio-mcp`) serves the tools on stdio with Bun:
 
 ```sh
-claude mcp add tredio --env TREDIO_API_URL=http://localhost:4000 -- bun /path/to/Tredio/packages/mcp/src/bin.ts
+claude mcp add tredio -- bun /path/to/Tredio/packages/mcp/src/bin.ts
 ```
 
 Read tools: `get_status`, `list_trends`, `get_trend`, `get_index_history`, `get_market`, `get_perp_market`, `get_coin`, `get_review`, `verify_index`, `get_account`, `get_leaders`, `list_candidates`, `get_paid_api`.
 With `TREDIO_X402_ACCOUNT` and `TREDIO_X402_PRIVATE_KEY` in its env it also offers `buy_trend_history`, which pays at most `TREDIO_X402_MAX_USDC` (default 0.05) per call.
-See `packages/mcp/README.md` for Claude Desktop and `.mcp.json` setups.
+It reads the hosted API at `https://api.tredio.bid` unless `TREDIO_API_URL` says otherwise, and the repository's `.mcp.json` registers it read-only for an agent working in a checkout.
+See `packages/mcp/README.md` for Claude Desktop setups.
 
 ### Trading through the MCP server
 

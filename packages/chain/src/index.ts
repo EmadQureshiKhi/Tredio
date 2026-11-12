@@ -149,8 +149,9 @@ export class Viewer {
     this.rotation = new RpcRotation(this.endpoints);
   }
 
-  async view<T>(contractId: string, method: string, args: object = {}): Promise<T> {
-    return this.failover((i) => this.clients[i]!.view<T>(contractId, method, args) as Promise<T>);
+  /** A contract view, at `final` unless asked for `optimistic` (what a transaction just sent changed shows there a block or two sooner). */
+  async view<T>(contractId: string, method: string, args: object = {}, finality: "final" | "optimistic" = "final"): Promise<T> {
+    return this.failover((i) => this.clients[i]!.view<T>(contractId, method, args, { finality }) as Promise<T>);
   }
 
   /**

@@ -70,11 +70,11 @@ const baseViews = (): Record<string, unknown> => ({
 
 let views: Record<string, unknown>;
 let gasBalance: bigint | null;
-const viewCalls: Array<{ key: string; args: unknown }> = [];
+const viewCalls: Array<{ key: string; args: unknown; finality?: string }> = [];
 const chain: ChainViews = {
-  async view<T>(contract: string, method: string, args?: object): Promise<T> {
+  async view<T>(contract: string, method: string, args?: object, finality?: "final" | "optimistic"): Promise<T> {
     const key = `${contract}.${method}`;
-    viewCalls.push({ key, args });
+    viewCalls.push({ key, args, finality });
     if (!(key in views)) throw new Error(`MethodNotFound: ${key}`);
     return structuredClone(views[key]) as T;
   },
@@ -236,6 +236,8 @@ describe("trade tools", () => {
     expect(r.spendUsdc).toBe("0");
     expect(r.calls).toEqual([K.outcomes.toBook(45, "up", "10000000", swapMsg("4643694"))]);
     expect((await data("sell_outcome", { series: 45, side: "up", tokens: "50" })).blocker).toBe("the account holds 40 up tokens of series 45, less than 50");
+    // Holdings are read at optimistic, so tokens a trade just bought can be sold at once.
+    expect(viewCalls.filter((v) => v.key === `${C.outcomes}.mt_balance_of`).every((v) => v.finality === "optimistic")).toBe(true);
   });
 
   test("open_perp and close_perp build the perps contract's calls", async () => {

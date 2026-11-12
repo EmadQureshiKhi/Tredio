@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "tredio": { "command": "bun", "args": ["packages/mcp/src/bin.ts"], "env": { "NEAR_NETWORK": "testnet" } }
+  }
+}

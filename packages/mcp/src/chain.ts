@@ -7,7 +7,7 @@
 
 /** Views and raw JSON-RPC; `Viewer` from `@tredio/chain` fits. */
 export interface ChainViews {
-  view<T>(contractId: string, method: string, args?: object): Promise<T>;
+  view<T>(contractId: string, method: string, args?: object, finality?: "final" | "optimistic"): Promise<T>;
   rpc<T>(method: string, params: unknown): Promise<T>;
 }
 

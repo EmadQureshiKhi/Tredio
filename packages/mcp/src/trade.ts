@@ -147,7 +147,8 @@ export function registerTradeTools(server: McpServer, d: ServerDeps, t: TradingD
   const fetchImpl = d.fetchImpl ?? fetch;
   const now = t.now ?? Date.now;
   const nowSec = () => Math.floor(now() / 1000);
-  const view = <T>(contract: string, method: string, args: object = {}) => d.chain.view<T>(contract, method, args);
+  // Optimistic, as the app reads: a trade returns once it executed, and a balance read at `final` right after it would still miss what it moved.
+  const view = <T>(contract: string, method: string, args: object = {}) => d.chain.view<T>(contract, method, args, "optimistic");
   const versions = new AccountVersions((a) => view<number>(a, "version"));
 
   const signerJson = (s: Signer) => ({

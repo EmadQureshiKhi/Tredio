@@ -4,12 +4,12 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 
 /**
  * The real `tredio-mcp` binary over stdio against a running API and NEAR testnet. Runs only with
- * TREDIO_LIVE=1 (the API at TREDIO_API_URL, default http://localhost:4000):
+ * TREDIO_LIVE=1 (the API at TREDIO_API_URL, default the hosted https://api.tredio.bid):
  *
  *   TREDIO_LIVE=1 bun test test/live.test.ts
  */
 const live = process.env.TREDIO_LIVE === "1";
-const API = process.env.TREDIO_API_URL ?? "http://localhost:4000";
+const API = process.env.TREDIO_API_URL ?? "https://api.tredio.bid";
 
 describe.skipIf(!live)("tredio-mcp live on testnet", () => {
   let client: Client;
