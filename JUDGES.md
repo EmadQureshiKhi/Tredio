@@ -67,6 +67,8 @@ A fresh clone needs no secrets to check the claims:
 
 ## What is not finished, said plainly
 
+- Much of the activity you see is the team's: twelve invented demo traders (`mila_k`, `owenh`, `rubyreads` and others, listed in [`apps/activity`](apps/activity)) trade, call and post on a schedule from 2026-11-12 to 2026-11-26, so the screens show a working market.
+  Their trades are real testnet transactions from their own passkey accounts and sessions, and their calls are signed like anyone's, but no real person is behind them.
 - Account code v3 is published on testnet and new accounts move onto it in their first request, but accounts made earlier keep the code they run until their passkey upgrades them in Settings: on v1 (before 2026-11-06), H-1 (the Hyperliquid mark not bound to the signed asset) stays open, and on v1 and v2 a policy wallet cannot act for the account; the registry's half of the H-1 fix is live for every account.
 - Crypto candidates the radar approves list only once smart-money inflow confirms them (Nansen), so the trends listed from NEAR AI reviews so far are topics, people and equities; the first live trends (World Cup, AI agents) were added by hand and carry no review.
 - Hyperliquid answers "user does not exist" for derived addresses that hold no Hyperliquid testnet USDC; the orders are signed and sent, and they fill once an address is funded.
