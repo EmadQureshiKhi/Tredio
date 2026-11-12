@@ -31,6 +31,7 @@ Create one env file per service in `deploy/env/`, starting from the `.env.exampl
 | `topup.env` | `apps/topup/.env.example` | |
 | `oracle.env` | `apps/oracle/.env.example` | `BACKEND_URL=http://backend:4000` |
 | `indexer.env` | `apps/indexer/.env.example` | `DATABASE_URL=...@postgres:5432/tredio_indexer` |
+| `activity.env` | `apps/activity/.env.example` | `BACKEND_URL=http://backend:4000`, `PERSONAS_FILE=/run/personas.json` (Compose mounts `env/activity-personas.json` there), the funder's key |
 | `agent-market.env` | `apps/agent-market/.env.example` | `BACKEND_URL=http://backend:4000`, `PUBLIC_API_URL=https://api.tredio.bid`, `WORKER_PUBLIC_URL=https://agent.tredio.bid`, the agent's token and webhook secret from market.near.ai |
 
 Then:
