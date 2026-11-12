@@ -60,7 +60,7 @@ export class Runner {
   private seriesCache: { at: number; byTrend: Map<string, number | null> } | null = null;
   private windows: number[] | null = null;
   /** Calls each persona made on a UTC day, kept here (the API caps them too). */
-  private calls = new Map<string, { day: string; n: number }>();
+  private calls = new Map<string, { day: string; trends: string[] }>();
   readonly recent: Done[] = [];
   readonly counts: Record<string, number> = {};
   failures = 0;
@@ -133,7 +133,8 @@ export class Runner {
     }
     const day = new Date(this.now()).toISOString().slice(0, 10);
     const made = this.calls.get(p.handle);
-    return { nowSec: this.nowSec(), usdc, trends, holdings, positions, callsToday: made?.day === day ? made.n : 0, callToAnswer };
+    const called = made?.day === day ? made.trends : [];
+    return { nowSec: this.nowSec(), usdc, trends, holdings, positions, callsToday: called.length, calledToday: called, callToAnswer };
   }
 
   private sender(p: Persona): Sender {
@@ -208,7 +209,7 @@ export class Runner {
         const r = await this.caller(p).call({ identifier: a.trend.identifier, direction: a.direction, horizonSec: a.horizonSec, note });
         const day = new Date(this.now()).toISOString().slice(0, 10);
         const made = this.calls.get(p.handle);
-        this.calls.set(p.handle, { day, n: made?.day === day ? made.n + 1 : 1 });
+        this.calls.set(p.handle, { day, trends: [...(made?.day === day ? made.trends : []), a.trend.identifier] });
         return { detail: `called ${a.direction} on ${a.trend.identifier} (${a.horizonSec / 86_400} d)`, ref: `call ${r.call.id}` };
       }
       case "post": {

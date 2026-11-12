@@ -12,7 +12,7 @@ const seq = (...xs: number[]) => {
   return () => xs[i++ % xs.length]!;
 };
 const trend = (over: Partial<TrendView> = {}): TrendView => ({ identifier: "topic:world-cup.2", displayName: "World Cup", index: 54.4, change24h: 6.8, series: 45, ...over });
-const state = (over: Partial<State> = {}): State => ({ nowSec: 1_794_400_000, usdc: 500n * USDC, trends: [trend()], holdings: [], positions: [], callsToday: 0, callToAnswer: null, ...over });
+const state = (over: Partial<State> = {}): State => ({ nowSec: 1_794_400_000, usdc: 500n * USDC, trends: [trend()], holdings: [], positions: [], callsToday: 0, calledToday: [], callToAnswer: null, ...over });
 
 describe("the roster", () => {
   test("handles fit the API's rule and are unique", () => {
@@ -67,6 +67,8 @@ describe("choosing an action", () => {
   test("calls stop at three a day, perps at three open, and a perp is held an hour before closing", () => {
     const callsOnly = (s: State) => Array.from({ length: 100 }, () => nextAction({ style: "caller" }, s, Math.random)!.kind);
     expect(callsOnly(state({ callsToday: 3 }))).not.toContain("call");
+    // A trend already called today is not called again.
+    expect(callsOnly(state({ callsToday: 1, calledToday: ["topic:world-cup.2"] }))).not.toContain("call");
     const young = { id: 1, trend: "topic:world-cup.2", isLong: true, openedAt: 1_794_400_000 - 600 };
     const full = state({ positions: [young, { ...young, id: 2 }, { ...young, id: 3 }] });
     const kinds = Array.from({ length: 200 }, () => nextAction({ style: "perps" }, full, Math.random)!.kind);

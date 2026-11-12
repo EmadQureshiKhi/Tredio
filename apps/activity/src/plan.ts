@@ -40,6 +40,8 @@ export interface State {
   holdings: Holding[];
   positions: PerpPosition[];
   callsToday: number;
+  /** Trends the persona already called today: one call a trend a day. */
+  calledToday: string[];
   /** Another persona's open call it could answer in that trend's thread. */
   callToAnswer: { id: number; identifier: string; handle: string; direction: Side } | null;
 }
@@ -117,13 +119,14 @@ export function nextAction(p: Pick<Persona, "style">, s: State, rng: Rng): Actio
   const open = s.holdings.filter((h) => h.outcome === "open" && (h.up > 0n || h.down > 0n));
   const closable = s.positions.filter((x) => s.nowSec - x.openedAt >= MIN_PERP_HOLD_SEC);
   const withSeries = s.trends.some((t) => t.series !== null);
+  const uncalled = s.trends.filter((t) => !s.calledToday.includes(t.identifier));
   const kind = weighted(
     [
       ["buy", withSeries ? w.buy : 0],
       ["sell", open.length > 0 ? w.sell : 0],
       ["perpOpen", s.positions.length < MAX_PERPS && s.trends.length > 0 ? w.perpOpen : 0],
       ["perpClose", closable.length > 0 ? w.perpClose : 0],
-      ["call", s.callsToday < MAX_CALLS_A_DAY && s.trends.length > 0 ? w.call : 0],
+      ["call", s.callsToday < MAX_CALLS_A_DAY && uncalled.length > 0 ? w.call : 0],
       ["post", s.trends.length > 0 ? w.post : 0],
     ] as const,
     rng,
@@ -154,7 +157,7 @@ export function nextAction(p: Pick<Persona, "style">, s: State, rng: Rng): Actio
       return { kind: "perpClose", position: x, acceptableIndex: x.isLong ? 0 : 100 * POINT };
     }
     case "call": {
-      const t = pickTrend(s.trends, rng)!;
+      const t = pickTrend(uncalled, rng)!;
       return { kind: "call", trend: t, direction: sideFor(p.style, t, rng), horizonSec: rng() < 0.8 ? 86_400 : 604_800 };
     }
     case "post": {
