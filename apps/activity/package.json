@@ -1,0 +1,25 @@
+{
+  "name": "@tredio/activity",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Demo traders the team runs on testnet: invented personas trade, call and post on Tredio on a schedule, so the screens show a working market.",
+  "author": "Emad Qureshi",
+  "license": "MIT",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noble/curves": "2.2.0",
+    "@tredio/chain": "workspace:*",
+    "@tredio/contracts": "workspace:*",
+    "hono": "4.12.18",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.1",
+    "typescript": "5.9.3"
+  }
+}
