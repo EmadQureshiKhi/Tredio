@@ -22,7 +22,7 @@ const NOT_A_TOPIC = /^(Main_Page|Special:|Wikipedia:|Portal:|File:|Help:|Talk:|T
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** The UTC day before `atMs`, the latest day with complete data. */
+/** The UTC day before `atMs`, the latest day that can have complete data (Wikimedia publishes it some hours later). */
 export function lastCompleteDay(atMs: number): Date {
   return new Date(atMs - 86_400_000);
 }
@@ -65,17 +65,32 @@ export class Wikipedia {
     };
   }
 
-  /** Views of `article` on `day`, or 0 when the article had none or does not exist. */
-  async pageviews(article: string, day: Date): Promise<number> {
+  /**
+   * Views of `article` on `day`, or null when Wikimedia has no row for it: the article had no views,
+   * does not exist, or the day is not published yet.
+   */
+  async pageviews(article: string, day: Date): Promise<number | null> {
     const d = `${day.getUTCFullYear()}${pad(day.getUTCMonth() + 1)}${pad(day.getUTCDate())}00`;
     const url = `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/${this.project}/all-access/user/${encodeURIComponent(article)}/daily/${d}/${d}`;
     try {
       const json = await fetchJson<{ items?: Array<{ views?: unknown }> }>(this.fetchPaced, "wikipedia", url, { headers: this.headers() });
       return (json.items ?? []).reduce((a, i) => a + (typeof i.views === "number" ? i.views : 0), 0);
     } catch (e) {
-      if (e instanceof HttpError && e.status === 404) return 0;
+      if (e instanceof HttpError && e.status === 404) return null;
       throw e;
     }
+  }
+
+  /**
+   * Views of `article` on the latest published day. Wikimedia publishes a day some hours after it
+   * ends and answers 404 for it until then, so a 404 for yesterday falls back to the day before
+   * rather than reading as no views; 0 only when neither day has a row.
+   */
+  async latestPageviews(article: string, atMs: number): Promise<number> {
+    const yesterday = lastCompleteDay(atMs);
+    const views = await this.pageviews(article, yesterday);
+    if (views !== null) return views;
+    return (await this.pageviews(article, new Date(yesterday.getTime() - 86_400_000))) ?? 0;
   }
 
   /** The day's most-viewed articles, without the main page, special pages and lists. */

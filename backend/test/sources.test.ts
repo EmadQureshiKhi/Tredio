@@ -339,12 +339,25 @@ describe("Wikipedia", () => {
     });
     const yesterday = new Date("2026-10-09T00:00:00Z");
     expect(await w.pageviews("Starlink", yesterday)).toBe(1200);
-    expect(await w.pageviews("Missing", yesterday)).toBe(0);
+    expect(await w.pageviews("Missing", yesterday)).toBeNull();
     expect(await w.canonicalTitle("Mercury")).toBeNull();
     await expect(w.topArticles(yesterday)).rejects.toThrow("429");
     await w.pageviews("Starlink", yesterday);
     // 8 a minute: 7.5 s apart, then the 30 s Retry-After.
     expect(waits).toEqual([7_500, 7_500, 7_500, 30_000]);
+  });
+
+  test("reads the day before while yesterday is not published, never a zero for it", async () => {
+    // Shortly after UTC midnight Wikimedia still answers 404 for the day that just ended.
+    const f = fakeFetch([
+      [/per-article\/en\.wikipedia\/all-access\/user\/Starlink\/daily\/2026101100/, () => json({ title: "Not found." }, 404)],
+      [/per-article\/en\.wikipedia\/all-access\/user\/Starlink\/daily\/2026101000/, () => json({ items: [{ views: 73_306 }] })],
+      [/per-article.*Missing/, () => json({ title: "Not found." }, 404)],
+    ]);
+    const w = new Wikipedia("Bot/1.0 (https://example.org)", "en.wikipedia", f.impl, { sleep: async () => {} });
+    const justAfterMidnight = Date.parse("2026-10-12T02:17:00Z");
+    expect(await w.latestPageviews("Starlink", justAfterMidnight)).toBe(73_306);
+    expect(await w.latestPageviews("Missing", justAfterMidnight)).toBe(0);
   });
 
   test("drops non-topics from the most-read list", async () => {

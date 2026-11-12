@@ -9,7 +9,7 @@ import { type HackerNews, hnTerms } from "./sources/hackernews";
 import type { Nansen } from "./sources/nansen";
 import { BudgetError } from "./sources/http";
 import { PacedError } from "./sources/pacer";
-import { lastCompleteDay, type Wikipedia } from "./sources/wikipedia";
+import type { Wikipedia } from "./sources/wikipedia";
 import { rankQueue, READING_MAX_AGE_SEC } from "./queue";
 import { pickRotation, type RotationRules } from "./rotation";
 import type { Reading, SourceName, Store } from "./store";
@@ -336,12 +336,11 @@ export class Collector {
       }
     };
 
-    // Wikipedia: views of the trend's article on the last complete day.
+    // Wikipedia: views of the trend's article on the latest published day.
     const wikipediaSection = async () => {
-      const day = lastCompleteDay(nowMs);
       for (const t of stalest("wikipedia", this.cfg.wikipediaRefreshSec, (x) => x.article !== null).slice(0, this.cfg.maxWikipediaPerTick)) {
         try {
-          const views = await this.sources.wikipedia.pageviews(t.article!, day);
+          const views = await this.sources.wikipedia.latestPageviews(t.article!, nowMs);
           await this.store.addMeasurement(t.identifier, "wikipedia", "pageviews", views, 86_400, now);
           ok("wikipedia");
         } catch (e) {
