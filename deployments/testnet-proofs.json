@@ -13,14 +13,14 @@
     "sender": "0ugt5v5y5rdhyhndtyhrwrkp5rxrmxhpfbrcx9ets3g94pjsdjt330"
   },
   "outlayerRun": {
-    "about": "The oracle service's first OutLayer run after the registry switched to the enclave's key (2026-11-10), requested as it requests every run (request_execution with WasmUrl pinned by sha256, so no project, and the API token from the OutLayer secret tredio.testnet/oracle). enclaveOutput is the run's stdout, which hashes to the attestation's output_hash; acceptedReportTx is the registry transaction that accepted its report.",
-    "tx": "DPDbwyk9X3uXwTooQUjMqTGp88ySZMbYCeR4HqCneHbV",
-    "acceptedReportTx": "C3KeBVLXUT1u5wubr2WDjpo3QEUFrDX8P3zS4bW4jsZ5",
+    "about": "The oracle service's first OutLayer run on the current enclave build, after the registry moved to that build's key (2026-11-12), requested as it requests every run (request_execution with WasmUrl pinned by sha256, so no project, and the API token from the OutLayer secret tredio.testnet/oracle). It listed topic:james-bond-casting in the slot person:katy-perry was rotating out of. enclaveOutput is the run's stdout, which hashes to the attestation's output_hash; acceptedReportTx is the registry transaction that accepted its report.",
+    "tx": "5UigaQ3LLZYKbFDeQh4M5fFPnZVcyTpmc6CEhDXVyKyJ",
+    "acceptedReportTx": "5qrQ9CCz6SFyLDMt7rfLMLrGaQUWfWV4oYwXB8Fn8jsE",
     "project": null,
     "caller": "tredio-oracle.testnet",
-    "wasmUrl": "https://test.fastfs.io/tredio.testnet/outlayer.testnet/434381e425292a8aaaf9edf0d74d27c0d8bfba3ad82794823e27e3959523b9ff.wasm",
-    "wasmSha256": "434381e425292a8aaaf9edf0d74d27c0d8bfba3ad82794823e27e3959523b9ff",
-    "commit": "f2424fa34864c42117e707809d2ab1c71bcc9041",
+    "wasmUrl": "https://test.fastfs.io/tredio.testnet/outlayer.testnet/148057927bce9b9ba79266015936006cfb7261bac8a6296df559a767205a4b19.wasm",
+    "wasmSha256": "148057927bce9b9ba79266015936006cfb7261bac8a6296df559a767205a4b19",
+    "commit": "a883aaa0a50e95f507d3c5dd2b93c10e88c7462b",
     "toolchain": "rustc 1.98.1 (48a229cea 2026-09-01), wasm32-wasip2 (apps/oracle/tee/rust-toolchain.toml)",
     "buildEnv": {
       "TREDIO_BACKEND_URL": "https://api.tredio.bid",
@@ -28,12 +28,12 @@
       "TREDIO_REGISTRY": "registry.tredio.testnet",
       "TREDIO_HYPERLIQUID_URL": "https://api.hyperliquid-testnet.xyz"
     },
-    "enclavePublicKey": "ed25519:8qDVQ9AySqUWeWdSJSUfLEpNkxtsrhDUjxyPDGFVWXsk",
+    "enclavePublicKey": "ed25519:5Jr1cb3HtZK8go2JZJCyUW5F1yCVWbfyNLYasNWh7rWF",
     "enclaveOutput": {
-      "observed_at": 1794298495,
-      "public_key": "ed25519:8qDVQ9AySqUWeWdSJSUfLEpNkxtsrhDUjxyPDGFVWXsk",
-      "report_json": "{\"run_id\":1794298495,\"observed_at\":1794298495,\"new_trends\":[],\"updates\":[{\"id\":\"equity:nvda\",\"index\":91930000},{\"id\":\"equity:tsla.2\",\"index\":58570000},{\"id\":\"person:jensen-huang\",\"index\":89830000},{\"id\":\"person:katy-perry\",\"index\":76700000},{\"id\":\"person:stephen-miller.2\",\"index\":88770000},{\"id\":\"politics:hegseth-impeachment-vote\",\"index\":90680000},{\"id\":\"politics:hegseth-officer-promotions\",\"index\":88510000},{\"id\":\"politics:ukraine-russia-peace-talks.2\",\"index\":99420000},{\"id\":\"topic:ai-agents.2\",\"index\":68180000},{\"id\":\"topic:booker-prize-winner\",\"index\":77070000},{\"id\":\"topic:godzilla-minus-zero.2\",\"index\":78660000},{\"id\":\"topic:world-cup.2\",\"index\":54410000}],\"marks\":[{\"asset\":\"SOL\",\"price\":\"8601600000\",\"asset_index\":0},{\"asset\":\"BTC\",\"price\":\"7515400000000\",\"asset_index\":3},{\"asset\":\"ETH\",\"price\":\"211240000000\",\"asset_index\":4},{\"asset\":\"NEAR\",\"price\":\"362890000\",\"asset_index\":54},{\"asset\":\"HYPE\",\"price\":\"7448800000\",\"asset_index\":135}]}",
-      "signature": "0qUSYhnG1muUVP8g4DfqT8wFnWXEdA35pGgJSHA2vNArh3s5Mojo8CE4ZnyPKS0Ujtr+Lw2XFbPtoI+TA7wGCg==",
+      "observed_at": 1794498237,
+      "public_key": "ed25519:5Jr1cb3HtZK8go2JZJCyUW5F1yCVWbfyNLYasNWh7rWF",
+      "report_json": "{\"run_id\":1794498237,\"observed_at\":1794498237,\"new_trends\":[{\"identifier\":\"topic:james-bond-casting\",\"asset_class\":\"topic\",\"index\":81680000,\"surfacer\":null,\"smart_money_confirmed\":false,\"review_hash\":\"dad92e83cb7d743ac41b1136a3d78285527ffb4f6ffc4334c33a489b796bb0b0\",\"asset\":null}],\"updates\":[{\"id\":\"crypto:eth\",\"index\":79570000},{\"id\":\"equity:anthropic-ipo\",\"index\":91830000},{\"id\":\"equity:mstr\",\"index\":59490000},{\"id\":\"equity:nvda\",\"index\":99160000},{\"id\":\"equity:tsla.2\",\"index\":82630000},{\"id\":\"person:jensen-huang\",\"index\":100000000},{\"id\":\"person:stephen-miller.2\",\"index\":85510000},{\"id\":\"politics:cop31-antalya\",\"index\":76280000},{\"id\":\"politics:hegseth-impeachment-vote\",\"index\":95100000},{\"id\":\"politics:hegseth-officer-promotions\",\"index\":93920000},{\"id\":\"politics:ukraine-russia-peace-talks.2\",\"index\":82470000},{\"id\":\"politics:white-house-ballroom\",\"index\":92880000},{\"id\":\"topic:ai-agents.2\",\"index\":83190000},{\"id\":\"topic:booker-prize-winner\",\"index\":71980000},{\"id\":\"topic:disney-adobe-ai\",\"index\":100000000},{\"id\":\"topic:godzilla-minus-zero.2\",\"index\":71200000},{\"id\":\"topic:man-utd-pochettino\",\"index\":87040000},{\"id\":\"topic:nfl-trade-deadline\",\"index\":56470000},{\"id\":\"topic:ocarina-of-time-remake\",\"index\":92860000},{\"id\":\"topic:ss-united-states-reef\",\"index\":80530000},{\"id\":\"topic:survivor-series-wargames\",\"index\":92440000},{\"id\":\"topic:us-cpi-october\",\"index\":69380000},{\"id\":\"topic:world-cup.2\",\"index\":71450000}],\"marks\":[{\"asset\":\"SOL\",\"price\":\"8874180000\",\"asset_index\":0},{\"asset\":\"BTC\",\"price\":\"7320000000000\",\"asset_index\":3},{\"asset\":\"ETH\",\"price\":\"193740000000\",\"asset_index\":4},{\"asset\":\"NEAR\",\"price\":\"337970000\",\"asset_index\":54},{\"asset\":\"HYPE\",\"price\":\"9787500000\",\"asset_index\":135}]}",
+      "signature": "7ZDpNnHXfR6TyRTomH29t0JyJC2IYhQxqMA1gkKVd0ZiamHjPJ6wLVYMnCkNaZTPNmNJZataSCXQi+QYG7+DCw==",
       "warnings": []
     },
     "attestations": "https://testnet-api.outlayer.ai/attestations/by-tx/"

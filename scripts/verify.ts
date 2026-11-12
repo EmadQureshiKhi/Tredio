@@ -271,7 +271,13 @@ async function chain() {
     const live = trends.filter((t) => t.status === "active" || t.status === "cooling");
     if (!live.length) return fail(`${trends.length} trends, none live`);
     const top = live.reduce((a, b) => (b.index > a.index ? b : a));
-    return ok(`${live.length} live of ${trends.length}; ${top.id} at ${(top.index / 1e6).toFixed(2)}`);
+    // A trend rotating out stays live on chain until it retires as stale, while its successor already holds its slot.
+    const rotation = await fetch(`${process.env.TREDIO_API_URL ?? PUBLIC_API}/v1/rotation`, { signal: AbortSignal.timeout(4_000) })
+      .then((r) => (r.ok ? (r.json() as Promise<{ rotating?: string[] }>) : null))
+      .catch(() => null);
+    const out = (rotation?.rotating ?? []).filter((id) => live.some((t) => t.id === id));
+    const note = out.length ? ` (${out.join(", ")} rotating out, waiting to retire)` : "";
+    return ok(`${live.length} live of ${trends.length}${note}; ${top.id} at ${(top.index / 1e6).toFixed(2)}`);
   });
 
   await check(S, "Hyperliquid order signed by Chain Signatures", async () => {
