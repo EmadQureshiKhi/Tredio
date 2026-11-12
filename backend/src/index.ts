@@ -64,7 +64,7 @@ const elfaRing =
         sql,
         "elfa",
         elfaRouting.routes.map((r) => r.key),
-        { daily: cfg.ELFA_DAILY_CREDITS_PER_KEY, monthly: cfg.ELFA_MONTHLY_CREDITS_PER_KEY, hourlySlack: cfg.ELFA_HOURLY_SLACK },
+        { daily: cfg.ELFA_DAILY_CREDITS_PER_KEY, monthly: cfg.ELFA_MONTHLY_CREDITS_PER_KEY, spendBy: cfg.ELFA_SPEND_BY, hourlySlack: cfg.ELFA_HOURLY_SLACK },
       )
     : null;
 // Elfa calls go out one at a time, spaced apart, each key resting between its own uses.

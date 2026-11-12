@@ -54,6 +54,8 @@ const schema = z.object({
   /** Elfa credit budgets; the monthly budget is paced across the days left. */
   ELFA_DAILY_CREDITS_PER_KEY: z.coerce.number().int().positive().default(100),
   ELFA_MONTHLY_CREDITS_PER_KEY: z.coerce.number().int().positive().default(950),
+  /** Spend each key's month by this UTC day (YYYY-MM-DD) instead of the month's end: for a deployment that runs a shorter time. */
+  ELFA_SPEND_BY: z.preprocess((v) => (v === "" ? undefined : v), z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()),
   /** Read usage from Elfa on start (one credit each) so budgets match Elfa's count. */
   ELFA_SYNC_USAGE: z.enum(["on", "off"]).default("off"),
   /** Elfa calls go out one at a time; after each, the next waits a random gap between these bounds. */

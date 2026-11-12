@@ -14,6 +14,11 @@ export interface Limits {
   /** Credits per key per calendar month (UTC); paced across the days left. */
   monthly?: number;
   /**
+   * The UTC day (YYYY-MM-DD) by which the month's credits may all be spent: they are paced across the
+   * days up to it (never past the month's end), not the whole month, for a deployment that ends sooner.
+   */
+  spendBy?: string;
+  /**
    * When set, a key's daily allowance opens hour by hour: by the end of UTC hour h it may have spent
    * its share of (h + 1) / 24 of the day, plus this many credits of slack.
    */
@@ -53,6 +58,14 @@ function monthStart(d: Date): string {
 function daysLeftInMonth(d: Date): number {
   const next = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
   return Math.max(1, Math.ceil((next - Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())) / DAY_MS));
+}
+
+/** Days the month's credits are paced across: up to `spendBy` (today and that day included) when it comes first. */
+export function pacingDays(d: Date, spendBy?: string): number {
+  const month = daysLeftInMonth(d);
+  if (!spendBy) return month;
+  const until = Math.floor((Date.parse(`${spendBy}T00:00:00Z`) - Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())) / DAY_MS) + 1;
+  return Math.max(1, Math.min(month, until));
 }
 
 /** How long a key the provider rejected as invalid sits out before it is tried again. */
@@ -169,7 +182,7 @@ export class KeyRing {
         FROM api_usage
        WHERE provider = ${this.provider} AND day >= ${monthStart(now)}::date
        GROUP BY key_id`;
-    const days = daysLeftInMonth(now);
+    const days = pacingDays(now, this.limits.spendBy);
     return this.ids.map((id) => {
       const r = rows.find((x) => x.key_id === id);
       const todaySpent = r?.today ?? 0;
