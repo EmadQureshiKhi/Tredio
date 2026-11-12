@@ -11,7 +11,7 @@ import { ApiError, history, type SourceName, type Trend, type TrendDetail } from
 import { Morph, morphName } from "@/features/home/TrendCard";
 import { ShareMenu } from "@/features/share/ShareActions";
 import { DEPLOYMENT, explorerAddress } from "@/lib/config";
-import { ago, assetClassLabel, usdc, compact, integer, points, shortAddress } from "@/lib/format";
+import { ago, assetClassLabel, usdc, compact, countdown, integer, points, shortAddress } from "@/lib/format";
 import { useTrend, useTrends } from "@/lib/hooks/queries";
 import { useSheets } from "@/lib/sheets";
 import { baseIdentifier, listingNumber, trendName } from "@/lib/trends";
@@ -22,6 +22,7 @@ import OnChain from "./OnChain";
 import Thread from "./Thread";
 import TradeBar from "./TradeBar";
 import TradePanel from "./TradePanel";
+import { useNow } from "./ticket";
 
 /** Smart money netflow (USD, 24 hours) at which it confirms or contradicts the attention. */
 const CONFIRM_NETFLOW_USD = 100_000;
@@ -69,7 +70,7 @@ function Loaded({ detail }: { detail: TrendDetail }) {
   return (
     <div className="flex flex-col gap-6">
       {relisted ? <Relisted identifier={relisted} /> : null}
-      {!relisted && trend.rotatingOut && trend.status !== "retired" ? <RotatingOut /> : null}
+      {!relisted && trend.rotatingOut && trend.status !== "retired" ? <RotatingOut retiresAt={trend.retiresAt ?? null} /> : null}
       <div className="grid gap-6 [grid-template-areas:'chart'_'trade'_'sources'_'thread'] lg:grid-cols-[minmax(0,1fr)_380px] lg:grid-rows-[auto_auto_1fr] lg:[grid-template-areas:'chart_trade'_'sources_trade'_'thread_trade']">
         <div className="flex min-w-0 flex-col gap-4 [grid-area:chart]">
           <IndexCard detail={detail} />
@@ -161,11 +162,13 @@ function Header({ trend, history }: { trend: Trend; history: TrendDetail["index"
               ) : null}
             </div>
             <p className="mt-1.5 flex items-center gap-1.5 text-[12px] text-text-3">
-              <span className={cn("size-1.5 rounded-full", retired ? "bg-text-3" : stale ? "bg-warn" : "live-dot bg-up")} aria-hidden />
+              <span className={cn("size-1.5 rounded-full", retired ? "bg-text-3" : stale || trend.rotatingOut ? "bg-warn" : "live-dot bg-up")} aria-hidden />
               {retired
                 ? `Final reading ${ago(live.data?.updatedAt ?? trend.updatedAt)}, peak ${points(trend.peakIndex)}`
-                : stale
-                  ? "Index updating: trading resumes on the next report"
+                : trend.rotatingOut
+                  ? `Rotating out: last update ${ago(live.data?.updatedAt ?? trend.updatedAt)}`
+                  : stale
+                    ? "Index updating: trading resumes on the next report"
                   : `Updated ${ago(live.data?.updatedAt ?? trend.updatedAt)}, peak ${points(trend.peakIndex)}`}
             </p>
           </div>
@@ -254,14 +257,22 @@ const SOURCES: Record<SourceName, { label: string; unit: string; note: string }>
   hn: { label: "Hacker News", unit: "mentions", note: "24h stories and comments" },
 };
 
-/** The backend is rotating this trend out for a fresher one: no new rounds, open ones settle soon. */
-function RotatingOut() {
+/** The backend is rotating this trend out for a fresher one: no new rounds, and open ones settle when it retires. */
+function RotatingOut({ retiresAt }: { retiresAt: number | null }) {
+  const now = useNow(30_000);
   return (
     <div className="flex items-start gap-3 rounded-2xl border border-[color:var(--warn-soft)] bg-warn-soft px-4 py-3.5 text-[13.5px] leading-5 text-text" data-testid="rotating-out">
       <RotateCcw className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
       <span>
         <span className="font-strong">Rotating out.</span>{" "}
-        <span className="text-text-2">Attention here has faded, so this trend is making room for a newer one. No new rounds open, and open rounds settle at its last index within about two hours.</span>
+        <span className="text-text-2">Attention here has faded, so this trend is making room for a newer one. Its index no longer updates, so market trades are closed and no new rounds open. Open rounds and positions settle at its last index when it retires
+          {retiresAt ? (
+            <>
+              , <span className="num">{retiresAt * 1000 > now ? `in about ${countdown(retiresAt, now)}` : "any moment now"}</span>
+            </>
+          ) : null}
+          .
+        </span>
       </span>
     </div>
   );

@@ -124,6 +124,8 @@ export default function PerpTicket({ trend }: { trend: Trend }) {
       </div>
       {closed ? (
         <Note tone="warn">This trend is no longer active, so new positions are closed. Open positions can still be closed, and settle at the final index if it retires.</Note>
+      ) : stale && trend.rotatingOut ? (
+        <Note tone="warn">This trend is rotating out, so its index no longer updates and new positions are closed. Open positions settle at its last index when it retires.</Note>
       ) : stale ? (
         <Note tone="warn">The index is between reports. Opening resumes with the next one, usually within a minute.</Note>
       ) : null}

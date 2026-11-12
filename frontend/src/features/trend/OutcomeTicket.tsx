@@ -329,7 +329,13 @@ function Trade({ trend, series: s, up, down, fresh, initialSide, onFilled, onFin
         ) : null}
         <Row label={kind === "market" ? "Fee and slippage limit" : "Taker fee if it crosses"} value={kind === "market" ? `${Number(TAKER_FEE_BPS) / 100}% · 1%` : `${Number(TAKER_FEE_BPS) / 100}%`} tone="muted" />
       </div>
-      {kind === "market" && !fresh ? <Note tone="warn">The attention index is between reports, so market trades wait for the next one, usually within a minute. Limit orders still rest on the book.</Note> : null}
+      {kind === "market" && !fresh ? (
+        <Note tone="warn">
+          {trend.rotatingOut
+            ? "This trend is rotating out, so its index no longer updates and market trades are closed. This round settles at its last index when it retires."
+            : "The attention index is between reports, so market trades wait for the next one, usually within a minute. Limit orders still rest on the book."}
+        </Note>
+      ) : null}
       {kind === "market" && quote && !quote.complete && quote.out > 0n ? (
         <button type="button" onClick={() => setKind("limit")} className="self-start text-[12.5px] font-strong text-primary underline-offset-4 hover:underline">
           Place a limit order for the rest instead

@@ -57,6 +57,8 @@ export interface Trend {
   spark?: number[];
   /** Being rotated out to make room: its rounds settle at its last index. */
   rotatingOut?: boolean;
+  /** For a trend rotating out: when the registry can retire it (unix seconds), its last update plus the stale window. */
+  retiresAt?: number | null;
 }
 
 export interface TrendDetail {

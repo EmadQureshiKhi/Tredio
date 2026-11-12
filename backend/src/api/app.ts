@@ -269,11 +269,18 @@ export function createApp(d: AppDeps): Hono {
     );
   });
 
+  // A trend rotating out is no longer updated, so anyone may retire it once the registry's stale window has passed since its last update.
+  const rotationRetiresAt = async (rotation: Rotation | null) => {
+    const window = rotation ? await d.chain.staleRetireWindow().catch(() => null) : null;
+    return (t: ChainTrend) => (window === null ? null : t.updatedAt + window);
+  };
+
   // App reads.
   app.get("/v1/trends", async (c) => {
     const all = c.req.query("all") === "1";
     const [trends, meta, rotation] = await Promise.all([d.chain.trends(), d.store.trendMeta(), d.store.activeRotation().catch(() => null)]);
     const shown = trends.filter((t) => all || t.status === "Active" || t.status === "Cooling");
+    const retiresAt = await rotationRetiresAt(rotation);
     const [latest, summaries] = await Promise.all([d.store.latest(shown.map((t) => baseOf(t.identifier))), d.history.summaries(shown.map((t) => t.id), Math.floor(now() / 1000))]);
     return c.json({
       lastRunId: Number(await d.chain.lastRunId()),
@@ -284,6 +291,7 @@ export function createApp(d: AppDeps): Hono {
           change24h: s?.change ?? null,
           spark: s?.spark ?? [],
           rotatingOut: rotation?.identifier === t.identifier,
+          retiresAt: rotation?.identifier === t.identifier ? retiresAt(t) : null,
         };
       }),
     });
@@ -304,8 +312,9 @@ export function createApp(d: AppDeps): Hono {
         ? all.filter((t) => t.identifier !== id && baseOf(t.identifier) === base && t.status !== "Retired").sort((a, b) => b.createdAt - a.createdAt)[0]
         : undefined;
     const rotation = await d.store.activeRotation().catch(() => null);
+    const rotatingOut = rotation?.identifier === trend.identifier;
     return c.json({
-      trend: { ...trendJson(trend, meta.get(id) ?? meta.get(base), latest.get(base)), rotatingOut: rotation?.identifier === trend.identifier },
+      trend: { ...trendJson(trend, meta.get(id) ?? meta.get(base), latest.get(base)), rotatingOut, retiresAt: rotatingOut ? (await rotationRetiresAt(rotation))(trend) : null },
       index,
       history,
       relistedAs: relisted?.identifier ?? null,
