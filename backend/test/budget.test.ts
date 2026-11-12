@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { KeyRing, keyId, REJECTED_KEY_MS, THROTTLED_KEY_MS } from "../src/budget";
+import { KeyRing, keyId, REJECTED_KEY_MS, THROTTLED_KEY_MS, pacingDays } from "../src/budget";
 import type { Sql } from "../src/db";
 import { testDb } from "./helpers";
 
@@ -35,6 +35,20 @@ describe("KeyRing", () => {
     await sql`INSERT INTO api_usage (provider, key_id, day, credits) VALUES ('t3', ${keyId("k")}, '2026-10-15', 900)`;
     const later = new KeyRing(sql, "t3", ["k"], { daily: 100, monthly: 950 }, () => new Date("2026-10-20T08:00:00Z"));
     expect((await later.usage())[0]).toMatchObject({ today: 0, month: 900, left: 4 });
+  });
+
+  test("a spend-by date paces the month across the days up to it, capped by the daily limit", async () => {
+    const day = new Date("2026-11-12T08:00:00Z");
+    expect(pacingDays(day)).toBe(19);
+    expect(pacingDays(day, "2026-11-21")).toBe(10);
+    // Past the date, or after the month's end, the rest of the month is today's to spend.
+    expect(pacingDays(day, "2026-11-01")).toBe(1);
+    expect(pacingDays(day, "2026-12-31")).toBe(19);
+    // November 12, spending by the 21st: 950 credits over 10 days is 95 a day, under the daily 100.
+    const ring = new KeyRing(sql, "t8", ["k"], { daily: 100, monthly: 950, spendBy: "2026-11-21" }, () => day);
+    expect((await ring.usage())[0]!.left).toBe(95);
+    const sooner = new KeyRing(sql, "t9", ["k"], { daily: 100, monthly: 950, spendBy: "2026-11-15" }, () => day);
+    expect((await sooner.usage())[0]!.left).toBe(100);
   });
 
   test("syncs usage the provider reports into today", async () => {
