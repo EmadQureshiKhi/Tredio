@@ -71,7 +71,9 @@ export function AmountField({
 export function SubmitButton({ children, tone = "primary", disabled, loading, onClick, testId, passkey }: { children: ReactNode; tone?: ButtonTone; disabled?: boolean; loading?: boolean; onClick: () => void; testId?: string; passkey?: boolean }) {
   const account = useAccount();
   // On wide screens the trade panel scrolls inside: the button stays pinned to its bottom edge, over a fade, so a long ticket never hides it.
-  const pinned = "lg:sticky lg:bottom-0 lg:z-10 lg:bg-surface lg:pt-1 lg:before:pointer-events-none lg:before:absolute lg:before:inset-x-0 lg:before:-top-5 lg:before:h-5 lg:before:bg-gradient-to-t lg:before:from-surface lg:before:to-transparent";
+  // It pins above the panel's bottom padding (pb-5), so `after:` covers that band too, or the ticket would show through under the button.
+  const pinned =
+    "lg:sticky lg:bottom-0 lg:z-10 lg:bg-surface lg:pt-1 lg:before:pointer-events-none lg:before:absolute lg:before:inset-x-0 lg:before:-top-5 lg:before:h-5 lg:before:bg-gradient-to-t lg:before:from-surface lg:before:to-transparent lg:after:pointer-events-none lg:after:absolute lg:after:inset-x-0 lg:after:top-full lg:after:h-5 lg:after:bg-surface";
   // Restoring the session: a neutral placeholder, never a "Sign in" that turns into the trade.
   if (account.status === "loading") return <div className="skeleton h-12 w-full rounded-2xl" aria-hidden />;
   if (!account.authenticated) {
