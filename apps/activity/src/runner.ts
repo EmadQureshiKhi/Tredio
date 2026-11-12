@@ -9,6 +9,9 @@ type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 type Log = (fields: Record<string, unknown>, msg: string) => void;
 type Outcome = Awaited<ReturnType<Sender["sendOutcome"]>>;
 
+/** What the funder adds to a persona's storage deposit with a contract at a time: about eight entries (the app's 0.02 NEAR). */
+const STORAGE_TOP_UP = 20_000_000_000_000_000_000_000n;
+
 export interface RunnerOptions {
   api: string;
   rpc: ConstructorParameters<typeof Sender>[0]["rpc"];
@@ -163,11 +166,26 @@ export class Runner {
       this.log({ persona: p.handle, topUp: Number(this.o.gasKeyTopUp) / 1e24 }, "gas key topped up");
     }
     const tgas = sessionCallTgas(await this.versions.of(p.account));
-    const o = await this.sender(p).sendOutcome(this.C.account.sessionCall(p.account, action, tgas));
-    const refused = refusalIn(o);
-    const hash = o.transaction?.hash ?? "";
-    if (refused) throw new Error(`refused: ${refused} (${hash})`);
-    return hash;
+    const send = async () => {
+      const o = await this.sender(p).sendOutcome(this.C.account.sessionCall(p.account, action, tgas));
+      const refused = refusalIn(o);
+      const hash = o.transaction?.hash ?? "";
+      if (refused) throw new Error(`refused: ${refused} (${hash})`);
+      return hash;
+    };
+    try {
+      return await send();
+    } catch (e) {
+      // Each position or balance a contract keeps for the account needs its storage deposit, which the
+      // app tops up before such trades; the funder does it here, then the trade goes again once.
+      if (!(e instanceof Error) || !/needs a larger storage deposit|not registered for storage/.test(e.message)) throw e;
+      const contracts = typeof action === "object" && ("perp_open" in action || "perp_close" in action) ? [this.d.contracts.perps] : [this.d.contracts.outcomes, this.d.contracts.book];
+      for (const contract of contracts) {
+        await this.funder.send({ receiverId: contract, methodName: "storage_deposit", args: { account_id: p.account, registration_only: false }, deposit: STORAGE_TOP_UP.toString(), gas: (30n * 10n ** 12n).toString() });
+      }
+      this.log({ persona: p.handle, contracts }, "storage deposit topped up");
+      return send();
+    }
   }
 
   private balanceOf = (account: string, series: number, side: "up" | "down") =>
