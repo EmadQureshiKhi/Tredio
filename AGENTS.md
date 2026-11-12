@@ -15,7 +15,6 @@ The product overview is in [README.md](README.md); the judges' checklist is in [
 - `scripts/`: `dev.ts` (run everything), `verify.ts` (check the claims against testnet), `e2e-testnet.ts` (one full flow on testnet), `x402-demo.ts` (pay for an x402 route on testnet), `signals-demo.ts` (a paid signal on testnet), `policy-wallet.ts` (Autopilot on an OutLayer policy wallet on testnet), `gas-keys.ts`.
 - `contracts/scripts/`: `build.sh` (local, or `--reproducible [commit]` in SourceScan's Docker image) and `deploy.sh testnet|mainnet`.
 - [MAINNET.md](MAINNET.md): what changes on mainnet, the rehearsal and the deploy steps.
-- `tools/readme_figures.py`: the README figures (SVG, a light and a dark version each, colours from `frontend/app/globals.css`); run it with `python3`.
 
 ## Commands
 
@@ -35,7 +34,7 @@ pnpm coverage:contracts
 - CI (`.github/workflows/ci.yml`): typecheck, lint and every package's tests; contracts fmt, clippy and unit tests; the enclave crate's clippy and tests (it is not rustfmt-formatted); the sandbox crates run only locally.
 - Contract sandbox flows: `cd contracts && cargo test -p tredio-sandbox-tests` (downloads a nearcore sandbox once); `--test mainnet` is the mainnet rehearsal, which imports Circle's USDC and Rhea from mainnet over RPC.
 - Release wasm: `pnpm build:contracts` (`cargo near build`, to `target/near`); `contracts/scripts/build.sh --reproducible [commit]` builds a commit in Docker to `target/near-reproducible/<commit>`, which is what mainnet deploys and NearBlocks verifies.
-- Live browser specs in `frontend/e2e` and `admin/e2e` run against testnet and spend testnet NEAR; see `frontend/CLAUDE.md`.
+- Live browser specs in `frontend/e2e` (`npx playwright test -c playwright.live.config.ts` against a running app) and `admin/e2e` run against testnet and spend testnet NEAR.
 
 ## How the pieces trust each other
 
@@ -58,24 +57,15 @@ pnpm coverage:contracts
 - Secrets live only in gitignored `.env` files; every app ships a `.env.example`.
 - Run `pnpm verify` and the touched packages' tests before you call a change done.
 
-## Traps
+## Working with the NEAR stack
 
-- NEAR keys are base58 and case-sensitive: never lowercase a public or session key.
-- RPC views at `final` lag a just-sent transaction by a block or two; the app reads `optimistic`.
-- A gas key reserves the attached gas at 1e9 yocto per gas for every call in flight: 300 Tgas needs 0.3 NEAR in the key, and deleting a gas key burns its balance.
-- Accounts run account code v1 (no `version` view), v2 or v3, and callers must not assume any: read it with `AccountVersions` from `@tredio/contracts`, which also gives the session call's gas (300 or 150 Tgas), the Hyperliquid mark age (120 or 300 s), whether the guard binds the mark's `asset_index`, whether renewals and revokes keep the gas key, and whether policy wallets can call (`acceptsWalletSessions`, v3).
-  New accounts move onto the newest code `deployments/<network>.json` names (`globalCode.accountV2`, `accountV3`) in their first request (`upgradeToLatest`); v3 also requires the passkey's user-verification flag.
-- Returning a joint promise (`a.and(b)`) from a contract method is not allowed; detach instead.
-- Some contract refusals are logged events, not failures (`*_refused`, `*_rejected`): read the receipts' logs, not just the status.
-- Public RPCs rate-limit per IP and answer a browser's 429 without CORS headers; keep polling modest and use the failover lists.
-  Services, the indexer and the scripts take FastNEAR API keys in `FASTNEAR_API_KEYS` (comma-separated, one per request in turn, ahead of the public endpoints); the app takes origin-locked browser keys in `NEXT_PUBLIC_FASTNEAR_KEYS`.
-  near-kit clients run with `retryConfig: { maxRetries: 0 }`, since its own retries wait up to 15 s on one provider before Tredio's failover moves on.
-  A refused key (FastNEAR answers 403 "Invalid API key") sits out ten minutes for every client in the process; FastNEAR's archival RPC and tx API accept any key, so only rpc.* proves one works.
-- 1Click quotes need an existing mainnet recipient, and confidential quotes need a partner JWT (`ONECLICK_JWT`); a refused JWT sits out ten minutes while quotes go out public.
-- OutLayer custody signs NEAR transactions only as the wallet's own implicit account, so a policy wallet acts for an account only through code that accepts its calls (`acceptsWalletSessions`, account code v3); store a wallet's policy before its API key goes anywhere (the first account to store it controls it), and never delete a policy (a wallet without one signs anything): freeze it.
-- Hyperliquid testnet has no leaderboard; leaders come from mainnet's.
-- On testnet the registry trusts only the enclave's key: an oracle in `ORACLE_MODE=local` signs reports the registry refuses. OutLayer caches a build by its wasm hash, so a run with a dead `OUTLAYER_WASM_URL` still runs; a wrong hash fails.
-- Regular RPC nodes drop transactions after about five epochs (2.5 days): look recorded proofs up on an archival node (`archival-rpc.<network>.fastnear.com`), as `verify.ts` does.
-- Publishing global code burns 10 times the storage price: 31.55 NEAR for the 316 KB account code. Re-running `deploy.sh` never republishes it; `PUBLISH_ACCOUNT_CODE=1` does, on purpose.
-- A reproducible build records its commit, so never rewrite history past a deployed commit: NearBlocks and `pnpm verify` need that commit in the public repository.
-- There is no Biome in this repo: `npx biome` runs an unrelated npm package. Lint with `pnpm lint`.
+Tredio is built around these NEAR behaviours; the code already handles each one, and new code should too.
+
+- **Keys and reads.** NEAR keys are base58 and case-sensitive, so they are never lowercased. The app reads at `optimistic`, so a trade shows the moment it lands; `final` follows a block or two later.
+- **Gas keys.** A gas key prepays the gas attached to each call in flight at 1e9 yocto a gas unit (300 Tgas reserves 0.3 NEAR), so the top-up service keeps every key funded; keys are refilled and revoked through the account, never deleted with a balance.
+- **Account versions.** Accounts run account code v1, v2 or v3; `AccountVersions` from `@tredio/contracts` reads which one and what it supports (session gas, the Hyperliquid mark age, policy wallets). New accounts start on the newest code `deployments/<network>.json` names (`upgradeToLatest`), and earlier ones upgrade with one passkey prompt.
+- **Outcomes.** Some contract refusals are logged events (`*_refused`, `*_rejected`) that return the funds, so callers read the receipts' logs as well as the status. Contract methods detach joint promises rather than return them.
+- **RPC.** Every client fails over across providers, FastNEAR keys first (`FASTNEAR_API_KEYS` on servers, origin-locked `NEXT_PUBLIC_FASTNEAR_KEYS` in the app); a key a provider refuses rests ten minutes for the whole process, near-kit runs with `retryConfig: { maxRetries: 0 }` so the failover moves on at once, and recorded proofs are read from archival nodes (`archival-rpc.<network>.fastnear.com`), as `verify.ts` does.
+- **Integrations.** 1Click makes confidential quotes with the partner JWT (`ONECLICK_JWT`) and public ones while it rests, and quotes need an existing mainnet recipient. OutLayer custody wallets act for an account through account code v3 (`acceptsWalletSessions`); a wallet's policy is stored before its API key is shared and is frozen, never deleted. Hyperliquid's leaderboard comes from mainnet, which testnet copies.
+- **The oracle.** The registry trusts only the enclave's key, so reports come from the OutLayer build (`ORACLE_MODE=outlayer`); OutLayer caches the build by its wasm hash.
+- **Releases.** Deployed contracts and published account code name the commit they were built from, so pushed history stays as it is; publishing global code costs 10 times the storage price (31.55 NEAR for the account code), so `deploy.sh` republishes it only with `PUBLISH_ACCOUNT_CODE=1`. Lint with `pnpm lint`.
