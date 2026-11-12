@@ -279,6 +279,7 @@ Positions on chain stay public; what is private is the signal and its timing, an
 3. **Record.** The signed report updates the index and records each series' opening and settlement values and the marks; the keeper opens and settles series from them.
 4. **Trade.** Markets read the registry: Up/Down series settle from it, perps use it as their price, and coins ratchet their floor from its peak.
 5. **Act.** People trade from their own account contracts, and the services keep markets quoted, series settled and wallets funded.
+6. **Rotate.** 24 trends are live at a time. When the board is full, a trend whose attention faded rotates out for a stronger approved candidate: the oracle stops measuring it, its successor lists in its slot on the next run, and it retires as stale, its open rounds settling at its last index ([`backend/src/rotation.ts`](backend/src/rotation.ts)).
 
 <br>
 
@@ -434,7 +435,9 @@ pnpm dev
 | [`packages/mcp`](packages/mcp) | An MCP server for trends, markets, accounts and index verification, with trade tools that are dry runs by default and send only within the user's spending policy |
 | [`skills/tredio/SKILL.md`](skills/tredio/SKILL.md) | A skill that teaches an agent to read and trade Tredio safely |
 | [`apps/agent-market`](apps/agent-market) | "Attention check", live on the NEAR AI Agent Market as [`@tredio`](https://tredio.market.near.ai): any topic answered with its attention index, the sources behind it and the NEAR AI review, paid per call |
-| [`llms.txt`](landing-page/public/llms.txt) | The product for language models, and the x402 endpoints in the API |
+| [`llms.txt`](llms.txt) | This repository mapped for language models: where each claim lives and how to check it |
+| [`tredio.bid/llms.txt`](landing-page/public/llms.txt) | The product for language models, and the x402 endpoints in the API |
+| [`.mcp.json`](.mcp.json) | Registers the MCP server, read-only against the hosted API, for an agent working in a checkout |
 
 <br>
 

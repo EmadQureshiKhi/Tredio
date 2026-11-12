@@ -1,0 +1,37 @@
+# Tredio
+
+> Tredio is a NEAR-native attention market, live on NEAR testnet (test assets only).
+> An oracle in an OutLayer TEE scores trends from 0 to 100 and signs each report; the registry contract on NEAR accepts only that key.
+> Passkey accounts with no seed phrase trade the index: Up/Down series settled in USDC, attention perps, trend coins that graduate into Rhea pools, and Hyperliquid perps through Chain Signatures.
+> This file maps the repository for language models; the hosted product's reference is https://tredio.bid/llms.txt.
+
+## Start here
+
+- [README.md](README.md): what Tredio is, how it works, the contracts and how to run it.
+- [JUDGES.md](JUDGES.md): every claim, where to see it, and how to check it on testnet, including without any of the team's keys.
+- [AGENTS.md](AGENTS.md): the architecture, commands, conventions and how the pieces trust each other.
+- [SECURITY.md](SECURITY.md): the trust model, static analysis, test coverage, the audit summary and what is not covered yet.
+- [MAINNET.md](MAINNET.md): what changes on mainnet, the rehearsal and the deploy steps.
+
+## Check it
+
+- `pnpm install && pnpm verify` reads testnet and checks the claims: deployed code against reproducible builds, the oracle key and its attested enclave run, accounts, recorded transactions, and every package's tests.
+- `pnpm verify --build` also rebuilds the oracle's enclave program and requires the attested sha256.
+- [deployments/testnet.json](deployments/testnet.json): every contract id and the oracle key; [deployments/testnet-proofs.json](deployments/testnet-proofs.json): the recorded transactions `pnpm verify` checks.
+- Live: the app at https://app.tredio.bid, the API at https://api.tredio.bid (`GET /v1/status`), contracts under `tredio.testnet` on https://testnet.nearblocks.io.
+
+## Code
+
+- [contracts/](contracts): Rust contracts (near-sdk 5): `registry` (the index), `outcomes` and `book` (Up/Down), `perps`, `coins` (the trend coin factory) and `coin` (the token it deploys), `curation`, `account` (passkey accounts, sessions, Chain Signatures) and its factory `accounts`, `usdc`; [contracts/AUDIT.md](contracts/AUDIT.md) is the internal audit.
+- [apps/oracle/](apps/oracle): the oracle service and its enclave program (`tee/`); [apps/oracle/docs/tee.md](apps/oracle/docs/tee.md) explains what the TEE proves and how to verify a report, and [apps/oracle/docs/index-method.md](apps/oracle/docs/index-method.md) the index method.
+- [backend/](backend): the API (Hono on Postgres): radar, NEAR AI Cloud reviews, rotation, sign-in, Autopilot, social, paid signals, x402.
+- [apps/](apps): the relayer, keeper, market maker, Autopilot executor, top-up, indexer, the NEAR AI Agent Market worker and the demo traders.
+- [frontend/](frontend), [admin/](admin), [landing-page/](landing-page): the app, the operator console and the website (Next.js).
+- [packages/](packages): shared libraries: `chain` (RPC failover, sending, x402 client), `contracts-ts`, `hyperliquid`, `intents` (1Click), `autopilot`, `custody`.
+
+## For agents
+
+- [packages/mcp/README.md](packages/mcp/README.md): an MCP server on stdio; `bun packages/mcp/src/bin.ts` serves 13 read tools against the hosted API with no configuration, `verify_index` checks an index value's oracle signature on chain, and the trade tools are dry runs unless confirmed, within a spending policy.
+- [.mcp.json](.mcp.json): registers that server, read-only, for an agent working in this checkout.
+- [skills/tredio/SKILL.md](skills/tredio/SKILL.md): a skill that teaches an agent to read, verify and trade Tredio safely.
+- x402: `GET https://api.tredio.bid/v1/x402` lists the routes an agent pays for in USDC on NEAR, gas paid by Tredio's relayer.

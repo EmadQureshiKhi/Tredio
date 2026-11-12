@@ -43,3 +43,4 @@ Every contract and account can be read on NearBlocks (testnet.nearblocks.io).
 
 The app reads Tredio's API for trends, history, calls and leaderboards; `GET /v1/status` reports its health and `GET /v1/trends` lists live trends.
 The website's llms.txt (https://tredio.bid/llms.txt) describes the API and the agent integrations: the MCP server, the agent skill and the x402 paid routes.
+The source is at https://github.com/EmadQureshiKhi/Tredio.

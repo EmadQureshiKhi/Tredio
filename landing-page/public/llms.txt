@@ -10,6 +10,7 @@
 - [Website](https://tredio.bid): what Tredio is and how it works.
 - [App](https://app.tredio.bid): sign in with a passkey (Face ID, a fingerprint or a security key) and trade on NEAR testnet, gas-free.
 - [API](https://api.tredio.bid): JSON over HTTPS; the root lists the main routes.
+- [Source](https://github.com/EmadQureshiKhi/Tredio): the contracts, services, app and agent tools; `llms.txt` at its root maps the repository, and `JUDGES.md` lists each claim with how to check it.
 - [This file](https://tredio.bid/llms.txt): the reference for agents.
 
 ## API
@@ -28,6 +29,7 @@ The API answers index values in points (51.86 is 51.86 points); on chain they ha
 ## For agents
 
 - MCP: `packages/mcp` in the repository is an MCP server (stdio) with tools for trends, markets, accounts, AI reviews and `verify_index`, which checks the registry's checkpoint and the oracle's signature itself.
+  `bun packages/mcp/src/bin.ts` from a checkout (after `pnpm install`) serves the read tools against `https://api.tredio.bid` with no configuration.
   Its trade tools (Up/Down, perps, coins, calls) are dry runs by default and send only within the user's policy: an allowlist of tools, a USDC cap per call and a daily cap.
 - Skill: `skills/tredio/SKILL.md` in the repository teaches an agent to read, verify and trade Tredio safely.
 - x402: `GET /v1/x402` lists the paid routes (`GET /v1/x402/trends/{identifier}/history` for 0.01 USDC: every checkpoint and source reading; `POST /v1/x402/backtests` for 0.02 USDC).
@@ -43,9 +45,10 @@ The API answers index values in points (51.86 is 51.86 points); on chain they ha
 1. Radar: Elfa, Bluesky, Nansen, CoinGecko, GeckoTerminal, Wikipedia and other public sources propose trends.
 2. Review: a verifiable model on NEAR AI Cloud checks each candidate; the signed attestation is stored with the listing.
 3. Oracle: the oracle computes the attention index with a published method (its build runs in an OutLayer TEE with a key bound to the build) and writes it to Tredio's registry contract on NEAR, which accepts signed reports only.
-4. Markets: each trend gets 24-hour and 7-day Up/Down series on Tredio's own order book, an attention perp and a trend coin; Hyperliquid perps on the underlying asset are placed from the user's NEAR account through Chain Signatures.
-5. Accounts: passkey accounts on NEAR, with no seed phrase; one prompt opens a week-long session whose network fees a relayer pays.
-6. Deposits: on mainnet, NEAR Intents 1Click brings USDC in from other chains; testnet shows dry quotes.
+4. Slots: 24 trends are live at a time; when the board is full, a trend whose attention faded rotates out for a stronger approved candidate, which lists in its slot, and the faded one's open rounds settle at its last index.
+5. Markets: each trend gets 24-hour and 7-day Up/Down series on Tredio's own order book, an attention perp and a trend coin; Hyperliquid perps on the underlying asset are placed from the user's NEAR account through Chain Signatures.
+6. Accounts: passkey accounts on NEAR, with no seed phrase; one prompt opens a week-long session whose network fees a relayer pays.
+7. Deposits: on mainnet, NEAR Intents 1Click brings USDC in from other chains; testnet shows dry quotes.
 
 ## Contact
 
