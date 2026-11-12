@@ -1,7 +1,7 @@
 # Mainnet
 
 Tredio runs on NEAR testnet today.
-The code is ready for NEAR mainnet: what is left is creating and funding the accounts, deploying the contracts and pointing the services at them.
+The code is ready for NEAR mainnet: the launch is creating and funding the accounts, deploying the contracts and pointing the services at them.
 This page says what changes on mainnet, how that was tested, and the steps in order.
 Code that exists only for mainnet, or behaves differently there, carries a `#mainnet` comment, so `grep -rn "#mainnet"` lists it (in the app every such branch reads `IS_MAINNET`).
 The contracts are the exception: they hold no network in code but take it as data at init (`network`, the USDC, Rhea and Chain Signatures ids), and their sources stay byte for byte as deployed, so the table below stands in for comments there.

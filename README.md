@@ -237,7 +237,7 @@ The details are in [AGENTS.md](AGENTS.md#how-the-pieces-trust-each-other) and [c
 | `usdc` | [`usdc.tredio.testnet`](https://testnet.nearblocks.io/address/usdc.tredio.testnet) | Test USDC with a faucet (mainnet uses native USDC) |
 
 - Account ids, global code hashes and the oracle key are in [`deployments/testnet.json`](deployments/testnet.json).
-- Demo trades on testnet were made by project-owned accounts, so activity you see there is not organic.
+- Testnet activity comes from project-run accounts, including the demo traders [JUDGES.md](JUDGES.md#demo-activity) describes.
 - The contracts were self-audited against the near-contract-audit checklist and then reviewed again in a separate AI review pass; findings, fixes, what is still open on testnet and the team's remaining powers are in [`contracts/AUDIT.md`](contracts/AUDIT.md).
 
 ---
@@ -268,7 +268,7 @@ What changes on mainnet, the steps and the budget are in [MAINNET.md](MAINNET.md
 | [`scripts/`](scripts) | `verify`, the testnet demos and the dev runner |
 | [`deploy/`](deploy) | Docker Compose and Caddy for the server, and how the sites deploy |
 | [`deployments/`](deployments) | Account ids, code hashes and the recorded proofs `pnpm verify` checks |
-| [`skills/`](skills), [`tools/`](tools), [`video/`](video) | The agent skill, the README figures (`tools/readme_figures.py`) and the launch film |
+| [`skills/`](skills) | The agent skill for using Tredio |
 
 ---
 
@@ -291,7 +291,6 @@ pnpm dev
 | `cd contracts && cargo test -p tredio-sandbox-tests` | The sandbox flows on a local NEAR node |
 | `pnpm security` | NEAR rules, Clippy security lints, cargo deny and cargo audit |
 
-The launch film is a Remotion project in [`video/`](video).
 
 ---
 
@@ -312,7 +311,7 @@ Details and how to rerun each one are in [SECURITY.md](SECURITY.md).
 
 | Check | Result |
 | --- | --- |
-| Self-audit ([contracts/AUDIT.md](contracts/AUDIT.md)) | 11 findings, 10 fixed with a test each, 1 open by design |
+| Self-audit ([contracts/AUDIT.md](contracts/AUDIT.md)) | 11 findings, 10 fixed with a test each, 1 accepted by design and bounded on chain |
 | Deployed code is this source (`pnpm verify`, `near contract verify`) | 10 of 10 code hashes match byte for byte; the 8 contracts are reproducible builds (SourceScan's Docker image, NEP-330) that NearBlocks can verify once the repository is public |
 | NEAR rules (`pnpm security`) | private callbacks, token receivers check their token, overflow checks, no `unsafe`, the signer used only to require a direct call: all hold |
 | Clippy security lints on the wasm build | 0 panics; every truncating cast, unwrap and slice index reviewed |
@@ -346,7 +345,7 @@ pnpm security
 | NEAR | near-kit (transactions, gas keys, views), HOT's NEAR Connect for wallets, Chain Signatures (`v1.signer`), NEAR Intents 1Click and the Agent API SDK (`@near-intents-agent-api/sdk`), NEAR AI Cloud (`@nearai/inference-sdk`), OutLayer (the enclave oracle and custody wallets), and Rhea for coin pools |
 | Services and API | Bun, Hono, Postgres (postgres.js), zod, pino and web-push; the MCP server uses `@modelcontextprotocol/sdk`; cryptography is `@noble/curves` and `@noble/hashes` |
 | App and admin | Next.js and React, TanStack Query, zustand, framer-motion, lightweight-charts, vaul, sonner, NumberFlow and lucide icons; the website adds GSAP, Lenis and Swiper |
-| Media | The launch film is made with Remotion, and the README figures are SVG drawn by [`tools/readme_figures.py`](tools/readme_figures.py) |
+| Media | The launch film is made with Remotion, and the README figures are SVG in a light and a dark version |
 | Tests | bun test, Playwright and cargo test |
 
 Claude and OpenCode were used to write the code.

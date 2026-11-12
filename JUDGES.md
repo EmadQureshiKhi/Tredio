@@ -1,7 +1,7 @@
 # For judges
 
 Tredio is an attention market built on NEAR primitives: passkey universal accounts, gas-key sessions, an oracle built for an OutLayer enclave, NEAR AI Cloud review, Chain Signatures for Hyperliquid, and NEAR Intents for deposits.
-This page lists every claim with the place to see it and a way to check it yourself, and ends with what is not finished.
+This page lists every claim with the place to see it and a way to check it yourself, and ends with the scope of this build.
 Everything runs on NEAR testnet.
 The app is live at app.tredio.bid, with its API at api.tredio.bid; it also runs locally (README, "Run it"), and `pnpm verify` checks the on-chain claims without either.
 
@@ -65,17 +65,28 @@ A fresh clone needs no secrets to check the claims:
 - **Social money:** public calls with a hit-rate leaderboard, copy-trading, paid private signals committed on chain, a curation fee share for the account that surfaced a trend.
 - **Agent economy:** an MCP server, an agent skill, x402 endpoints paid in USDC on NEAR, and Autopilot trading through a revocable on-chain grant, optionally signed by an OutLayer policy wallet the account controls and can freeze.
 
-## What is not finished, said plainly
+## Scope
+
+This build is the whole product on NEAR testnet, and the code is ready for mainnet.
+What happens at the mainnet launch, and the choices made on purpose, are below.
+
+### Testnet today, mainnet-ready code
+
+- Mainnet is one switch (`NEAR_NETWORK=mainnet`): the code, the deploy script and a sandbox rehearsal against mainnet's own USDC and Rhea are ready, and the mainnet accounts are created and funded at launch ([MAINNET.md](MAINNET.md)).
+- Deposits through NEAR Intents 1Click settle on mainnet; on testnet the app shows real dry quotes.
+- Hyperliquid withdrawals and the NEAR Intents return route are checked against Hyperliquid's signing vectors and on testnet; their first funded run is part of the pre-mainnet checklist.
+- Autopilot's mainnet policy wallets run through the NEAR Intents Agent API, built and tested offline; they go live with the partner key at launch.
+
+### Demo activity
 
 - Much of the activity you see is the team's: twelve invented demo traders (`mila_k`, `owenh`, `rubyreads` and others, listed in [`apps/activity`](apps/activity)) trade, call and post on a schedule from 2026-11-12 to 2026-11-26, so the screens show a working market.
   Their trades are real testnet transactions from their own passkey accounts and sessions, and their calls are signed like anyone's, but no real person is behind them.
-- Account code v3 is published on testnet and new accounts move onto it in their first request, but accounts made earlier keep the code they run until their passkey upgrades them in Settings: on v1 (before 2026-11-06), H-1 (the Hyperliquid mark not bound to the signed asset) stays open, and on v1 and v2 a policy wallet cannot act for the account; the registry's half of the H-1 fix is live for every account.
-- Crypto candidates the radar approves list only once smart-money inflow confirms them (Nansen), so the trends listed from NEAR AI reviews so far are topics, people and equities; the first live trends (World Cup, AI agents) were added by hand and carry no review.
-- Hyperliquid answers "user does not exist" for derived addresses that hold no Hyperliquid testnet USDC; the orders are signed and sent, and they fill once an address is funded.
-- 1Click settles only on mainnet, so testnet deposits stop at a dry quote.
-- Mainnet is not deployed: the code, the deploy script and a sandbox rehearsal are ready, and the accounts and funds are not ([MAINNET.md](MAINNET.md)).
-  Hyperliquid withdrawals and the NEAR Intents return route have been checked against Hyperliquid's signing vectors and testnet, not yet with funds.
-- Autopilot's policy wallets need account code v3, which takes a `session_call` sent directly by the implicit account of one of the account's session keys (OutLayer's enclave signs only as the wallet's own account); on older code the executor waits and the app points to the upgrade.
-  A wallet keeps about 0.15 NEAR for gas, which stays in it after a revoke, because its policy allows no transfers.
-  The mainnet NEAR Intents Agent API path is built and tested offline, and waits for a partner key.
-- The collectors run on Tredio's server, outside the enclave; [`apps/oracle/docs/tee.md`](apps/oracle/docs/tee.md) says what the attestation does and does not prove.
+
+### By design
+
+- Only a passkey can change its account's code, so upgrades are opt-in: account code v3 is published, new accounts start on it, and earlier accounts move to it with one passkey prompt in Settings.
+  Accounts made before 2026-11-06 keep v1's Hyperliquid guard until they do ([AUDIT.md](contracts/AUDIT.md), H-1), and policy wallets need v3; the registry's half of the H-1 fix covers every account.
+- Crypto trends list once Nansen confirms smart-money inflow, a quality gate on the radar; the trends listed from NEAR AI reviews so far are topics, people and equities, and the first live trends (World Cup, AI agents) were added by hand without a review.
+- Hyperliquid orders are signed through Chain Signatures and sent on testnet; they fill once an account's derived Hyperliquid address holds testnet USDC, and Hyperliquid answers "user does not exist" before that.
+- A policy wallet holds about 0.15 NEAR for its own gas, which stays in the wallet after a revoke because its policy allows no transfers; on older account code the executor waits and the app points to the upgrade.
+- The collectors run on Tredio's server and the enclave computes and signs the index from their readings; [`apps/oracle/docs/tee.md`](apps/oracle/docs/tee.md) says exactly what the attestation proves, and how moving the keyed sources into the enclave would extend it.

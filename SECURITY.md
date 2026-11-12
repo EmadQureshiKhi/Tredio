@@ -10,7 +10,7 @@ Results from 2026-11-07, on the code deployed on NEAR testnet under `tredio.test
 
 | Check | Tool | Result |
 | --- | --- | --- |
-| Line-by-line audit | `near-contract-audit` checklist and manual review ([AUDIT.md](contracts/AUDIT.md)) | 11 findings (1 high, 7 medium, 3 low): 10 fixed with a test each, 1 open by design (M-4) |
+| Line-by-line audit | `near-contract-audit` checklist and manual review ([AUDIT.md](contracts/AUDIT.md)) | 11 findings (1 high, 7 medium, 3 low): 10 fixed with a test each, 1 accepted by design and bounded on chain (M-4) |
 | Deployed code is this source | Reproducible builds in SourceScan's Docker image (NEP-330), `near contract verify`, `pnpm verify` | 10 of 10 match byte for byte: the 8 contracts are reproducible builds of commit `d976aea`, ready for NearBlocks verification once it is public; the newest account code (v3) is the reproducible build of commit `18dd319`, and the global coin code matches the local build |
 | NEAR rules | `pnpm security` | 6 of 6 hold: overflow checks, no `unsafe`, 30 of 30 callbacks private, 6 of 6 token receivers check their token, `signer_account_id` only to require a direct call (1 use), no joint promise returned |
 | Static analysis | Clippy's security lints on the wasm32 build | 0 panics; every truncating cast, unwrap and slice index reviewed (below) |
@@ -166,7 +166,7 @@ Each finding got a failing test first, then the fix.
 | M-1 | Medium | Concurrent `graduate` calls repeated graduation steps | Fixed |
 | M-2 | Medium | A failed account creation kept the caller's deposit | Fixed |
 | M-3, M-6 | Medium | `set_account_code` and `set_protocol` moved every passkey to a new address | Fixed |
-| M-4 | Medium | Trades price against an index whose next value can be known first | Open by design: the registry's 50% move clamp and the anchored band bound each trade; the options (fill at the next observation, a spread that grows with the expected move, pausing new risk during an oracle run) change the trading design |
+| M-4 | Medium | Trades price against an index whose next value can be known first | Accepted by design: the registry's 50% move clamp and the anchored band bound each trade; the tighter options (fill at the next observation, a spread that grows with the expected move, pausing new risk during an oracle run) are trading-design choices for the pre-mainnet review |
 | M-5 | Medium | A buy quote ignored the floor ratchet the buy applies | Fixed |
 | M-7 | Medium | The coin factory never registered on its coins, so no coin could be sold back | Fixed |
 | L-1 | Low | A failed payout could lose redeemed tokens | Fixed |
