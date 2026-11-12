@@ -15,7 +15,7 @@ The product overview is in [README.md](README.md); the judges' checklist is in [
 - `scripts/`: `dev.ts` (run everything), `verify.ts` (check the claims against testnet), `e2e-testnet.ts` (one full flow on testnet), `x402-demo.ts` (pay for an x402 route on testnet), `signals-demo.ts` (a paid signal on testnet), `policy-wallet.ts` (Autopilot on an OutLayer policy wallet on testnet), `gas-keys.ts`.
 - `contracts/scripts/`: `build.sh` (local, or `--reproducible [commit]` in SourceScan's Docker image) and `deploy.sh testnet|mainnet`.
 - [MAINNET.md](MAINNET.md): what changes on mainnet, the rehearsal and the deploy steps.
-- `tools/make_readme_art.py`: the README figures (Pillow, colours from `frontend/app/globals.css`).
+- `tools/readme_figures.py`: the README figures (SVG, a light and a dark version each, colours from `frontend/app/globals.css`); run it with `python3`.
 
 ## Commands
 
