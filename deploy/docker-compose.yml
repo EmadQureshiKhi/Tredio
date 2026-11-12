@@ -94,6 +94,14 @@ services:
     env_file: env/agent-market.env
     healthcheck: { <<: *live, test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4800/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"] }
 
+  # Demo traders the team runs on testnet through ACTIVITY_UNTIL (apps/activity; JUDGES.md discloses them).
+  activity:
+    <<: *service
+    build: { context: .., dockerfile: apps/activity/Dockerfile }
+    env_file: env/activity.env
+    volumes: ["./env/activity-personas.json:/run/personas.json:ro"]
+    healthcheck: { <<: *live, test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4900/live').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"] }
+
   # Restarts a container labelled autoheal=true once its health check fails three times in a row.
   autoheal:
     image: willfarrell/autoheal:1.2.0
