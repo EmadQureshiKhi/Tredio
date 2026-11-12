@@ -96,6 +96,6 @@ USDC, all of it the protocol's own working capital:
 
 | What | USDC |
 | --- | --- |
-| Market maker: 1,500 margin plus 100 sets for each of 12 series | about 2,700 |
+| Market maker: 1,500 margin plus 100 sets for each of 24 series | about 3,900 |
 | Perps pool seed (`deposit_pool`), which backs traders' profits | 5,000 or more |
 | Autopilot bot's Hyperliquid margin, funded through 1Click | 500 to 1,000 |

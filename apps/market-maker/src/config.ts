@@ -18,7 +18,8 @@ const schema = z.object({
   MM_GAS_KEY_LANES: z.coerce.number().int().min(0).max(16).default(0),
   /** Series windows to quote (seconds). */
   QUOTE_WINDOWS: z.string().default("86400,604800").transform((v) => list(v).map(Number)),
-  MAX_SERIES: z.coerce.number().int().positive().default(12),
+  /** Series quoted at once, shorter windows first: one 24h series per live slot (the API's MAX_LIVE_TRENDS). */
+  MAX_SERIES: z.coerce.number().int().positive().default(24),
   /** Complete sets (USDC) minted per quoted series as ask inventory. */
   SETS_PER_SERIES: z.coerce.number().positive().default(100),
   /** USDC kept on the book to back bids across all series. */
