@@ -2,7 +2,7 @@ import type { Sender, Viewer } from "@tredio/chain";
 import { calls, type Deployment, type Report, type Trend } from "@tredio/contracts";
 import type { HyperliquidInfo } from "@tredio/hyperliquid";
 import { type Method, measure, type Readings } from "./method";
-import { allocate, assetClassOf, baseOf, type Candidate, decide, freeListing, type LiveTrend, reportMarks } from "./plan";
+import { allocate, assetClassOf, baseOf, type Candidate, decide, freeListing, freeSlots, type LiveTrend, reportMarks } from "./plan";
 import type { OutLayerRunner } from "./outlayer";
 import type { ReportSigner } from "./signer";
 
@@ -167,14 +167,13 @@ export class Oracle {
         return { ...t, pendingDue: pending.filter((e) => e <= observedAt).length };
       }),
     );
-    const liveCount = all.filter((t) => t.status !== "retired").length;
     const liveBases = new Set(all.filter((t) => t.status !== "retired").map((t) => baseOf(t.id)));
     const candidates: Candidate[] = queue.candidates
       .filter((c) => !liveBases.has(baseOf(c.identifier)))
       .map((c) => ({ identifier: baseOf(c.identifier), surfacer: c.surfacer ?? null, ticker: c.ticker ?? null, reviewHash: c.reviewHash ?? null, pinned: c.pinned === true, pick: c.pick === true }));
     // Kept topics first, then community picks, then the queue as ranked.
     const ordered = [...candidates.filter((c) => c.pinned), ...candidates.filter((c) => !c.pinned && c.pick), ...candidates.filter((c) => !c.pinned && !c.pick)];
-    const sample = allocate(live, ordered, this.o.maxSamplesPerRun, this.o.maxCandidatesPerRun, this.o.maxLiveTrends - liveCount);
+    const sample = allocate(live, ordered, this.o.maxSamplesPerRun, this.o.maxCandidatesPerRun, freeSlots(all, rotating, this.o.maxLiveTrends));
 
     const listings = sample.candidates.flatMap((c) => {
       const id = freeListing(c.identifier, (x) => byId.get(x)?.status ?? null);

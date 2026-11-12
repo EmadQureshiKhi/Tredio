@@ -105,11 +105,10 @@ fn run() -> Result<serde_json::Value, String> {
         let pending: Vec<u64> = sources::view(RPC, REGISTRY, "pending_expiries", &serde_json::json!({ "id": t.id })).unwrap_or_default();
         live.push(LiveTrend { trend: t.clone(), pending_due: pending.iter().filter(|e| **e <= observed_at).count() });
     }
-    let live_count = all.iter().filter(|t| t.status != "retired").count();
     let live_bases: HashSet<&str> = all.iter().filter(|t| t.status != "retired").map(|t| base_of(&t.id)).collect();
     let fresh: Vec<Candidate> = queue.candidates.into_iter().filter(|c| !live_bases.contains(base_of(&c.identifier))).map(|c| Candidate { identifier: base_of(&c.identifier).to_string(), ..c }).collect();
     let ordered: Vec<Candidate> = fresh.iter().filter(|c| c.pinned).chain(fresh.iter().filter(|c| !c.pinned && c.pick)).chain(fresh.iter().filter(|c| !c.pinned && !c.pick)).cloned().collect();
-    let (sample, picked) = plan::allocate(&live, &ordered, MAX_SAMPLES, MAX_CANDIDATES, MAX_LIVE.saturating_sub(live_count));
+    let (sample, picked) = plan::allocate(&live, &ordered, MAX_SAMPLES, MAX_CANDIDATES, plan::free_slots(&all, &rotating, MAX_LIVE));
     let status_of = |id: &str| all.iter().find(|t| t.id == id).map(|t| t.status.clone());
     let listings: Vec<(Candidate, String)> = picked.into_iter().filter_map(|c| plan::free_listing(&c.identifier, status_of).map(|id| (c, id))).collect();
     let mut bases: Vec<String> = sample.iter().map(|t| base_of(&t.trend.id).to_string()).chain(listings.iter().map(|(c, _)| c.identifier.clone())).collect();

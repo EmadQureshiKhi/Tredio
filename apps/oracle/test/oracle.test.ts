@@ -6,7 +6,7 @@ import { ENCLAVE_RETRY_MS, Oracle, retryUntil } from "../src/oracle";
 import type { EnclaveOutput } from "../src/outlayer";
 import { boostedPoints, normalizeCount, toIndexUnits } from "../src/index-method";
 import { METHOD, measure } from "../src/method";
-import { allocate, assetClassOf, type Candidate, decide, freeListing, type LiveTrend, payableSurfacer, reportMarks } from "../src/plan";
+import { allocate, assetClassOf, type Candidate, decide, freeListing, freeSlots, type LiveTrend, payableSurfacer, reportMarks } from "../src/plan";
 
 const NOW = 1_793_900_000;
 const reading = (value: number, ageSec = 60) => ({ value, windowSec: 86_400, observedAt: NOW - ageSec });
@@ -66,6 +66,15 @@ describe("planning a run", () => {
     expect(s.trends.map((t) => t.id)).toEqual(["c", "b"]);
     expect(s.candidates.map((c) => c.identifier)).toEqual(["topic:x"]);
     expect(allocate(live, [cand("topic:x")], 3, 1, 0).candidates).toEqual([]);
+  });
+
+  test("a trend rotating out frees its slot for its successor, and the board is full again once it lists", () => {
+    const full = [...Array.from({ length: 24 }, (_, i) => trend(`topic:t${i}`, { status: i % 2 ? "cooling" : "active" })), trend("topic:old", { status: "retired" })];
+    expect(freeSlots(full, new Set(), 24)).toBe(0);
+    expect(freeSlots(full, new Set(["topic:t3"]), 24)).toBe(1);
+    const listed = [...full, trend("topic:new")];
+    expect(freeSlots(listed, new Set(["topic:t3"]), 24)).toBe(0);
+    expect(freeSlots(listed, new Set(), 24)).toBe(0);
   });
 
   test("versions: the base, then .2 once retired; none while one is live", () => {

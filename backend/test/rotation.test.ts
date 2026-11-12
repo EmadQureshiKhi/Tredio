@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ChainTrend } from "../src/chain";
-import { pickRotation, type RotationRules } from "../src/rotation";
+import { loadConfig } from "../src/config";
+import { pickRotation, replacementFirst, type RotationRules } from "../src/rotation";
 import type { Candidate, Reading, SourceName } from "../src/store";
 
 const NOW = 1_791_720_000;
@@ -114,5 +115,27 @@ describe("rotation", () => {
     const pick = pickRotation(b, [candidate("topic:new"), candidate("topic:loud")], l, new Set(), { ...rules, maxLive: 5 }, NOW);
     expect(pick?.trend.identifier).toBe("topic:fading");
     expect(pick?.replacement.identifier).toBe("topic:loud");
+  });
+});
+
+describe("the oracle's queue during a rotation", () => {
+  const q = ["topic:a", "topic:b", "topic:c"].map((identifier) => ({ identifier }));
+  const ids = (xs: { identifier: string }[]) => xs.map((x) => x.identifier);
+  test("the replacement goes first, the rest keep their order", () => {
+    expect(ids(replacementFirst(q, "topic:c"))).toEqual(["topic:c", "topic:a", "topic:b"]);
+    expect(ids(replacementFirst(q, "topic:a"))).toEqual(["topic:a", "topic:b", "topic:c"]);
+  });
+  test("without a rotation, or with a replacement no longer waiting, the queue is unchanged", () => {
+    expect(ids(replacementFirst(q, null))).toEqual(["topic:a", "topic:b", "topic:c"]);
+    expect(ids(replacementFirst(q, "topic:gone"))).toEqual(["topic:a", "topic:b", "topic:c"]);
+  });
+});
+
+describe("rotation settings", () => {
+  const base = { DATABASE_URL: "postgres://unused", ORACLE_TOKEN: "t".repeat(32) };
+  test("the timeout outlasts the stale window, so a trend rotating out is never brought back just before it retires", () => {
+    const c = loadConfig(base);
+    expect(c.ROTATION_TIMEOUT_SEC).toBeGreaterThanOrEqual(c.ROTATION_STALE_WINDOW_SEC + 3600);
+    expect(() => loadConfig({ ...base, ROTATION_TIMEOUT_SEC: "21600", ROTATION_STALE_WINDOW_SEC: "21600" })).toThrow(/ROTATION_TIMEOUT_SEC/);
   });
 });

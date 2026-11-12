@@ -132,7 +132,8 @@ const schema = z.object({
   ROTATION: z.enum(["on", "off"]).default("on"),
   ROTATION_MIN_AGE_SEC: z.coerce.number().int().positive().default(36 * 3600),
   ROTATION_FADE_RATIO: z.coerce.number().gt(0).lt(1).default(0.6),
-  ROTATION_TIMEOUT_SEC: z.coerce.number().int().positive().default(6 * 3600),
+  // At least an hour past the stale window (loadConfig checks): the trend can retire only after it, so an earlier timeout would bring it back.
+  ROTATION_TIMEOUT_SEC: z.coerce.number().int().positive().default(7 * 3600),
   ROTATION_LIST_GRACE_SEC: z.coerce.number().int().positive().default(20 * 60),
   // The registry's stale_retire_window (6 h on testnet).
   ROTATION_STALE_WINDOW_SEC: z.coerce.number().int().positive().default(6 * 3600),
@@ -206,6 +207,8 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
   if (parsed.NEAR_NETWORK === "mainnet" && !parsed.ACTIVATION_TICKET_KEY) throw new Error("mainnet needs ACTIVATION_TICKET_KEY: the relayer creates accounts only with an activation ticket");
   const rpc = rpcEndpoints(parsed.NEAR_NETWORK, list(parsed.NEAR_RPC_URLS), list(parsed.FASTNEAR_API_KEYS));
   for (const a of parsed.ADMIN_ACCOUNTS) accountId.parse(a);
+  // The registry retires a trend rotating out a stale window after its last update, which can fall just after the rotation started.
+  if (parsed.ROTATION_TIMEOUT_SEC < parsed.ROTATION_STALE_WINDOW_SEC + 3600) throw new Error("ROTATION_TIMEOUT_SEC must be at least an hour longer than ROTATION_STALE_WINDOW_SEC");
   const systemServices = [...parseServices(parsed.STATUS_SERVICES), ...parseServices(parsed.ADMIN_SERVICES)].filter((s, i, all) => all.findIndex((x) => x.name === s.name) === i);
   return { ...parsed, deployment, rpc, frontendOrigins: list(parsed.FRONTEND_URL), landingOrigins: list(parsed.LANDING_URL), systemServices };
 }

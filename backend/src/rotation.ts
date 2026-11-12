@@ -72,3 +72,13 @@ export function pickRotation(
     reason: `faded to ${pick.t.index.toFixed(1)} (${pct}% of its ${pick.t.peakIndex.toFixed(1)} peak, median ${mid.toFixed(1)}); ${strongest.identifier} draws ${Math.round(strength)} mentions to its ${Math.round(pick.mentions)}`,
   };
 }
+
+/**
+ * The oracle's queue with the running rotation's replacement first, so the trend that takes the
+ * freed slot is the one the rotation named. Kept topics and community picks still go before it:
+ * the oracle tries those first whatever the order.
+ */
+export function replacementFirst<T extends { identifier: string }>(queue: readonly T[], replacement: string | null | undefined): T[] {
+  const i = replacement ? queue.findIndex((c) => c.identifier === replacement) : -1;
+  return i <= 0 ? [...queue] : [queue[i]!, ...queue.slice(0, i), ...queue.slice(i + 1)];
+}

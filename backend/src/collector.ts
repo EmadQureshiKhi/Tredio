@@ -34,7 +34,7 @@ const RESUME_MARGIN_SEC = 15 * 60;
 export interface CollectorConfig {
   /** Rotation (see rotation.ts); absent, nothing rotates. */
   rotation?: RotationRules & {
-    /** A rotation still live after this long is called off (the registry retires a stale trend after 2 h on Testnet). */
+    /** A rotation still live after this long is called off; longer than `staleWindowSec`, after which the registry can retire the trend. */
     timeoutSec: number;
     /** A new trend must take the slot within this long, or the rotation is called off and the trend stays. */
     listGraceSec: number;

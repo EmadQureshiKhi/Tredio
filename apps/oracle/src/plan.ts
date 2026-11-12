@@ -53,6 +53,15 @@ export function freeListing(base: string, statusOf: (id: string) => Trend["statu
 }
 
 /**
+ * Live slots a run may list into. A trend rotating out stays on the registry until it retires as
+ * stale, but its slot is already its successor's: the backend calls a rotation off when no new
+ * trend takes that slot.
+ */
+export function freeSlots(all: readonly Pick<Trend, "id" | "status">[], rotating: ReadonlySet<string>, maxLive: number): number {
+  return Math.max(0, maxLive - all.filter((t) => t.status !== "retired" && !rotating.has(t.id)).length);
+}
+
+/**
  * The run's sample: trends whose series wait on a settlement observation first, then candidates
  * (while live slots are free), then the trends observed longest ago.
  */

@@ -105,6 +105,12 @@ pub fn free_listing(base: &str, status_of: impl Fn(&str) -> Option<String>) -> O
     None
 }
 
+/// Live slots a run may list into. A trend rotating out stays on the registry until it retires as stale, but its slot
+/// is already its successor's: the backend calls a rotation off when no new trend takes that slot.
+pub fn free_slots(all: &[Trend], rotating: &HashSet<&str>, max_live: usize) -> usize {
+    max_live.saturating_sub(all.iter().filter(|t| t.status != "retired" && !rotating.contains(t.id.as_str())).count())
+}
+
 pub fn allocate(live: &[LiveTrend], candidates: &[Candidate], slots: usize, max_candidates: usize, free_slots: usize) -> (Vec<LiveTrend>, Vec<Candidate>) {
     let by_age = |a: &&LiveTrend, b: &&LiveTrend| a.trend.updated_at.cmp(&b.trend.updated_at).then(a.trend.id.cmp(&b.trend.id));
     let mut pending: Vec<&LiveTrend> = live.iter().filter(|t| t.pending_due > 0).collect();
@@ -211,5 +217,17 @@ mod tests {
         assert_eq!(new_trends[0].surfacer.as_deref(), Some("alice.testnet"));
         assert_eq!(new_trends[1].surfacer, None);
         assert_eq!(payable_surfacer(Some(&format!("0u{}", "a".repeat(52)))), Some(format!("0u{}", "a".repeat(52))));
+    }
+
+    #[test]
+    fn a_trend_rotating_out_frees_its_slot() {
+        let t = |id: &str, status: &str| Trend { id: id.into(), status: status.into(), updated_at: NOW, index: 0, asset: None };
+        let full: Vec<Trend> = (0..24).map(|i| t(&format!("topic:t{i}"), if i % 2 == 0 { "active" } else { "cooling" })).chain([t("topic:old", "retired")]).collect();
+        assert_eq!(free_slots(&full, &HashSet::new(), 24), 0);
+        assert_eq!(free_slots(&full, &["topic:t3"].into(), 24), 1);
+        // Once the successor lists, the board is full again while the old trend waits to retire.
+        let listed: Vec<Trend> = full.iter().cloned().chain([t("topic:new", "active")]).collect();
+        assert_eq!(free_slots(&listed, &["topic:t3"].into(), 24), 0);
+        assert_eq!(free_slots(&listed, &HashSet::new(), 24), 0);
     }
 }

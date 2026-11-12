@@ -30,6 +30,7 @@ import type { Log } from "../log";
 import { type Radar, SOURCE_ATTRIBUTION } from "../radar";
 import { communityPicks, mentionsOf, type QueueOptions, rankQueue } from "../queue";
 import { readingsOf, signalOf, SPARK_HOURS, SPARK_SOURCES, sparkOf } from "../radar-view";
+import { replacementFirst } from "../rotation";
 import type { Jobs } from "../jobs";
 import type { Gdelt } from "../sources/gdelt";
 import type { Fetch } from "../sources/http";
@@ -481,7 +482,7 @@ export function createApp(d: AppDeps): Hono {
       // `pinned`: kept by an admin; the workflow tries it first and lists crypto without smart-money inflow.
       // `pick`: a community pick; the workflow tries it right after kept topics, with every listing check.
       // `reviewHash`: the NEAR AI Cloud review the registry stores with the listing (GET /v1/reviews/<hash>).
-      candidates: ranked.map((a) => ({
+      candidates: replacementFirst(ranked, rotation?.replacement).map((a) => ({
         identifier: a.identifier,
         keywords: a.keywords.slice(0, 5),
         surfacer: a.surfacer,
