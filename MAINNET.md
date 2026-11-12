@@ -67,7 +67,7 @@ Not rehearsed: Chain Signatures signing (it needs the MPC network), live 1Click 
    `ORACLE_PUBLIC_KEY=ed25519:... contracts/scripts/deploy.sh mainnet` prints what it will do and waits for you to type `deploy to mainnet`.
    Commit the `deployments/mainnet.json` it writes.
 5. **Verify the source on NearBlocks.**
-   Each contract's code names the repository and commit (NEP-330), so NearBlocks' contract tab (SourceScan) can rebuild it and mark it verified.
+   Each contract's code names the repository and commit (NEP-330), so NearBlocks' verify page (`nearblocks.io/verify-contract?account=<contract>`, verifier SourceScan) fills itself in; submit it for each contract, as was done for the eight on testnet.
    `NEAR_NETWORK=mainnet pnpm verify --rebuild` does the same check locally.
 6. **Services.**
    Set `NEAR_NETWORK=mainnet` in every service's `.env`, with the mainnet service accounts and keys, give them gas keys (`NEAR_NETWORK=mainnet bun scripts/gas-keys.ts <account>`), and set `ACTIVATION_TICKET_KEY` on the API and `ACTIVATION_TICKET_SIGNER` on the relayer.

@@ -11,7 +11,7 @@ Results from 2026-11-07, on the code deployed on NEAR testnet under `tredio.test
 | Check | Tool | Result |
 | --- | --- | --- |
 | Line-by-line audit | `near-contract-audit` checklist and manual review ([AUDIT.md](contracts/AUDIT.md)) | 11 findings (1 high, 7 medium, 3 low): 10 fixed with a test each, 1 accepted by design and bounded on chain (M-4) |
-| Deployed code is this source | Reproducible builds in SourceScan's Docker image (NEP-330), `near contract verify`, `pnpm verify` | 10 of 10 match byte for byte: the 8 contracts are reproducible builds of commit `d976aea`, ready for NearBlocks verification once it is public; the newest account code (v3) is the reproducible build of commit `18dd319`, and the global coin code matches the local build |
+| Deployed code is this source | Reproducible builds in SourceScan's Docker image (NEP-330), NearBlocks verification, `near contract verify`, `pnpm verify` | 10 of 10 match byte for byte: the 8 contracts are reproducible builds of commit `d976aea`, source-verified on NearBlocks on 2026-11-12; the newest account code (v3) is the reproducible build of commit `18dd319`, and the global coin code matches the local build |
 | NEAR rules | `pnpm security` | 6 of 6 hold: overflow checks, no `unsafe`, 30 of 30 callbacks private, 6 of 6 token receivers check their token, `signer_account_id` only to require a direct call (1 use), no joint promise returned |
 | Static analysis | Clippy's security lints on the wasm32 build | 0 panics; every truncating cast, unwrap and slice index reviewed (below) |
 | Static analysis built for NEAR | BlockSec's Rustle, every detector, adapted to LLVM 22 ([contracts/RUSTLE.md](contracts/RUSTLE.md)) | 0 high, 0 medium; 2 low findings, both fixed and gone on a second run; the rest triaged as false positives or by design |
@@ -49,15 +49,17 @@ On NEAR an account's `code_hash` is the SHA-256 of the wasm it runs, and global 
 
 - **Reproducible builds.**
   The eight contract accounts run wasm that `contracts/scripts/build.sh --reproducible` built in SourceScan's pinned Docker image (`sourcescan/cargo-near:0.22.0-rust-1.98.1`, by digest) from commit `d976aea` of this repository, redeployed on 2026-11-07 with no change to their state.
-  Each records the repository, the commit and the build command (NEP-330 `contract_source_metadata`), so NearBlocks' contract tab can rebuild it from the public source and mark it verified, and anyone can rebuild it with Docker alone.
-- **Checked here before it is public.**
-  `near contract verify --use-contract-source-code-path <checkout of d976aea> deployed-at <contract> network-config testnet now` rebuilt `registry` and `perps` the way SourceScan does and answered, for each, that the code on chain and the code built from the repository are the same.
-  Without `--use-contract-source-code-path` it fetches the source from GitHub, which works once the commit is pushed.
+  Each records the repository, the commit and the build command (NEP-330 `contract_source_metadata`), so anyone can rebuild it with Docker alone.
+- **Verified on NearBlocks.**
+  On 2026-11-12 SourceScan (`v2-verifier.sourcescan.testnet`, the verifier behind NearBlocks' contract tab) rebuilt all eight from the public repository at `d976aea`, matched each code hash and published the source to IPFS.
+  Each account's Contract tab on NearBlocks reads "Contract Source Code Verified" and lists the source files, for example [registry](https://testnet.nearblocks.io/address/registry.tredio.testnet/contract/code).
+- **`near contract verify`.**
+  `near contract verify deployed-at <contract> network-config testnet now` fetches the commit from GitHub, rebuilds it the way SourceScan does and answers whether the code on chain and the code built from the repository are the same; it agreed for `registry` and `perps`.
 - **Global code.**
   The coin code and account code v1 and v2 were published from the local build (rustc 1.98.1, cargo-near 0.22.0) before reproducible builds existed here; account code v3 is a reproducible build of commit `18dd319`, published on 2026-11-10.
   Republishing burns ten times the storage price (31.55 NEAR for the account code), so testnet keeps the older ones, and `pnpm verify` compares the newest account code with its reproducible build and the coin code with `pnpm build:contracts`.
   On mainnet every artifact, global code included, is a reproducible build ([MAINNET.md](MAINNET.md)).
-- **`pnpm verify`** checks each: the commit a contract names is in this repository and its contract source is unchanged since, and its code hashes like that commit's reproducible build (`--rebuild` makes the builds it is missing).
+- **`pnpm verify`** checks each: the commit a contract names is in this repository and its contract source is unchanged since, its code hashes like that commit's reproducible build (`--rebuild` makes the builds it is missing), and SourceScan lists it as verified.
 
 | Contract | Account | Build | Size | Code hash (base58 SHA-256) |
 | --- | --- | --- | --- | --- |
@@ -185,7 +187,6 @@ Each finding got a failing test first, then the fix.
 - No independent audit firm has reviewed the contracts; the audit above is a self-audit.
 - The off-chain services (relayer, keeper, market maker, oracle runner, indexer, API, app) are outside the contract audit; their tests run in CI and `pnpm verify`.
 - The testnet contract accounts keep full-access keys so the team can redeploy; before mainnet they are removed or moved behind a timelocked multisig ([AUDIT.md](contracts/AUDIT.md), "Trust assumptions").
-- NearBlocks shows the "verified" badge only after SourceScan rebuilds from the public repository, which waits for the code to be pushed.
 
 ## Reporting a vulnerability
 

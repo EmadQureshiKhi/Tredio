@@ -15,7 +15,7 @@
   <br>
   <img alt="Rust: near-sdk 5" src="https://img.shields.io/badge/Rust-near--sdk%205-b7410e?style=flat-square&logo=rust&logoColor=white">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-Bun%20%C2%B7%20Next.js-3178c6?style=flat-square&logo=typescript&logoColor=white">
-  <a href="SECURITY.md"><img alt="Contracts: reproducible builds" src="https://img.shields.io/badge/contracts-reproducible%20builds-0f8a5f?style=flat-square"></a>
+  <a href="https://testnet.nearblocks.io/address/registry.tredio.testnet/contract/code"><img alt="Contracts: source verified on NearBlocks" src="https://img.shields.io/badge/contracts-source%20verified-0f8a5f?style=flat-square"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-71717a?style=flat-square"></a>
 </p>
 
@@ -236,6 +236,7 @@ The details are in [AGENTS.md](AGENTS.md#how-the-pieces-trust-each-other) and [c
 | `accounts` | [`accounts.tredio.testnet`](https://testnet.nearblocks.io/address/accounts.tredio.testnet) | Factory for passkey universal accounts on a global contract |
 | `usdc` | [`usdc.tredio.testnet`](https://testnet.nearblocks.io/address/usdc.tredio.testnet) | Test USDC with a faucet (mainnet uses native USDC) |
 
+- All eight are source-verified on NearBlocks: SourceScan rebuilt each from commit [`d976aea`](https://github.com/EmadQureshiKhi/Tredio/tree/d976aea4a71665cb6630f9800f424d90b1977be) of this repository, and each account's Contract tab shows the source it runs.
 - Account ids, global code hashes and the oracle key are in [`deployments/testnet.json`](deployments/testnet.json).
 - Testnet activity comes from project-run accounts, including the demo traders [JUDGES.md](JUDGES.md#demo-activity) describes.
 - The contracts were self-audited against the near-contract-audit checklist and then reviewed again in a separate AI review pass; findings, fixes, what is still open on testnet and the team's remaining powers are in [`contracts/AUDIT.md`](contracts/AUDIT.md).
@@ -245,7 +246,7 @@ The details are in [AGENTS.md](AGENTS.md#how-the-pieces-trust-each-other) and [c
 ## Ready for mainnet
 
 The same code runs on NEAR mainnet: one switch (`NEAR_NETWORK=mainnet`) moves every service and the app to [`deployments/mainnet.json`](deployments/mainnet.json), which names Circle's native USDC, Rhea's `v2.ref-finance.near`, the `v1.signer` Chain Signatures contract and OutLayer's `outlayer.near`.
-What is left is deploying and funding: [`contracts/scripts/deploy.sh mainnet`](contracts/scripts/deploy.sh) deploys only reproducible builds of a clean commit, so NearBlocks can verify every contract from this repository.
+What is left is deploying and funding: [`contracts/scripts/deploy.sh mainnet`](contracts/scripts/deploy.sh) deploys only reproducible builds of a clean commit, so every mainnet contract is verified on NearBlocks the way the testnet ones are.
 A mainnet rehearsal runs the whole plan on a local NEAR sandbox against the code mainnet runs today for USDC and Rhea, through to a trend coin graduating into a real Rhea pool:
 
 ```bash
@@ -300,7 +301,7 @@ pnpm dev
 pnpm verify
 ```
 
-`pnpm verify` reads NEAR testnet and checks the claims in [JUDGES.md](JUDGES.md): every contract holds code, and that code hashes byte for byte like its build from this checkout (the reproducible build of the commit the contract or the account code names, or `pnpm build:contracts` for the coin code); user accounts run published global code and derive from their passkeys, a live session gas key, the oracle key the registry trusts and how fresh its last report is, a Hyperliquid order signed through Chain Signatures, OutLayer's record of an enclave run (it carries a TDX quote), an x402 payment, a curation claim, a paid signal and the policy wallet; then it runs every test suite.
+`pnpm verify` reads NEAR testnet and checks the claims in [JUDGES.md](JUDGES.md): every contract holds code, and that code hashes byte for byte like its build from this checkout (the reproducible build of the commit the contract or the account code names, or `pnpm build:contracts` for the coin code) and SourceScan lists it as verified; user accounts run published global code and derive from their passkeys, a live session gas key, the oracle key the registry trusts and how fresh its last report is, a Hyperliquid order signed through Chain Signatures, OutLayer's record of an enclave run (it carries a TDX quote), an x402 payment, a curation claim, a paid signal and the policy wallet; then it runs every test suite.
 
 ---
 
@@ -312,7 +313,7 @@ Details and how to rerun each one are in [SECURITY.md](SECURITY.md).
 | Check | Result |
 | --- | --- |
 | Self-audit ([contracts/AUDIT.md](contracts/AUDIT.md)) | 11 findings, 10 fixed with a test each, 1 accepted by design and bounded on chain |
-| Deployed code is this source (`pnpm verify`, `near contract verify`) | 10 of 10 code hashes match byte for byte; the 8 contracts are reproducible builds (SourceScan's Docker image, NEP-330) that NearBlocks can verify once the repository is public |
+| Deployed code is this source (NearBlocks, `pnpm verify`, `near contract verify`) | 10 of 10 code hashes match byte for byte; the 8 contracts are reproducible builds (SourceScan's Docker image, NEP-330), source-verified on NearBlocks |
 | NEAR rules (`pnpm security`) | private callbacks, token receivers check their token, overflow checks, no `unsafe`, the signer used only to require a direct call: all hold |
 | Clippy security lints on the wasm build | 0 panics; every truncating cast, unwrap and slice index reviewed |
 | BlockSec's Rustle, the NEAR static analyzer ([contracts/RUSTLE.md](contracts/RUSTLE.md)) | 0 high, 0 medium; 2 low findings, both fixed |

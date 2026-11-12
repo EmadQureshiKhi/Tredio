@@ -193,6 +193,21 @@ async function chain() {
     return ok(`${items.length} of ${items.length} hash like their ${how}, byte for byte`);
   });
 
+  // NearBlocks' "Contract Source Code Verified" comes from SourceScan, which rebuilt each contract from the commit its
+  // code names and published the source; its API lists the accounts verified for a code hash.
+  await check(S, "Source verified on NearBlocks", async () => {
+    const own = Object.entries(D.contracts).filter(([role, account]) => role !== "usdc" || account.endsWith(`.${D.root}`));
+    const missing: string[] = [];
+    for (const [, account] of own) {
+      const { code_hash } = await viewAccount(account);
+      const r = await fetch(`https://api.sourcescan.dev/api/contracts/by-code-hash/${code_hash}?networkId=${NETWORK}`, { signal: AbortSignal.timeout(10_000) });
+      if (!r.ok) return fail(`SourceScan answered ${r.status} for ${account}`);
+      const { contracts } = (await r.json()) as { contracts: Array<[string, unknown]> };
+      if (!contracts.some(([id]) => id === account)) missing.push(account);
+    }
+    return missing.length ? fail(`not verified: ${missing.join(", ")}`) : ok(`${own.length} of ${own.length} contracts, rebuilt by SourceScan from this repository`);
+  });
+
   await check(S, "Accounts run published global code", async () => {
     const [, , codeHash] = await viewer.view<[string, unknown, string, number]>(D.contracts.accounts, "config");
     if (codeHash !== D.globalCode.account) return fail(`factory uses ${codeHash}, deployments say ${D.globalCode.account}`);
