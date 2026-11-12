@@ -43,7 +43,7 @@ Tredio's own UI scenes, rendered with `assets/brand/export.sh scenes`.
 Every trend, account name and number in them is illustrative.
 
 `example-near.webp`, `example-agents.webp`, `example-heatwave.webp` (in `public/assets/img`), and the link cards `src/app/opengraph-image.jpg` and `twitter-image.jpg`.
-The hero film and its poster (`public/assets/video/`) are edited in `video/` from the owner's own source film.
+The hero film and its poster (`public/assets/video/`) are edited from the owner's own source film.
 
 ## Logos in "Built with"
 

@@ -56,6 +56,9 @@ Thumbs.db
 # Deploy script markers
 deployments/.*
 
-# README art tooling
-tools/.venv/
 __pycache__/
+
+# Internal tooling and agent notes: kept on the machine, not part of the project
+/tools/
+/video/
+CLAUDE.md

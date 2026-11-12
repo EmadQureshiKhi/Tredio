@@ -3,7 +3,7 @@
 The logo is a brush-stroke T: a crossbar with a waving top edge and a stem that tapers to a foot.
 The wordmark is TREDIO in capitals: that T, then REDIO outlined from Arial Bold at the T's cap height with the font's own spacing, on one base line.
 The lockup is the wordmark with the T in the glyph colour; the glyph alone is the T.
-`tools/make_brand_marks.py` draws every SVG here (and the path data the apps draw inline), so the marks never drift apart.
+One internal script draws every SVG here (and the path data the apps draw inline), so the marks never drift apart.
 
 ## Colours
 
@@ -31,7 +31,7 @@ Keep clear space around the logo of at least the T's crossbar height, and do not
 
 ## Export
 
-After changing the marks, run `tools/.venv/bin/python -I tools/make_brand_marks.py` (it needs fontTools and macOS's Arial Bold) and paste the path data it prints into `frontend/src/components/shell/Logo.tsx`, `admin/src/components/Header.tsx` and `landing-page/src/components/brand/Logo.jsx`.
+After changing the marks, regenerate them with that script and paste the new path data into the apps' logo components.
 `assets/brand/export.sh icons` writes the favicons, PWA and touch icons and logos into `frontend/public`, `admin/public` and `landing-page`.
 `assets/brand/export.sh scenes` renders the scenes with Google Chrome and writes the link cards, the X banner and the example market pictures.
 It needs `rsvg-convert`, ImageMagick, `cwebp`, `sips` (macOS) and Google Chrome.
