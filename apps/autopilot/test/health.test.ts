@@ -31,6 +31,18 @@ describe("health", () => {
     expect(down.body).toMatchObject({ ok: false, wallets: [], alerts: { database: "database unreachable: connection refused" } });
   });
 
+  test("the bot's session: a warning three days before it ends, unhealthy once it has", async () => {
+    const at = (expiresAt: number | null) => healthReport({ ...base, status: () => status(), stats, wallet: wallet("0.35"), botSessionExpiresAt: async () => expiresAt });
+    expect((await at(T + 10 * 86_400)).body.alerts).toEqual({});
+    const soon = await at(T + 2 * 86_400);
+    expect(soon.httpStatus).toBe(200);
+    expect(soon.body.alerts).toEqual({ botSession: "the bot's Autopilot session ends in 48h; renew it" });
+    const ended = await at(T - 60);
+    expect(ended.httpStatus).toBe(503);
+    expect(ended.body.alerts).toEqual({ botSession: "the bot's Autopilot session has ended; renew it (add_session with the same key)" });
+    expect((await at(null)).body.alerts).toEqual({ botSession: "the bot's Autopilot session is not on its account" });
+  });
+
   test("/live answers whatever the database says", async () => {
     const app = healthApp({ ...base, status: () => status(), stats: async () => Promise.reject(new Error("down")), wallet: async () => null });
     expect(await (await app.request("/live")).json()).toEqual({ live: true });

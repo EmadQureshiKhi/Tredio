@@ -6,12 +6,16 @@ import type { WalletCheck } from "./wallets";
 
 /** A session call attaches 300 Tgas, which a gas key prepays at 1e9 yocto per gas: 0.3 NEAR. */
 export const SESSION_CALL_GAS_NEAR = 0.3;
+/** Warn this long before the bot's session ends, so it is renewed (one passkey request) before the bot stops. */
+export const BOT_SESSION_WARN_SEC = 3 * 86_400;
 
 export interface HealthDeps {
   status: () => ExecutorStatus;
   stats: ExecutorDb["stats"];
   /** The bot account with its session gas key, or null without a bot. */
   wallet: () => Promise<WalletHealth | null>;
+  /** When the bot's session ends on chain (unix seconds), or null without a bot or session. Sessions last 30 days at most. */
+  botSessionExpiresAt?: () => Promise<number | null>;
   /** The last check of each policy wallet the executor trades through (OutLayer custody or Agent API agents). */
   policyWallets?: () => WalletCheck[];
   network: string;
@@ -32,7 +36,11 @@ export interface HealthDeps {
 export async function healthReport(d: HealthDeps): Promise<{ httpStatus: 200 | 503; body: Record<string, unknown> }> {
   const nowSec = Math.floor((d.now ?? Date.now)() / 1000);
   const s = d.status();
-  const [stats, wallet] = await Promise.all([d.stats(nowSec).then((v) => ({ ok: true as const, v }), (e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e) })), d.wallet().catch(() => null)]);
+  const [stats, wallet, botExpiresAt] = await Promise.all([
+    d.stats(nowSec).then((v) => ({ ok: true as const, v }), (e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e) })),
+    d.wallet().catch(() => null),
+    d.botSessionExpiresAt?.().catch(() => undefined),
+  ]);
   const alerts: Record<string, string> = {};
   const ticking = s.lastTickAt !== null && nowSec - s.lastTickAt <= d.tickSec * 4;
   if (!ticking) alerts.stale = s.lastTickAt === null ? "no tick yet" : `no tick for ${nowSec - s.lastTickAt}s`;
@@ -45,7 +53,11 @@ export async function healthReport(d: HealthDeps): Promise<{ httpStatus: 200 | 5
   const waitingWallets = policyWallets.filter((w) => w.problem !== null).length;
   const gas = wallet?.gasKeys[0];
   if (wallet && (!gas || Number(gas.balance) < SESSION_CALL_GAS_NEAR)) alerts.gas = gas ? `the bot's session gas key holds ${gas.balance} NEAR, below the ${SESSION_CALL_GAS_NEAR} NEAR a session call prepays` : "the bot's session gas key is not on its account";
-  const ok = ticking && stats.ok && s.failingTicks < 3 && !alerts.gas;
+  // The bot trades only through its session: once it ends, the bot's rules wait and nothing else says why.
+  const botExpired = wallet !== null && botExpiresAt !== undefined && (botExpiresAt === null || botExpiresAt <= nowSec);
+  if (botExpired) alerts.botSession = botExpiresAt === null ? "the bot's Autopilot session is not on its account" : "the bot's Autopilot session has ended; renew it (add_session with the same key)";
+  else if (wallet !== null && typeof botExpiresAt === "number" && botExpiresAt - nowSec < BOT_SESSION_WARN_SEC) alerts.botSession = `the bot's Autopilot session ends in ${Math.ceil((botExpiresAt - nowSec) / 3600)}h; renew it`;
+  const ok = ticking && stats.ok && s.failingTicks < 3 && !alerts.gas && !botExpired;
   const flags = [...(s.kill.engaged ? ["kill switch engaged"] : []), ...(d.sealKeyId === null ? ["no seal key: grants cannot trade"] : [])];
   const facts = [
     ...(s.lastTickAt !== null ? [{ label: "Last tick", at: s.lastTickAt }, { label: "Tick took", value: `${s.lastTickMs} ms` }] : []),

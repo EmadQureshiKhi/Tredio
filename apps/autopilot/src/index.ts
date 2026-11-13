@@ -143,6 +143,7 @@ const server = Bun.serve({
     status: () => executor.status,
     stats: (nowSec) => db.stats(nowSec),
     wallet: async () => (botWallet ? botWallet() : null),
+    botSessionExpiresAt: async () => (cfg.bot ? ((await viewer.view<{ expires_at: number } | null>(cfg.bot.account, "session", { public_key: cfg.bot.sessionKey }))?.expires_at ?? null) : null),
     policyWallets: () => venues.walletChecks(),
     network: cfg.NEAR_NETWORK,
     tickSec: cfg.TICK_SEC,
