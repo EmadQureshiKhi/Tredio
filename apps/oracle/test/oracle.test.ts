@@ -3,7 +3,7 @@ import { AUTOPILOT_MARKETS } from "@tredio/autopilot";
 import type { Trend } from "@tredio/contracts";
 import { loadConfig } from "../src/config";
 import { ENCLAVE_RETRY_MS, Oracle, retryUntil } from "../src/oracle";
-import type { EnclaveOutput } from "../src/outlayer";
+import { type EnclaveOutput, noOutputReason } from "../src/outlayer";
 import { boostedPoints, normalizeCount, toIndexUnits } from "../src/index-method";
 import { METHOD, measure } from "../src/method";
 import { allocate, assetClassOf, type Candidate, decide, freeListing, freeSlots, type LiveTrend, payableSurfacer, reportMarks } from "../src/plan";
@@ -213,5 +213,15 @@ describe("enclave runs", () => {
     expect(calls).toBe(2);
     expect(oracle.enclaveFailures).toBe(0);
     expect(oracle.enclaveOkAt).not.toBeNull();
+  });
+});
+
+describe("an OutLayer request without output says why", () => {
+  test("the enclave's own failure, a request no worker answered in time, or nothing at all", () => {
+    expect(noOutputReason(["Execution failed: timeout"])).toBe("Execution failed: timeout");
+    expect(noOutputReason(['[[yNEAR charged: "1000000000000000000000"]]', "Execution promise failed: Failed. Refunded 6002000000000000000000 yoctoNEAR"])).toBe(
+      "OutLayer did not run the request in time: no worker answered within NEAR's 200-block window",
+    );
+    expect(noOutputReason([])).toBe("the enclave returned nothing");
   });
 });

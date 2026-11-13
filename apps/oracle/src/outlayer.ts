@@ -28,6 +28,18 @@ export interface OutLayerOptions {
   secrets: { profile: string; account_id: string } | null;
 }
 
+/**
+ * Why a request came back without output, from OutLayer's logs: the enclave's own failure, or
+ * "Execution promise failed", which OutLayer logs when no worker answered within NEAR's 200-block
+ * window for a yielded call (the enclave never ran).
+ */
+export function noOutputReason(logs: readonly string[]): string {
+  const failed = logs.find((l) => l.startsWith("Execution failed"));
+  if (failed) return failed.slice(0, 300);
+  if (logs.some((l) => l.startsWith("Execution promise failed"))) return "OutLayer did not run the request in time: no worker answered within NEAR's 200-block window";
+  return "the enclave returned nothing";
+}
+
 export class OutLayerRunner {
   constructor(
     private readonly sender: Sender,
@@ -54,10 +66,8 @@ export class OutLayerRunner {
       gas: (300n * 10n ** 12n).toString(),
     });
     const output = returnValue<EnclaveOutput | null>(outcome);
-    if (!output) {
-      const failure = outcome.receipts_outcome?.flatMap((r) => r.outcome.logs).find((l) => l.startsWith("Execution failed")) ?? "the enclave returned nothing";
-      return { output: { report_json: null, error: failure.slice(0, 300) }, tx: outcome.transaction?.hash ?? null };
-    }
-    return { output, tx: outcome.transaction?.hash ?? null };
+    const tx = outcome.transaction?.hash ?? null;
+    if (!output) return { output: { report_json: null, error: `${noOutputReason(outcome.receipts_outcome?.flatMap((r) => r.outcome.logs) ?? [])}${tx ? ` (tx ${tx})` : ""}` }, tx };
+    return { output, tx };
   }
 }
