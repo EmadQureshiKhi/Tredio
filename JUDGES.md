@@ -77,7 +77,8 @@ What happens at the mainnet launch, and the choices made on purpose, are below.
 
 - Mainnet is one switch (`NEAR_NETWORK=mainnet`): the code, the deploy script and a sandbox rehearsal against mainnet's own USDC and Rhea are ready, and the mainnet accounts are created and funded at launch ([MAINNET.md](MAINNET.md)).
 - Deposits through NEAR Intents 1Click settle on mainnet; on testnet the app shows real dry quotes.
-- Hyperliquid withdrawals and the NEAR Intents return route are checked against Hyperliquid's signing vectors and on testnet; their first funded run is part of the pre-mainnet checklist.
+- Hyperliquid transfers ran funded on testnet, each signed through Chain Signatures: the bot moved USDC from spot to perps, sent 60 to each of eight demo traders by `usdSend`, and withdrew 5 USDC through Hyperliquid's bridge to Arbitrum Sepolia ([`Be1B4RNQ...`](https://testnet.nearblocks.io/txns/Be1B4RNQvP3cubUnHzZsaUuPaVjoT2wozck4chjvErNk)).
+  The NEAR Intents return route (a `usdSend` to a 1Click deposit address) settles only on mainnet, so its first run is part of the pre-mainnet checklist.
 - Autopilot's mainnet policy wallets run through the NEAR Intents Agent API, built and tested offline; they go live with the partner key at launch.
 
 ### Demo activity

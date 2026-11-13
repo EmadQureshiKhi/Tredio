@@ -190,8 +190,8 @@ It then asks [Chain Signatures](https://docs.near.org/chain-abstraction/chain-si
 
 A session can only sign orders within 2% of a fresh oracle mark and up to 10x leverage, enforced on chain.
 
-- **Status on testnet:** Account code v3, whose guard binds the mark to the signed asset ([AUDIT.md](contracts/AUDIT.md), H-1) and which requires the passkey's user verification, is published. New accounts start on it, and older ones upgrade from Settings with one passkey prompt.
-- **In the app:** The Perp tab's Hyperliquid market, on a trend with an asset. Today's live trends are mostly topics, and crypto trends (NEAR and Hyperliquid are queued) list once Nansen confirms smart-money inflow.
+- **Status on testnet:** Orders fill on Hyperliquid testnet: the Tredio bot's BTC buy [`4sjJsezW...`](https://testnet.nearblocks.io/txns/4sjJsezW9JUbEfYo6KZ3K4hrc4HxzQg6MnBwzFkWZX9o) was signed this way, and `pnpm verify` checks it against Hyperliquid's public record. Account code v3, whose guard binds the mark to the signed asset ([AUDIT.md](contracts/AUDIT.md), H-1) and which requires the passkey's user verification, is published. New accounts start on it, and older ones upgrade from Settings with one passkey prompt.
+- **In the app:** The Perp tab's Hyperliquid market, on a trend with an asset: `crypto:btc` and `crypto:eth` today. Crypto trends list once Nansen confirms smart-money inflow.
 - **Code:** [`contracts/account/src/hyperliquid.rs`](contracts/account/src/hyperliquid.rs), [`packages/hyperliquid`](packages/hyperliquid)
 
 <br>
@@ -226,7 +226,7 @@ Account code v3 lets the wallet act for the session as its own implicit account.
 
 Stop-loss, take-profit and loss limits are enforced by the executor off chain.
 
-- **Status on testnet:** An OutLayer enclave signed a `session_call` that a v3 account took as Autopilot's session and signed through Chain Signatures ([`ENCLocW8...`](https://testnet.nearblocks.io/txns/ENCLocW8Mk6KikN2nLgH56UQu8JoxFr2U56wPVn1ejKG)). The mainnet path through the NEAR Intents Agent API is tested offline.
+- **Status on testnet:** Rules and copies fill on Hyperliquid: four demo traders copied the Tredio bot's BTC buy within seconds (one is [`14cjKcUa...`](https://testnet.nearblocks.io/txns/14cjKcUaKwva2wHHixziaQBxziHmciwYsqiK2L8kbnxV)) and closed with it, and an Autopilot rule sold ETH when ETH's attention fell 2.3% in a day ([`BUKGEuMW...`](https://testnet.nearblocks.io/txns/BUKGEuMWwVZJSQqL6pdxXcBsk1ZXK7VEwpzaY5HBgF44)); eight demo traders keep trading this way, set up by [`scripts/hyperliquid-demo.ts`](scripts/hyperliquid-demo.ts). An OutLayer enclave signed a `session_call` that a v3 account took as Autopilot's session and signed through Chain Signatures ([`ENCLocW8...`](https://testnet.nearblocks.io/txns/ENCLocW8Mk6KikN2nLgH56UQu8JoxFr2U56wPVn1ejKG)). The mainnet path through the NEAR Intents Agent API is tested offline.
 - **In the app:** Autopilot (grant access, then "Policy wallet").
 - **Code:** [`apps/autopilot`](apps/autopilot), [`backend/src/autopilot`](backend/src/autopilot), [`packages/custody`](packages/custody)
 

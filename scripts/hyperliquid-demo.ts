@@ -12,6 +12,7 @@
  *   bun scripts/hyperliquid-demo.ts stop <handle> <rule id...>  stops a trader's rules (no approval needed)
  *   bun scripts/hyperliquid-demo.ts trade BTC long 30 the bot opens a position (USDC notional) through its Autopilot session, or
  *   bun scripts/hyperliquid-demo.ts trade BTC close   closes it; the copy traders' follows mirror both
+ *   bun scripts/hyperliquid-demo.ts withdraw 5       the bot withdraws USDC through Hyperliquid's bridge to its own address on Arbitrum Sepolia
  *
  * Needs internal/keys/autopilot-bot.json and internal/keys/activity-personas.json (gitignored), the relayer's
  * and treasury's keys in ~/.near-credentials, and the admin key (tredio.testnet) for the bot's rules.
@@ -41,6 +42,7 @@ import {
   usdClassTransferAction,
   usdSendAction,
   userSignedDigestHex,
+  withdrawAction,
 } from "@tredio/hyperliquid";
 import { AdminApi, BACKEND_URL } from "../admin/e2e/support/backend";
 import { adminAccount } from "../admin/e2e/support/wallet";
@@ -321,6 +323,11 @@ if (step === "renew-bot") {
       log(handle, "rule", created.id, rule.name, "enabled");
     }
   }
+} else if (step === "withdraw") {
+  // withdraw3 from perps, as the app's withdraw sheet sends it; the bridge keeps 1 USDC and pays the rest on Arbitrum (Sepolia here).
+  const amount = BigInt(Math.round(Number(process.argv[3] ?? "5") * 1e6));
+  const address = await addressOf(bot.account);
+  log("bot withdraws", Number(amount) / 1e6, "USDC to", address, "on Arbitrum Sepolia, signed in", await userSigned(bot, withdrawAction("testnet", address, amount)));
 } else if (step === "stop") {
   const [handle = "", ...ids] = process.argv.slice(3);
   const t = trader(handle);
