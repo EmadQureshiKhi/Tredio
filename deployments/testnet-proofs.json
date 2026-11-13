@@ -90,5 +90,34 @@
     "sessionCallTx": "ENCLocW8Mk6KikN2nLgH56UQu8JoxFr2U56wPVn1ejKG",
     "freezeTx": "HbcVYSJTRRZ7ES6PCKt9t94z2dFU6TiDZQGnt4BXDaKF",
     "unfreezeTx": "3rLBDandCdTQAT2aS7kt1CFoP8CjzF34YTkwJ7QEZd9K"
+  },
+  "hyperliquidFills": {
+    "leader": {
+      "account": "0uwe0tdnrj46ft4cg7np83tbk6qwyay776as9nh47zb11p6hjsy4pg",
+      "address": "0x972dac64d693f387cd089f0efcda320c71097a2c",
+      "tx": "4sjJsezW9JUbEfYo6KZ3K4hrc4HxzQg6MnBwzFkWZX9o",
+      "coin": "BTC",
+      "side": "B",
+      "size": "0.00043",
+      "price": "69167"
+    },
+    "copy": {
+      "account": "0ubfvfchbrh9303yzzz6gv4fnnpp5jx39ncqrsr9ncecsz0n1p25fg",
+      "address": "0xa7b1ad65931c6bc45337681e9879404a48697bd4",
+      "tx": "14cjKcUaKwva2wHHixziaQBxziHmciwYsqiK2L8kbnxV",
+      "coin": "BTC",
+      "side": "B",
+      "size": "0.00021",
+      "price": "69185"
+    },
+    "rule": {
+      "account": "0ubab7t94srbs32hprwq0s8186td2t1ts8s0sv9k6403h165pa8p30",
+      "address": "0xf1f840340c22f75e6e6c4a440f78df89e3e4a4fd",
+      "tx": "BUKGEuMWwVZJSQqL6pdxXcBsk1ZXK7VEwpzaY5HBgF44",
+      "coin": "ETH",
+      "side": "A",
+      "size": "0.0186",
+      "price": "1928.33"
+    }
   }
 }

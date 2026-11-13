@@ -111,5 +111,7 @@ To check a deployment end to end, `bun run order` sends one order through a sess
   On v2 the mark must also name the asset index the order signs, so Autopilot waits while the oracle has not reported it.
 - Leaders trade mainnet and followers copy into their testnet accounts; testnet marks drift from mainnet's by a few tenths of a percent, so a tight slippage setting skips copies that would chase the leader's fill.
 - Fresh Hyperliquid testnet accounts hold no USDC (its faucet needs a mainnet history), so openings wait for margin until an account is funded.
+  A funded account passes USDC on with `usdSend`, which lands on the receiver's perps balance; USDC that arrives in spot moves to perps with `usdClassTransfer`. `scripts/hyperliquid-demo.ts fund` does both for the demo traders.
+- The bot trades through its own session, which lasts 30 days at most; `/health` warns three days before it ends and fails once it has. Renewing is one owner request (`add_session` with the same key, account code v2 or later): `bun scripts/hyperliquid-demo.ts renew-bot`.
 - A policy wallet pays its own gas, and OutLayer sends a call only while the wallet holds the gas it attaches (0.15 NEAR for 150 Tgas); below `POLICY_WALLET_GAS_MIN_NEAR` (0.16) Autopilot waits for the account to fund it.
   Its policy allows no transfers, so the NEAR in a wallet stays there after the grant ends.

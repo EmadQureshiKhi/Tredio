@@ -18,6 +18,7 @@ import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58Decode, base58Encode, rpcEndpoints, Viewer } from "@tredio/chain";
 import { accountCodeHashes, deployment, latestAccountCode, type Network } from "@tredio/contracts";
 import { CUSTODY_CONTRACT, custodyKeyOf, nearKeyOf } from "@tredio/custody";
+import { API_URL as HYPERLIQUID_API, hyperliquidAddressOf } from "@tredio/hyperliquid";
 
 const ROOT = join(import.meta.dir, "..");
 const NETWORK = (process.env.NEAR_NETWORK ?? "testnet") as Network;
@@ -46,7 +47,18 @@ const recorded = (existsSync(PROOFS_FILE) ? JSON.parse(readFileSync(PROOFS_FILE,
   settledSeries: { series: number; trend: string; window: number; openTx: string; settleTx: string; keeper: string };
   graduation: { trend: string; pool: number; keeper: string; steps: string[] };
   policyWallet: { account: string; wallet: string; relayer: string; setupTx: string; refusedTx: string; upgradeTx: string; sessionCallTx: string; freezeTx: string; unfreezeTx: string };
+  hyperliquidFills: Record<"leader" | "copy" | "rule", HyperliquidFillProof>;
 } | null;
+interface HyperliquidFillProof {
+  account: string;
+  address: string;
+  tx: string;
+  coin: string;
+  /** Hyperliquid's side: B buys, A sells. */
+  side: "B" | "A";
+  size: string;
+  price: string;
+}
 class NoProofs extends Error {}
 const proofs = new Proxy({} as NonNullable<typeof recorded>, {
   get: (_, key) => {
@@ -55,6 +67,7 @@ const proofs = new Proxy({} as NonNullable<typeof recorded>, {
   },
 });
 const args = new Set(process.argv.slice(2));
+const HYPERLIQUID_INFO = `${HYPERLIQUID_API[NETWORK]}/info`;
 const FASTNEAR_KEYS = (process.env.FASTNEAR_API_KEYS ?? "").split(",").map((k) => k.trim()).filter(Boolean);
 const viewer = new Viewer(NETWORK, rpcEndpoints(NETWORK, [], FASTNEAR_KEYS));
 /** Recorded transactions age out of regular nodes after about five epochs (2.5 days); FastNEAR's archival nodes keep them. */
@@ -287,6 +300,35 @@ async function chain() {
     const mpc = o.receipts_outcome.some((r) => r.outcome.executor_id === D.external.chainSignatures);
     if (!signed || !mpc) return fail(`${tx}: ${signed ? "" : "no hyperliquid_signed event "}${mpc ? "" : `no receipt on ${D.external.chainSignatures}`}`);
     return ok(`${tx.slice(0, 10)}... by ${o.transaction.signer_id.slice(0, 10)}..., signed through ${D.external.chainSignatures}`);
+  });
+
+  await check(S, "Hyperliquid fills: the bot, a copy of it, an Autopilot rule", async () => {
+    const fills = proofs.hyperliquidFills;
+    const seen: string[] = [];
+    for (const [kind, f] of Object.entries(fills)) {
+      // The account's own session signed the order: a session gas key sends from the account itself.
+      const o = await archive.rpc<Outcome>("EXPERIMENTAL_tx_status", { tx_hash: f.tx, sender_account_id: f.account, wait_until: "NONE" });
+      const signed = events(o).some((e) => e.event === "hyperliquid_signed");
+      const mpc = o.receipts_outcome.some((r) => r.outcome.executor_id === D.external.chainSignatures);
+      if (o.transaction.signer_id !== f.account || !signed || !mpc) return fail(`${kind} ${f.tx}: not a Chain Signatures order from ${f.account}`);
+      const address = await hyperliquidAddressOf((c, m, a) => viewer.view(c, m, a), D.external.chainSignatures, f.account);
+      if (address !== f.address.toLowerCase()) return fail(`${kind}: ${f.account} derives ${address}, not ${f.address}`);
+      // Hyperliquid reports one fill per price level an order crossed: total them per order.
+      const res = await fetch(`${HYPERLIQUID_INFO}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type: "userFills", user: address }), signal: AbortSignal.timeout(10_000) });
+      if (!res.ok) return fail(`Hyperliquid answered ${res.status}`);
+      const orders = new Map<number, { coin: string; side: string; size: number; notional: number }>();
+      for (const x of (await res.json()) as Array<{ coin: string; side: string; px: string; sz: string; oid: number }>) {
+        const g = orders.get(x.oid) ?? { coin: x.coin, side: x.side, size: 0, notional: 0 };
+        g.size += Number(x.sz);
+        g.notional += Number(x.sz) * Number(x.px);
+        orders.set(x.oid, g);
+      }
+      const near = (a: number, b: number) => Math.abs(a - b) <= b * 1e-4;
+      const hit = [...orders.values()].find((g) => g.coin === f.coin && g.side === f.side && near(g.size, Number(f.size)) && near(g.notional / g.size, Number(f.price)));
+      if (!hit) return fail(`${kind}: Hyperliquid lists no ${f.side === "B" ? "buy" : "sell"} of ${f.size} ${f.coin} at ${f.price} for ${address}`);
+      seen.push(`${kind} ${f.side === "B" ? "bought" : "sold"} ${f.size} ${f.coin}`);
+    }
+    return ok(`${seen.join("; ")}: each signed through ${D.external.chainSignatures} and filled on Hyperliquid testnet`);
   });
 
   await check(S, "Oracle run attested by OutLayer", async () => {

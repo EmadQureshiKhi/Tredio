@@ -16,6 +16,7 @@ import {
   postUserSigned,
   transferOutcome,
   usdAmount,
+  usdClassTransferAction,
   usdSendAction,
   userSignedBody,
   userSignedDigest,
@@ -111,6 +112,14 @@ describe("user-signed transfers match Hyperliquid's SDK", () => {
     expect(w).toMatchObject({ hyperliquidChain: "Mainnet", signatureChainId: "0xa4b1", amount: "12.5" });
     expect(userSignedDigestHex(w)).toBe("59ac165c84dfe89a8fa99250188fad1309bfc3bb0f02553bf7350a829027219c");
     expect(userSignedDigestHex(usdSendAction("mainnet", destination, 12_500_000n, 1_700_000_000_000))).toBe("aaaa00717967a6e5d56ba6a149fb7171c226d0c5133f10f69edda060b598c902");
+  });
+
+  test("usdClassTransfer moves spot USDC to perps, signed over its nonce (digests from ethers)", () => {
+    const a = usdClassTransferAction("testnet", 1_000_000n, true, time);
+    expect(a).toEqual({ type: "usdClassTransfer", hyperliquidChain: "Testnet", signatureChainId: "0x66eee", amount: "1", toPerp: true, nonce: time });
+    expect(userSignedDigestHex(a)).toBe("5149dfa9ac9a951c7236ba72dd42984ff953a7c61ac8bd3c15cb5976aa33bf67");
+    expect(userSignedDigestHex(usdClassTransferAction("mainnet", 12_500_000n, false, 1_700_000_000_000))).toBe("46bcd93d54a3f05304a4be55b9cc204fea5b552f7169e5f1b73fe56d1c307ae6");
+    expect(userSignedBody(a, { r: "0x01", s: "0x02", v: 27 }).nonce).toBe(time);
   });
 
   test("a checksummed destination is signed and sent in lowercase", () => {

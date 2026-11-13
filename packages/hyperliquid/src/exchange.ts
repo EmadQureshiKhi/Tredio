@@ -1,6 +1,6 @@
 import type { L1Action } from "./actions";
 import { API_URL, type HlNetwork } from "./info";
-import type { UserSignedAction } from "./transfers";
+import { type UserSignedAction, userSignedNonce } from "./transfers";
 
 /** An EVM signature as the account contract returns it from Chain Signatures (r and s hex, no 0x). */
 export interface EvmSignature {
@@ -29,7 +29,7 @@ export function exchangeBody(action: L1Action | UserSignedAction, nonce: number,
 }
 
 /** The same for a withdrawal or USDC send, whose nonce is its own `time`. */
-export const userSignedBody = (action: UserSignedAction, sig: EvmSignature): ExchangeBody => exchangeBody(action, action.time, sig);
+export const userSignedBody = (action: UserSignedAction, sig: EvmSignature): ExchangeBody => exchangeBody(action, userSignedNonce(action), sig);
 
 async function post(network: HlNetwork, body: ExchangeBody, fetchImpl: typeof fetch): Promise<ExchangeResponse> {
   const res = await fetchImpl(`${API_URL[network]}/exchange`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000) });

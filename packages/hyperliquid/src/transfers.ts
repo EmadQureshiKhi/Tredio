@@ -55,10 +55,26 @@ export interface UsdSendAction extends Transfer {
   type: "usdSend";
 }
 
-export type UserSignedAction = WithdrawAction | UsdSendAction;
+/**
+ * Moves USDC between the same address's spot and perps balances (`toPerp`). On an account in
+ * Hyperliquid's default mode, USDC that arrives in spot must move to perps before it margins an order.
+ * Its EIP-712 type is `HyperliquidTransaction:UsdClassTransfer(string hyperliquidChain,string amount,bool toPerp,uint64 nonce)`
+ * (the SDK's `sign_usd_class_transfer_action`), and `nonce` is the request's nonce.
+ */
+export interface UsdClassTransferAction {
+  type: "usdClassTransfer";
+  hyperliquidChain: HyperliquidChain;
+  signatureChainId: string;
+  amount: string;
+  toPerp: boolean;
+  nonce: number;
+}
 
-const PRIMARY_TYPE: Record<UserSignedAction["type"], string> = { withdraw3: "HyperliquidTransaction:Withdraw", usdSend: "HyperliquidTransaction:UsdSend" };
+export type UserSignedAction = WithdrawAction | UsdSendAction | UsdClassTransferAction;
+
+const PRIMARY_TYPE: Record<Exclude<UserSignedAction["type"], "usdClassTransfer">, string> = { withdraw3: "HyperliquidTransaction:Withdraw", usdSend: "HyperliquidTransaction:UsdSend" };
 const FIELDS = "(string hyperliquidChain,string destination,string amount,uint64 time)";
+const CLASS_TRANSFER_TYPE = "HyperliquidTransaction:UsdClassTransfer(string hyperliquidChain,string amount,bool toPerp,uint64 nonce)";
 const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
 export const isEvmAddress = (s: string): boolean => EVM_ADDRESS.test(s.trim());
@@ -88,12 +104,23 @@ export function usdSendAction(network: HlNetwork, destination: string, amount: b
   return { type: "usdSend", ...transfer(network, destination, amount, time) };
 }
 
+/** Moves `amount` raw USDC from spot to perps (`toPerp`) or back, on the signer's own address. */
+export function usdClassTransferAction(network: HlNetwork, amount: bigint, toPerp: boolean, nonce = Date.now()): UsdClassTransferAction {
+  if (!Number.isSafeInteger(nonce) || nonce <= 0) throw new Error("nonce must be a timestamp in milliseconds");
+  return { type: "usdClassTransfer", hyperliquidChain: HYPERLIQUID_CHAIN[network], signatureChainId: SIGNATURE_CHAIN_ID[network], amount: usdAmount(amount), toPerp, nonce };
+}
+
+/** The request nonce of a user-signed action: its `time`, or a class transfer's `nonce`. */
+export const userSignedNonce = (action: UserSignedAction): number => (action.type === "usdClassTransfer" ? action.nonce : action.time);
+
 /** The 32-byte EIP-712 digest the account's Chain Signatures key signs for `action`. */
 export function userSignedDigest(action: UserSignedAction): Uint8Array {
   const chainId = Number.parseInt(action.signatureChainId, 16);
   if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error("bad signatureChainId");
   const structHash = keccak_256(
-    concat(keccakText(`${PRIMARY_TYPE[action.type]}${FIELDS}`), keccakText(action.hyperliquidChain), keccakText(action.destination), keccakText(action.amount), word(action.time)),
+    action.type === "usdClassTransfer"
+      ? concat(keccakText(CLASS_TRANSFER_TYPE), keccakText(action.hyperliquidChain), keccakText(action.amount), word(action.toPerp ? 1 : 0), word(action.nonce))
+      : concat(keccakText(`${PRIMARY_TYPE[action.type]}${FIELDS}`), keccakText(action.hyperliquidChain), keccakText(action.destination), keccakText(action.amount), word(action.time)),
   );
   return typedDataDigest(domainSeparator("HyperliquidSignTransaction", "1", chainId), structHash);
 }
