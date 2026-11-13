@@ -61,9 +61,12 @@ export function isTransient(e: unknown): boolean {
   return /fetch failed|network|timeout|timed out|429|too many|rate limit|deprecated|503|502|504|^(http|rpc) 500\b|internal server error|econnreset|socket|unavailable/.test(m);
 }
 
-/** True when a provider turned the request away for its key: an HTTP 401 or 403 (FastNEAR: 403 "Invalid API key"). */
+/**
+ * True when a provider turned the request away for its key: an HTTP 401 or 403 (FastNEAR: 403 "Invalid API key"),
+ * or a 402 once the key's credits run out (FastNEAR: "quota_exceeded").
+ */
 export function isRefused(e: unknown): boolean {
-  return /^(HTTP|rpc) 40[13]\b|invalid api key/i.test(String((e as Error)?.message ?? e));
+  return /^(HTTP|rpc) 40[123]\b|invalid api key|quota_exceeded|credit limit/i.test(String((e as Error)?.message ?? e));
 }
 
 const FAILOVER_ROUNDS = 3;

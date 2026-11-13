@@ -209,8 +209,10 @@ describe("RPC providers", () => {
     expect(b.order()).toEqual([0, 1]);
   });
 
-  test("a refusal is an HTTP 401 or 403 or FastNEAR's invalid key answer, never a contract's message", () => {
+  test("a refusal is an HTTP 401, 402 or 403 or FastNEAR's invalid key answer, never a contract's message", () => {
     expect(isRefused(new Error("HTTP 403: Forbidden"))).toBe(true);
+    expect(isRefused(new Error("HTTP 402: Payment Required"))).toBe(true);
+    expect(isRefused(new Error("rpc 402"))).toBe(true);
     expect(isRefused(new Error("rpc 401"))).toBe(true);
     expect(isRefused(new Error("Invalid API key"))).toBe(true);
     expect(isRefused(new Error("Smart contract panicked: 403 is not a market"))).toBe(false);
@@ -228,6 +230,26 @@ describe("RPC providers", () => {
     try {
       const v = new Viewer("testnet", [{ url, headers: { authorization: "Bearer refused-in-this-test" } }, url]);
       await expect(v.head()).rejects.toThrow("rpc 429");
+    } finally {
+      console.warn = warn;
+      server.stop(true);
+    }
+  });
+
+  test("a key out of credits (HTTP 402) rests and the public providers answer", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch: (req) =>
+        req.headers.get("authorization")
+          ? Response.json({ error: "quota_exceeded", message: "Credit limit exceeded." }, { status: 402 })
+          : Response.json({ jsonrpc: "2.0", id: 1, result: { sync_info: { latest_block_height: 9, latest_block_time: "2026-11-13T00:00:00Z" } } }),
+    });
+    const url = `http://localhost:${server.port}`;
+    const warn = console.warn;
+    console.warn = () => undefined;
+    try {
+      const v = new Viewer("testnet", [{ url, headers: { authorization: "Bearer out-of-credits-in-this-test" } }, url]);
+      expect((await v.head()).height).toBe(9);
     } finally {
       console.warn = warn;
       server.stop(true);
