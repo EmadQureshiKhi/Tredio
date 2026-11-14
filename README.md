@@ -167,6 +167,8 @@ The `registry` contract accepts a report only with the signature of the one orac
 - **The cap is a guard:** each source is normalized on a log scale up to a saturation level `K` (5,000 Elfa mentions, 1,000 Bluesky posts, 3,000 GDELT articles or 150,000 Wikipedia views a day), so a topic past every answering source's `K` reads exactly 100 until it fades.
   The markets know it: the keeper opens no Up/Down series on a capped trend (Up could not win) and the market maker quotes none there, while perps and the coin keep trading the climb and the fade.
   Testnet's levels are tuned for mid-size topics; the mainnet enclave build (a new hash in any case, [MAINNET.md](MAINNET.md)) recalibrates them from testnet's readings so the biggest topics keep moving on the way up ([`apps/oracle/docs/index-method.md`](apps/oracle/docs/index-method.md)).
+- **Freshness is visible:** testnet reads the attention sources on free tiers, so some readings refresh slowly.
+  A reading past its source's window (two hours for Bluesky and news, twelve for X and Telegram, two days for Wikipedia) is left out of the blend by the oracle and marked "Stale" on the trend page, so the index never leans on old data; mainnet runs paid plans ([ROADMAP.md](ROADMAP.md)).
 - **Code:** [`apps/oracle/tee`](apps/oracle/tee), [`contracts/registry/src/oracle.rs`](contracts/registry/src/oracle.rs), method and trust model in [`apps/oracle/docs`](apps/oracle/docs)
 
 <br>
@@ -327,7 +329,7 @@ The details are in [AGENTS.md](AGENTS.md#how-the-pieces-trust-each-other) and [c
 | `accounts` | [`accounts.tredio.testnet`](https://testnet.nearblocks.io/address/accounts.tredio.testnet) | Factory for passkey universal accounts on a global contract |
 | `usdc` | [`usdc.tredio.testnet`](https://testnet.nearblocks.io/address/usdc.tredio.testnet) | Test USDC with a faucet (mainnet uses native USDC) |
 
-- **Source-verified.** All eight are verified on NearBlocks: SourceScan rebuilt each from commit [`d976aea`](https://github.com/EmadQureshiKhi/Tredio/tree/d976aea4a71665cb6630f9800f424d90b1977be) of this repository, and each account's Contract tab shows the source it runs.
+- **Source-verified.** All eight are verified on NearBlocks: SourceScan rebuilt each from commit [`d976aea`](https://github.com/EmadQureshiKhi/Tredio/tree/d976aea4a71665cb6630ff9800f424d90b1977be) of this repository, and each account's Contract tab shows the source it runs.
 - **Deployments.** Account ids, global code hashes and the oracle key are in [`deployments/testnet.json`](deployments/testnet.json).
 - **Activity.** Testnet activity comes from project-run accounts, including the demo traders [JUDGES.md](JUDGES.md#demo-activity) describes.
 - **Audit.** The contracts were self-audited against the near-contract-audit checklist and then reviewed again in a separate AI review pass; findings, fixes, what is still open on testnet and the team's remaining powers are in [`contracts/AUDIT.md`](contracts/AUDIT.md).
@@ -345,11 +347,12 @@ What is left is deploying and funding.
 A mainnet rehearsal runs the whole plan on a local NEAR sandbox against the code mainnet runs today for USDC and Rhea, through to a trend coin graduating into a real Rhea pool:
 
 ```bash
+pnpm build:contracts
 cd contracts && cargo test -p tredio-sandbox-tests --test mainnet
 ```
 
 The mainnet enclave build also recalibrates the index's saturation levels from testnet's readings, so the biggest topics keep moving instead of resting at 100 (see "The cap is a guard" above).
-What changes on mainnet, the steps and the budget are in [MAINNET.md](MAINNET.md).
+What changes on mainnet, the steps and the budget are in [MAINNET.md](MAINNET.md); the order of work before and after the launch is in [ROADMAP.md](ROADMAP.md).
 
 <br>
 
@@ -388,6 +391,9 @@ Details and how to rerun each one are in [SECURITY.md](SECURITY.md).
 | `cargo deny` on the deployed wasm's dependencies | advisories, bans and sources ok |
 | Tests | 176 unit tests (84% line coverage), 17 integration flows on a real NEAR node including a mainnet rehearsal, end to end on testnet |
 
+Testnet is run as a testnet: the audit is a self-audit, the contract accounts keep full-access keys so the team can redeploy, finding M-4 is bounded on chain rather than closed, and the relayer's abuse budgets live in memory.
+Each of these changes before mainnet, in the order in [ROADMAP.md](ROADMAP.md).
+
 ```bash
 pnpm security
 ```
@@ -409,8 +415,8 @@ pnpm dev
 | --- | --- |
 | `pnpm test` | Every package's tests |
 | `pnpm typecheck` · `pnpm lint` | Types and lint across the workspace |
-| `pnpm build:contracts` · `pnpm test:contracts` | Build and test the contracts |
-| `cd contracts && cargo test -p tredio-sandbox-tests` | The sandbox flows on a local NEAR node |
+| `pnpm build:contracts`, then `pnpm test:contracts` | Build the contracts, then run their unit tests and sandbox flows; the flows load the built wasm from `target/near`, so build first |
+| `cd contracts && cargo test -p tredio-sandbox-tests` | The sandbox flows alone on a local NEAR node (after `pnpm build:contracts`) |
 | `pnpm security` | NEAR rules, Clippy security lints, cargo deny and cargo audit |
 
 The backend, indexer, Autopilot and MCP database tests need `TEST_DATABASE_URL`, a Postgres database they may truncate; without it they skip with a notice.
@@ -450,6 +456,14 @@ TEST_DATABASE_URL=postgres://postgres:tredio@localhost:5433/tredio_test pnpm tes
 | [`llms.txt`](llms.txt) | This repository mapped for language models: where each claim lives and how to check it |
 | [`tredio.bid/llms.txt`](landing-page/public/llms.txt) | The product for language models, and the x402 endpoints in the API |
 | [`.mcp.json`](.mcp.json) | Registers the MCP server, read-only against the hosted API, for an agent working in a checkout |
+
+<br>
+
+## Prior work
+
+The first commit carries the app's front end, its design and part of the backend from a personal project of the author's.
+Everything on NEAR was built in the hackathon window: the eight contracts, the passkey accounts and their published code, the oracle and its enclave build, the relayer, keeper, market maker, top-up, indexer and Autopilot executor, the MCP server, the x402 routes, the Hyperliquid and NEAR Intents integrations, and the move of the app and the backend onto all of it.
+The diff from that first commit: [`c02978e...main`](https://github.com/EmadQureshiKhi/Tredio/compare/c02978ea3f9e6cde231e90222ac75136f784dcf2...main).
 
 <br>
 

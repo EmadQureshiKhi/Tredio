@@ -104,11 +104,11 @@ They are counted, then each risky kind is reviewed by hand.
 | Lint | Count | Review |
 | --- | --- | --- |
 | `panic` | 0 | |
-| `arithmetic_side_effects` | 240 | Overflow checks are on, so each one reverts the call instead of wrapping; amounts are `u128` with 6 or 18 decimals, far from the limit |
+| `arithmetic_side_effects` | 242 | Overflow checks are on, so each one reverts the call instead of wrapping; amounts are `u128` with 6 or 18 decimals, far from the limit |
 | `integer_division` | 64 | Where rounding moves value, the code rounds against the trader: the curve rounds fees up and coins out down with `mul_div_ceil` and `mul_div_floor` |
 | `as_conversions` | 93 | Widening casts and enum tags; the narrowing ones are the next row |
 | `cast_possible_truncation` | 15 | All 15 reviewed: each is clamped first (`clamp`, `min(MAX_TICK)`), bounded by a constant (a session count under `MAX_SESSIONS`), or a view's page index |
-| `indexing_slicing` | 15 | All bounded: a length checked on the line before, or a tick at most 999 indexing a 16-word bitmap (999 / 64 = 15) |
+| `indexing_slicing` | 16 | All bounded: a length checked on the line before, or a tick at most 999 indexing a 16-word bitmap (999 / 64 = 15) |
 | `unwrap_used` | 14 | Invariants the contract itself keeps (an order or level the book wrote, a storage entry after a registration check); a failure reverts the call |
 | `expect_used` | 2 | `mul_div` and `exp` overflow, which revert with a message |
 
@@ -187,6 +187,10 @@ Each finding got a failing test first, then the fix.
 - No independent audit firm has reviewed the contracts; the audit above is a self-audit.
 - The off-chain services (relayer, keeper, market maker, oracle runner, indexer, API, app) are outside the contract audit; their tests run in CI and `pnpm verify`.
 - The testnet contract accounts keep full-access keys so the team can redeploy; before mainnet they are removed or moved behind a timelocked multisig ([AUDIT.md](contracts/AUDIT.md), "Trust assumptions").
+- M-4 (trades price against an index whose next value can be known first) is bounded on chain by the clamp and the anchored band, not closed; the trading-design answer is part of the pre-mainnet review.
+- The relayer's sign-up and funding budgets (accounts and NEAR per hour) live in memory and reset on a restart; they move to Postgres before mainnet.
+
+The order these are taken in is in [ROADMAP.md](ROADMAP.md).
 
 ## Reporting a vulnerability
 

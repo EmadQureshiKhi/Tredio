@@ -25,14 +25,14 @@ pnpm typecheck
 pnpm lint
 pnpm verify        # read testnet and check the claims in JUDGES.md
 pnpm dev           # API, services and app against testnet
-pnpm test:contracts
+pnpm build:contracts && pnpm test:contracts   # the sandbox flows load the built wasm, so build first
 pnpm security      # NEAR rules, Clippy security lints, cargo deny and cargo audit
 pnpm coverage:contracts
 ```
 
 - Database tests (backend, Autopilot, indexer) need `TEST_DATABASE_URL`, a Postgres database they may truncate; without it `pnpm test` skips them with a notice (the backend refuses to skip under `CI`), and CI runs them on Postgres 16.
 - CI (`.github/workflows/ci.yml`): typecheck, lint and every package's tests; contracts fmt, clippy and unit tests; the enclave crate's clippy and tests (it is not rustfmt-formatted); the sandbox crates run only locally.
-- Contract sandbox flows: `cd contracts && cargo test -p tredio-sandbox-tests` (downloads a nearcore sandbox once); `--test mainnet` is the mainnet rehearsal, which imports Circle's USDC and Rhea from mainnet over RPC.
+- Contract sandbox flows: `pnpm build:contracts`, then `cd contracts && cargo test -p tredio-sandbox-tests` (loads the wasm from `target/near`; downloads a nearcore sandbox once); `--test mainnet` is the mainnet rehearsal, which imports Circle's USDC and Rhea from mainnet over RPC.
 - Release wasm: `pnpm build:contracts` (`cargo near build`, to `target/near`); `contracts/scripts/build.sh --reproducible [commit]` builds a commit in Docker to `target/near-reproducible/<commit>`, which is what mainnet deploys and NearBlocks verifies.
 - Live browser specs in `frontend/e2e` (`npx playwright test -c playwright.live.config.ts` against a running app) and `admin/e2e` run against testnet and spend testnet NEAR.
 
