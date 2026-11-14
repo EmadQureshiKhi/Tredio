@@ -1,4 +1,4 @@
-import type { Trend } from "@/lib/api";
+import type { Reading, SourceName, Trend } from "@/lib/api";
 import { compact } from "@/lib/format";
 
 /**
@@ -47,6 +47,25 @@ export function newestListing<T extends { identifier: string; status: string; cr
  * Hacker News counts are left out: GDELT's usually means it did not answer, and most topics never
  * reach Hacker News.
  */
+/** The index's cap in points: a trend past every answering source's saturation level reads exactly 100 until it fades. */
+export const INDEX_CAP = 100;
+
+/** What the cap means, for the badge's tooltip. */
+export const CAP_NOTE = "Past every source's saturation level: the index reads the cap until attention fades. Perps and the coin keep trading; no new Up/Down series opens here.";
+
+/** True when a trend reads the cap, so the chart is flat at the top and no new Up/Down series opens on it. */
+export const atCap = (index: number) => index >= INDEX_CAP;
+
+/**
+ * How old a reading may be before the oracle leaves it out of the blend (the enclave's `maxAgeSec`
+ * per source, apps/oracle/tee/src/method.rs). The app marks such readings as stale.
+ */
+export const SOURCE_MAX_AGE_SEC: Record<SourceName, number> = { elfa: 43_200, bluesky: 7_200, gdelt: 7_200, wikipedia: 172_800, hn: 10_800, nansen: 43_200 };
+
+/** True when a reading is past its source's window, so the oracle no longer counts it. */
+export const staleReading = (source: SourceName, reading: Pick<Reading, "observedAt"> | null, nowSec: number) =>
+  reading !== null && nowSec - reading.observedAt > SOURCE_MAX_AGE_SEC[source];
+
 export function attentionStory(t: Trend): string[] {
   const out: string[] = [];
   const { elfa, bluesky, gdelt, wikipedia, nansen, hn } = t.readings;

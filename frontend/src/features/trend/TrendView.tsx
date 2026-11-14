@@ -1,6 +1,6 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, ChevronLeft, Radar, RotateCcw, ShieldCheck, Snowflake, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowRight, ChevronLeft, Gauge, Radar, RotateCcw, ShieldCheck, Snowflake, TrendingDown, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Avatar } from "@/components/shell/AppShell";
@@ -14,7 +14,7 @@ import { DEPLOYMENT, explorerAddress } from "@/lib/config";
 import { ago, assetClassLabel, usdc, compact, countdown, integer, points, shortAddress } from "@/lib/format";
 import { useTrend, useTrends } from "@/lib/hooks/queries";
 import { useSheets } from "@/lib/sheets";
-import { baseIdentifier, listingNumber, trendName } from "@/lib/trends";
+import { atCap, baseIdentifier, CAP_NOTE, listingNumber, SOURCE_MAX_AGE_SEC, staleReading, trendName } from "@/lib/trends";
 import { AlertButton } from "@/features/alerts/AlertSheet";
 import { ReviewChip } from "./ReviewChip";
 import { useRegistryIndex, useSeries } from "./data";
@@ -136,6 +136,11 @@ function Header({ trend, history }: { trend: Trend; history: TrendDetail["index"
               <Badge tone="down">Retired</Badge>
             ) : null}
             {trend.ticker ? <Badge tone="primary">{trend.ticker}</Badge> : null}
+            {!retired && atCap(index) ? (
+              <Badge tone="accent" icon={<Gauge className="size-3" aria-hidden />} className="cursor-help" title={CAP_NOTE} testId="at-cap">
+                At the cap
+              </Badge>
+            ) : null}
             {trend.reviewHash ? <ReviewChip hash={trend.reviewHash} /> : null}
             <span className="font-mono text-[12px] text-text-3">{baseIdentifier(trend.identifier)}</span>
             {listing > 1 ? <span className="text-[12px] text-text-3">· Listing {listing}</span> : null}
@@ -257,6 +262,9 @@ const SOURCES: Record<SourceName, { label: string; unit: string; note: string }>
   hn: { label: "Hacker News", unit: "mentions", note: "24h stories and comments" },
 };
 
+/** "2h" or "2d", for a source's freshness window. */
+const window = (sec: number) => (sec >= 86_400 ? `${Math.round(sec / 86_400)}d` : `${Math.round(sec / 3_600)}h`);
+
 /** The backend is rotating this trend out for a fresher one: no new rounds, and open ones settle when it retires. */
 function RotatingOut({ retiresAt }: { retiresAt: number | null }) {
   const now = useNow(30_000);
@@ -298,6 +306,7 @@ function Relisted({ identifier }: { identifier: string }) {
 
 function SourcesCard({ detail, relisted }: { detail: TrendDetail; relisted: string | null }) {
   const { trend, history } = detail;
+  const nowSec = Math.floor(useNow(60_000) / 1000);
   const crypto = trend.assetClass === "crypto";
   const order: SourceName[] = crypto ? ["elfa", "bluesky", "nansen", "wikipedia", "gdelt", "hn"] : ["elfa", "bluesky", "wikipedia", "gdelt", "hn"];
   // A news count of zero usually means GDELT did not answer, and most topics never reach Hacker
@@ -339,11 +348,21 @@ function SourcesCard({ detail, relisted }: { detail: TrendDetail; relisted: stri
             const r = trend.readings[s];
             const spark = history.filter((h) => h.source === s).map((h) => h.value);
             const value = r === null ? "-" : s === "nansen" ? `${r.value >= 0 ? "+" : "-"}$${compact(Math.abs(r.value))}` : compact(r.value);
+            const stale = staleReading(s, r, nowSec);
             return (
-              <li key={s} className="flex items-center gap-4 py-3.5">
+              <li key={s} className={cn("flex items-center gap-4 py-3.5", stale && "opacity-70")} data-stale={stale ? "true" : undefined}>
                 <div className="min-w-0 flex-1">
-                  <p className="font-strong text-[14px] text-text">{SOURCES[s].label}</p>
-                  <p className="mt-0.5 truncate text-[12.5px] text-text-3">{r ? `${SOURCES[s].note}, ${ago(r.observedAt)}` : "Not measured yet"}</p>
+                  <p className="flex items-center gap-1.5 font-strong text-[14px] text-text">
+                    {SOURCES[s].label}
+                    {stale ? (
+                      <Badge tone="warn" className="h-5 px-2 text-[10.5px]" testId="source-stale">
+                        Stale
+                      </Badge>
+                    ) : null}
+                  </p>
+                  <p className="mt-0.5 truncate text-[12.5px] text-text-3">
+                    {r ? (stale ? `${SOURCES[s].note}, ${ago(r.observedAt)}: past its ${window(SOURCE_MAX_AGE_SEC[s])} window, left out of the blend` : `${SOURCES[s].note}, ${ago(r.observedAt)}`) : "Not measured yet"}
+                  </p>
                 </div>
                 <Sparkline values={spark} width={72} height={28} className="hidden shrink-0 sm:block" />
                 <div className="w-[92px] shrink-0 text-right">

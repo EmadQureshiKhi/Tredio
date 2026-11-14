@@ -11,9 +11,24 @@ const tones: Record<BadgeTone, string> = {
   warn: "bg-warn-soft text-warn border-transparent",
 };
 
-export function Badge({ tone = "neutral", children, className, icon }: { tone?: BadgeTone; children: ReactNode; className?: string; icon?: ReactNode }) {
+export function Badge({
+  tone = "neutral",
+  children,
+  className,
+  icon,
+  title,
+  testId,
+}: {
+  tone?: BadgeTone;
+  children: ReactNode;
+  className?: string;
+  icon?: ReactNode;
+  /** A plain tooltip for a badge that needs a sentence of explanation. */
+  title?: string;
+  testId?: string;
+}) {
   return (
-    <span className={cn("inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 font-strong text-[11.5px] tracking-[0.01em]", tones[tone], className)}>
+    <span className={cn("inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 font-strong text-[11.5px] tracking-[0.01em]", tones[tone], className)} title={title} data-testid={testId}>
       {icon}
       {children}
     </span>

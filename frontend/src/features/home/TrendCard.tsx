@@ -1,6 +1,6 @@
 "use client";
 import { useQueryClient } from "@tanstack/react-query";
-import { Snowflake } from "lucide-react";
+import { Gauge, Snowflake } from "lucide-react";
 import Link from "next/link";
 // A namespace read, since only Next's bundled React (canary) exports it; plain React would fail to import it.
 import * as React from "react";
@@ -8,7 +8,7 @@ import { FORWARD } from "@/components/shell/PageTransition";
 import { Badge, cn, Delta, Num, Sparkline } from "@/components/ui";
 import { type Trend, trends } from "@/lib/api";
 import { assetClassLabel } from "@/lib/format";
-import { attentionStory, trendName } from "@/lib/trends";
+import { atCap, attentionStory, CAP_NOTE, trendName } from "@/lib/trends";
 
 const { ViewTransition } = React;
 
@@ -59,6 +59,11 @@ export function TrendCard({ trend: t, tradable, className, morph = true }: { tre
               </Badge>
             ) : null}
             {tradable ? <Badge tone="primary">Hyperliquid</Badge> : null}
+            {atCap(t.index) && t.status === "active" ? (
+              <Badge tone="accent" icon={<Gauge className="size-3" aria-hidden />} className="cursor-help" title={CAP_NOTE} testId="at-cap">
+                At the cap
+              </Badge>
+            ) : null}
           </div>
           <Morph name={morphName("title", t)} on={morph}>
             <h3 className="mt-2.5 line-clamp-2 w-fit font-strong text-[16px] leading-6 text-text">{name}</h3>
