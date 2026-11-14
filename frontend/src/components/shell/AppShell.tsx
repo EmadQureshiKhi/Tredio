@@ -11,6 +11,7 @@ import { useUsdcBalance, useSystemStatus, useTrends } from "@/lib/hooks/queries"
 import { useTheme } from "@/lib/theme";
 import { matchParts } from "@/lib/highlight";
 import { useSheets } from "@/lib/sheets";
+import { outlayerStall } from "@/features/status/data";
 import { WaitlistCard } from "@/features/waitlist/Waitlist";
 import { baseIdentifier, trendName } from "@/lib/trends";
 import ConnectionBanner from "./ConnectionBanner";
@@ -71,7 +72,7 @@ function Sidebar({ pathname }: { pathname: string }) {
         <div className="flex items-center justify-between px-1">
           <Link href="/status" className="flex items-center gap-2 text-[12.5px] text-text-3 transition-colors hover:text-text-2">
             <span className={cn("live-dot size-2 rounded-full", status.data?.ok ? "bg-up" : status.isLoading ? "bg-text-3" : "bg-warn")} aria-hidden />
-            {status.data?.ok ? "All systems live" : status.isLoading ? "Checking" : "Status"}
+            {status.data?.ok ? "All systems live" : status.isLoading ? "Checking" : status.data && outlayerStall(status.data) ? "Waiting on OutLayer" : "Status"}
           </Link>
           <div className="flex items-center gap-0.5">
             <Link href="/settings" className="rounded-lg p-1.5 text-text-3 transition-colors hover:bg-surface-2 hover:text-text" aria-label="Settings" title="Settings">
@@ -161,7 +162,7 @@ function MobileStatus() {
   return (
     <Link href="/status" className="flex h-7 items-center gap-1.5 rounded-full border border-line px-2.5 text-[11.5px] text-text-3 lg:hidden" aria-label={ok ? "All systems live" : "System status"}>
       <span className={cn("size-1.5 rounded-full", ok ? "live-dot bg-up" : status.isLoading ? "bg-text-3" : "bg-warn")} aria-hidden />
-      {ok ? "Live" : status.isLoading ? "..." : "Status"}
+      {ok ? "Live" : status.isLoading ? "..." : status.data && outlayerStall(status.data) ? "OutLayer" : "Status"}
     </Link>
   );
 }

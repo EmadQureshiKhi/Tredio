@@ -24,6 +24,24 @@ export function useStatusPage() {
   return useQuery({ queryKey: ["status-page"], queryFn: ({ signal }) => fetchStatus(signal), refetchInterval: 10_000, refetchIntervalInBackground: false, retry: 1 });
 }
 
+/**
+ * An upstream stall: OutLayer, the enclave host, is not running the oracle's requests (no worker
+ * answers inside NEAR's yield window). Read from the oracle's own issue text, "enclave runs failing
+ * on OutLayer (3 in a row, each after its retries; last good run 2026-11-14 15:41 UTC)".
+ */
+export function outlayerStall(s: Pick<SystemStatus, "services">): { inARow: number | null; lastGoodAt: number | null } | null {
+  const issue = s.services.find((x) => x.name === "oracle")?.issue ?? "";
+  if (!/outlayer/i.test(issue)) return null;
+  const inARow = Number(/(\d+) in a row/.exec(issue)?.[1] ?? Number.NaN);
+  const when = /last good run (\d{4}-\d{2}-\d{2} \d{2}:\d{2}) UTC/.exec(issue)?.[1];
+  const lastGoodAt = when ? Date.parse(`${when.replace(" ", "T")}:00Z`) / 1000 : null;
+  return { inARow: Number.isFinite(inARow) ? inARow : null, lastGoodAt: Number.isFinite(lastGoodAt as number) ? lastGoodAt : null };
+}
+
+/** What a stall means for a reader of the app: not Tredio's to fix, and nothing at risk. */
+export const STALL_NOTE =
+  "OutLayer, the enclave host that runs the oracle, is not picking up its runs right now. That is upstream of Tredio: the index on chain keeps its last signed value, trading continues, and nothing on Tredio's side needs fixing. Stalls usually clear within minutes; a trend pauses only after six hours without a report.";
+
 export interface ServiceInfo {
   label: string;
   body: string;

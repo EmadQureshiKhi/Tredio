@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Boxes, FileCode2, Fuel, Radio } from "lucide-react";
+import { Activity, Boxes, CloudOff, FileCode2, Fuel, Radio } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge, Card, cn, ErrorNote, ExplorerLink, RefreshIcon, Skeleton } from "@/components/ui";
 import { explorerAddress } from "@/lib/config";
@@ -7,7 +7,7 @@ import type { SystemStatus } from "@/lib/api";
 import { integer, shortAddress } from "@/lib/format";
 import { useTrends } from "@/lib/hooks/queries";
 import { useNow } from "@/features/portfolio/parts";
-import { CONTRACT_LABELS, serviceInfo, useStatusPage } from "./data";
+import { CONTRACT_LABELS, outlayerStall, serviceInfo, STALL_NOTE, useStatusPage } from "./data";
 
 // #mainnet: this file branches on the network (testnet or mainnet); MAINNET.md lists what changes.
 
@@ -89,19 +89,24 @@ function Overall({ s, since, stale }: { s: SystemStatus; since: number; stale: b
   const count = silent.length + troubled.length;
   const problems = [silent.length ? `not answering: ${silent.join(", ")}` : null, troubled.length ? `reporting a problem: ${troubled.join(", ")}` : null].filter(Boolean).join("; ");
   const lastRun = s.oracle.lastRunAgeSec === null ? null : s.oracle.lastRunAgeSec + since;
+  // The one upstream case gets its own words: an OutLayer stall is not a Tredio service down.
+  const stall = outlayerStall(s);
+  const onlyStall = stall !== null && count === 1 && troubled.length === 1;
   return (
-    <section aria-label="Overall status" className="relative overflow-hidden rounded-[24px] border border-line bg-surface px-5 py-6 sm:px-8 sm:py-7" data-testid="status-overall" data-ok={s.ok}>
+    <section aria-label="Overall status" className="relative overflow-hidden rounded-[24px] border border-line bg-surface px-5 py-6 sm:px-8 sm:py-7" data-testid="status-overall" data-ok={s.ok} data-stall={stall ? "true" : undefined}>
       <div aria-hidden className={cn("pointer-events-none absolute -right-24 -top-28 size-72 rounded-full blur-3xl", s.ok ? "bg-up-soft" : "bg-warn-soft")} />
       <div className="relative flex items-center gap-3">
         <span className={cn("flex size-10 items-center justify-center rounded-full", s.ok ? "bg-up-soft text-up" : "bg-warn-soft text-warn")}>
           <Activity className="size-5" aria-hidden />
         </span>
-        <p className="font-display text-[28px] leading-tight text-text sm:text-[34px]">{s.ok ? "All systems live" : "Some systems need attention"}</p>
+        <p className="font-display text-[28px] leading-tight text-text sm:text-[34px]">{s.ok ? "All systems live" : onlyStall ? "Waiting on OutLayer" : "Some systems need attention"}</p>
       </div>
       <p className="relative mt-3 max-w-2xl text-[14px] leading-[22px] text-text-2">
         {s.ok
           ? `Every service answered and the oracle measured attention ${lastRun === null ? "recently" : `${age(lastRun)} ago`}.`
-          : `${count === 1 ? "One part is" : `${count} parts are`} ${problems}. Positions and funds stay safe; actions that need ${count === 1 ? "it" : "them"} wait until ${count === 1 ? "it is" : "they are"} back.`}
+          : onlyStall
+            ? `${STALL_NOTE} The last report landed ${lastRun === null ? "a while" : age(lastRun)} ago${stall.inARow ? `; ${stall.inARow} runs in a row have gone unanswered since` : ""}.`
+            : `${count === 1 ? "One part is" : `${count} parts are`} ${problems}. Positions and funds stay safe; actions that need ${count === 1 ? "it" : "them"} wait until ${count === 1 ? "it is" : "they are"} back.`}
       </p>
       {stale ? <p className="relative mt-2 text-[12.5px] text-warn">The last check failed; showing the previous result.</p> : null}
     </section>
@@ -123,6 +128,7 @@ function OracleCard({ s, since }: { s: SystemStatus; since: number }) {
   const trends = useTrends();
   const lastRun = s.oracle.lastRunAgeSec === null ? null : s.oracle.lastRunAgeSec + since;
   const live = trends.data?.trends.length;
+  const stall = outlayerStall(s);
   return (
     <Card className="flex flex-col gap-4 p-5 sm:p-6" data-testid="status-oracle">
       <div className="flex items-start justify-between gap-3">
@@ -138,6 +144,14 @@ function OracleCard({ s, since }: { s: SystemStatus; since: number }) {
           {lastRun === null ? "Never" : `${age(lastRun)} ago`}
         </p>
       </div>
+      {stall ? (
+        <div className="flex items-start gap-3 rounded-xl bg-warn-soft px-3.5 py-3 text-[13px] leading-5 text-text" data-testid="outlayer-stall">
+          <CloudOff className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
+          <p>
+            <span className="font-strong">Waiting on OutLayer.</span> <span className="text-text-2">{STALL_NOTE}</span>
+          </p>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-2 border-t border-line pt-4">
         <Fact label="Live trends" value={live === undefined ? "..." : integer(live)} testId="live-trends" />
         <Fact label="Trends behind on measurements" value={integer(s.oracle.staleTrends)} tone={s.oracle.staleTrends > 0 ? "warn" : undefined} testId="stale-trends" />
