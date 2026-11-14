@@ -6,6 +6,7 @@
  *   bun scripts/hyperliquid-demo.ts status           balances, positions and recent fills
  *   bun scripts/hyperliquid-demo.ts renew-bot        renews the bot's Autopilot session for 30 days (the executor trades the bot through it)
  *   bun scripts/hyperliquid-demo.ts fund             the bot moves spot USDC to perps and sends each chosen trader some
+ *   bun scripts/hyperliquid-demo.ts send 0x... 25     the bot sends USDC to any Hyperliquid address (a fresh account's)
  *   bun scripts/hyperliquid-demo.ts grant            each chosen trader grants Autopilot a Hyperliquid-only session
  *   bun scripts/hyperliquid-demo.ts rules            Autopilot rules for the bot (admin API) and the rule traders
  *   bun scripts/hyperliquid-demo.ts follow           the copy traders follow the Tredio bot
@@ -240,6 +241,13 @@ if (step === "renew-bot") {
     }
     await spotToPerps(t);
   }
+} else if (step === "send") {
+  // The bot sends USDC from its perps balance to any Hyperliquid address (a fresh demo account's, say).
+  const [address = "", amount = "25"] = process.argv.slice(3);
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address)) throw new Error("usage: send <0x address> [usdc]");
+  const value = BigInt(Math.round(Number(amount) * 1e6));
+  log("bot usdSend", Number(value) / 1e6, "to", address, await userSigned(bot, usdSendAction("testnet", address, value)));
+  log("receiver", await balances(address));
 } else if (step === "grant") {
   const { publicKey: executorKey } = await api<{ publicKey: string }>("GET", "/v1/autopilot/grant/seal-key");
   for (const t of traders()) {
