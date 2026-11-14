@@ -164,6 +164,8 @@ The `registry` contract accepts a report only with the signature of the one orac
 
 - **Status on testnet:** Since 2026-11-10 the registry trusts only an enclave build's key (one public `set_oracle` transaction per build), so every index value on chain was computed and signed in the enclave, once a minute, with an attested TDX quote per run. `pnpm verify` prints the key in use and checks a recorded run end to end.
 - **In the app:** Every trend page shows its index history; the status page shows the oracle's last run.
+- **Why some trends read 100:** each source is normalized on a log scale up to a saturation level `K` (5,000 Elfa mentions, 1,000 Bluesky posts, 3,000 GDELT articles or 150,000 Wikipedia views a day), so a topic past every answering source's `K` reads exactly 100 until it fades.
+  Above `K` the index has no resolution by design, no Up/Down series opens on a trend at the cap (Up could not win), and raising `K` means a new enclave build ([`apps/oracle/docs/index-method.md`](apps/oracle/docs/index-method.md)).
 - **Code:** [`apps/oracle/tee`](apps/oracle/tee), [`contracts/registry/src/oracle.rs`](contracts/registry/src/oracle.rs), method and trust model in [`apps/oracle/docs`](apps/oracle/docs)
 
 <br>
@@ -408,6 +410,14 @@ pnpm dev
 | `pnpm build:contracts` · `pnpm test:contracts` | Build and test the contracts |
 | `cd contracts && cargo test -p tredio-sandbox-tests` | The sandbox flows on a local NEAR node |
 | `pnpm security` | NEAR rules, Clippy security lints, cargo deny and cargo audit |
+
+The backend, indexer, Autopilot and MCP database tests need `TEST_DATABASE_URL`, a Postgres database they may truncate; without it they skip with a notice.
+A throwaway one with Docker:
+
+```bash
+docker run -d --name tredio-test-db -e POSTGRES_PASSWORD=tredio -e POSTGRES_DB=tredio_test -p 5433:5432 postgres:16
+TEST_DATABASE_URL=postgres://postgres:tredio@localhost:5433/tredio_test pnpm test
+```
 
 <br>
 

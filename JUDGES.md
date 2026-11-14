@@ -20,6 +20,7 @@ A fresh clone needs no secrets to check the claims:
 - `pnpm install && pnpm verify --chain-only` reads NEAR testnet (and the API, for the checks that need it: https://api.tredio.bid or `TREDIO_API_URL`, skipped when none answers) and checks every claim below; it sends nothing and needs no key.
   "Deployed code is this source" also needs the builds: add `--rebuild` to make the reproducible ones with Docker (a few minutes per contract).
 - `pnpm verify` then runs every package's test suite too; database tests skip without `TEST_DATABASE_URL`, and the run says so.
+  To run those too, start a throwaway Postgres and point the tests at it: `docker run -d --name tredio-test-db -e POSTGRES_PASSWORD=tredio -e POSTGRES_DB=tredio_test -p 5433:5432 postgres:16`, then `TEST_DATABASE_URL=postgres://postgres:tredio@localhost:5433/tredio_test pnpm test`.
 - `pnpm test`, `pnpm typecheck` and `pnpm lint` need nothing else; `cd contracts && cargo test --workspace` runs the unit tests and the sandbox flows on a local NEAR node.
 - Running the services yourself needs their own keys (service accounts, the oracle's report key, data-source API keys), so for the app use the hosted one.
 
@@ -66,6 +67,7 @@ A fresh clone needs no secrets to check the claims:
 - **DeFi:** an on-chain order book for Up/Down outcomes, attention perps, Hyperliquid perps through Chain Signatures, deposits through 1Click.
 - **Memecoins:** one trend coin per trend on a bonding curve whose floor ratchets with peak attention, graduating into Rhea.
 - **Social money:** public calls with a hit-rate leaderboard, copy-trading, paid private signals committed on chain, a curation fee share for the account that surfaced a trend.
+  In the track's terms: reputation is a hit rate earned by calls settled against the on-chain index, access to a caller's signals is bought with USDC on NEAR and gated by that record, and the curation share is a programmable reward paid by the `curation` contract to whoever surfaced the trend.
 - **Agent economy:** an MCP server, an agent skill, x402 endpoints paid in USDC on NEAR, and Autopilot trading through a revocable on-chain grant, optionally signed by an OutLayer policy wallet the account controls and can freeze.
 
 ## Scope
