@@ -461,8 +461,9 @@ TEST_DATABASE_URL=postgres://postgres:tredio@localhost:5433/tredio_test pnpm tes
 
 ## Prior work
 
-The first commit carries the app's front end, its design and part of the backend from a personal project of the author's.
-Everything on NEAR was built in the hackathon window: the eight contracts, the passkey accounts and their published code, the oracle and its enclave build, the relayer, keeper, market maker, top-up, indexer and Autopilot executor, the MCP server, the x402 routes, the Hyperliquid and NEAR Intents integrations, and the move of the app and the backend onto all of it.
+The first commit carries the app's front end, its design and part of the backend from a personal project of mine.
+Everything on NEAR was built in the hackathon window: the eight contracts, the passkey accounts and their published code, the oracle and its enclave build, the relayer, keeper, market maker, top-up, indexer and Autopilot executor, the MCP server, the x402 routes, and the Hyperliquid and NEAR Intents integrations, with the app and the backend wired to them.
+The web app and the platform around it were also polished throughout the window: screens, flows, copy, tests and docs.
 The diff from that first commit: [`c02978e...main`](https://github.com/EmadQureshiKhi/Tredio/compare/c02978ea3f9e6cde231e90222ac75136f784dcf2...main).
 
 <br>
