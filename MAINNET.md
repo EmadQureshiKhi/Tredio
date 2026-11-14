@@ -23,7 +23,7 @@ The contracts are the exception: they hold no network in code but take it as dat
 | Rhea (coin graduation) | `ref-finance-101.testnet` | `v2.ref-finance.near` |
 | Chain Signatures | `v1.signer-prod.testnet` | `v1.signer` |
 | OutLayer (oracle enclave) | `outlayer.testnet` | `outlayer.near` (same `request_execution` method, checked) |
-| Enclave build | `apps/oracle/tee/build.sh` | `NEAR_NETWORK=mainnet apps/oracle/tee/build.sh`: mainnet RPC, registry and Hyperliquid compiled in, so a new hash and a new enclave key |
+| Enclave build | `apps/oracle/tee/build.sh` | `NEAR_NETWORK=mainnet apps/oracle/tee/build.sh`: mainnet RPC, registry and Hyperliquid compiled in, so a new hash and a new enclave key; the saturation levels in `apps/oracle/tee/src/method.rs` are recalibrated from testnet's readings so the biggest topics keep moving instead of resting at 100 |
 | Outcome series | 24 hours, 7 days and a 15-minute test window | 24 hours and 7 days (`test_window` 0) |
 | Accounts | factory network `testnet` | factory network `mainnet`: requests name the network, the faucet action is refused, Hyperliquid orders sign with source `a` |
 | Sign-ups | the relayer pays without a ticket if none is configured | the relayer requires an activation ticket, and the API refuses to start without `ACTIVATION_TICKET_KEY` |

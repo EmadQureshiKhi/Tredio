@@ -164,8 +164,9 @@ The `registry` contract accepts a report only with the signature of the one orac
 
 - **Status on testnet:** Since 2026-11-10 the registry trusts only an enclave build's key (one public `set_oracle` transaction per build), so every index value on chain was computed and signed in the enclave, once a minute, with an attested TDX quote per run. `pnpm verify` prints the key in use and checks a recorded run end to end.
 - **In the app:** Every trend page shows its index history; the status page shows the oracle's last run.
-- **Why some trends read 100:** each source is normalized on a log scale up to a saturation level `K` (5,000 Elfa mentions, 1,000 Bluesky posts, 3,000 GDELT articles or 150,000 Wikipedia views a day), so a topic past every answering source's `K` reads exactly 100 until it fades.
-  Above `K` the index has no resolution by design, no Up/Down series opens on a trend at the cap (Up could not win), and raising `K` means a new enclave build ([`apps/oracle/docs/index-method.md`](apps/oracle/docs/index-method.md)).
+- **The cap is a guard:** each source is normalized on a log scale up to a saturation level `K` (5,000 Elfa mentions, 1,000 Bluesky posts, 3,000 GDELT articles or 150,000 Wikipedia views a day), so a topic past every answering source's `K` reads exactly 100 until it fades.
+  The markets know it: the keeper opens no Up/Down series on a capped trend (Up could not win) and the market maker quotes none there, while perps and the coin keep trading the climb and the fade.
+  Testnet's levels are tuned for mid-size topics; the mainnet enclave build (a new hash in any case, [MAINNET.md](MAINNET.md)) recalibrates them from testnet's readings so the biggest topics keep moving on the way up ([`apps/oracle/docs/index-method.md`](apps/oracle/docs/index-method.md)).
 - **Code:** [`apps/oracle/tee`](apps/oracle/tee), [`contracts/registry/src/oracle.rs`](contracts/registry/src/oracle.rs), method and trust model in [`apps/oracle/docs`](apps/oracle/docs)
 
 <br>
@@ -347,6 +348,7 @@ A mainnet rehearsal runs the whole plan on a local NEAR sandbox against the code
 cd contracts && cargo test -p tredio-sandbox-tests --test mainnet
 ```
 
+The mainnet enclave build also recalibrates the index's saturation levels from testnet's readings, so the biggest topics keep moving instead of resting at 100 (see "The cap is a guard" above).
 What changes on mainnet, the steps and the budget are in [MAINNET.md](MAINNET.md).
 
 <br>
